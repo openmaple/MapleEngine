@@ -21,21 +21,27 @@
             libssl-dev openjdk-8-jdk-headless unzip python-minimal python3
 
 ## Setup Maple environment
+```
   cd maple_engine
   source ./envsetup.sh
+```
 
 ## Build Maple compiler and engine
+```
   ./maple_build/tools/build-maple.sh
-
+```
 ## Build Java core library
    Following the doc at ./maple_build/doc/build_OpenJDK8.md to build the customized OpenJDK8.
    Make sure the needed .jar files are copied into ./maple_build/jar/ directory.
 
+```
    ./maple_build/tools/build-libcore.sh
-
+```
 ## Build and run app
+```
   cd ./maple_build/examples/HelloWorld
   $MAPLE_BUILD_TOOLS/java2asm.sh HelloWorld.java
   $MAPLE_BUILD_TOOLS/asm2so.sh HelloWorld.s
 
   $MAPLE_BUILD_TOOLS/run-app.sh -classpath ./HelloWorld.so HelloWorld
+```
