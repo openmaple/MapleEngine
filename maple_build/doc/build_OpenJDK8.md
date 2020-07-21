@@ -25,12 +25,6 @@ Java Core libraries:
     jce.jar
     jsse.jar
 ```
-Shared libraries(Can use these three shared libraries from the openjdk-8-jdk-headless package also):
-```
-    libjava.so
-    libjvm.so
-    libverify.so
-```
 Please note that one of the components rt.jar is a customized version for Maple Engine. In order
 to generate the customized version of rt.jar file, modification to Object.java file of OpenJDK-8
 and building OpenJDK-8 from source are required.
@@ -153,23 +147,15 @@ diff -r 096dc407d310 make/BuildNashorn.gmk
 
 ## 4. Copy required OpenJDK components to Maple build directory
 
-Copy following built files from OpenJDK-8 build (under ~/my_opejdk8/build directory) to 
-directory maple_engine/maple_build/jar/:
+Copy following built .jar files from OpenJDK-8 build to directory maple_engine/maple_build/jar/:
 ```
-   rt.jar
-   jce.jar
-   jsse.jar
-   charsets.jar
-```
-
-Copy following built files from OpenJDK-8 build to directory maple_engine/maple_runtime/lib/x86_64/:
-```
-   libjava.so
-   libjvm.so
-   libverify.so
+   ./linux-x86_64-normal-server-release/images/lib/rt.jar
+   ./linux-x86_64-normal-server-release/images/lib/jce.jar
+   ./linux-x86_64-normal-server-release/images/lib/jsse.jar
+   ./linux-x86_64-normal-server-release/images/lib/charsets.jar
 ```
 
-## 4. Build libcore.so and run HelloWorld
+## 5. Build libcore.so and run HelloWorld
 
 Build Maple compiler&engine and libcore.so:
 ```
