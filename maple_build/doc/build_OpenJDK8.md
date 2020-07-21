@@ -37,7 +37,7 @@ and building OpenJDK-8 from source are required.
 
 The followings are instructions of how to build OpenJDK-8 components on OpenJDK-8 build machine,
 how to modify Object.java file or customize rt.jar, and where to copy required components built
-to the destinated libcore.so build directorie.
+to the designated libcore.so build directories.
 
 ## 1. Download OpenJDK- 8 Source
 
@@ -65,7 +65,11 @@ $ sudo apt-get update
 $ sudo apt-get install openjdk-7-jdk
 ```
 Note: Install all dependent software development packages required if they have not been already
-installed (such as hg).
+installed. You may install these packages with following commend:
+```
+$ sudo apt install mercurial build-essential cpio zip libx11-dev libxext-dev libxrender-dev \
+              libxtst-dev libxt-dev libcups2-dev libfreetype6-dev libasound2-dev
+```
 
 Download OpenJDK-8 source:
 ```
@@ -77,9 +81,8 @@ $ bash ./get_source.sh
 
 Add two extra fields in Object class by modifying Object.java file:
 
-Add the following fields in Object class of Object.java file as the first two fields of the class
-by editing the  ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java file by inserting the 
-following 2 lines right after the line `public class Object {`:
+Add reserved_1 and reserved_2 fields right after the line `public class Object {` in
+ ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java file as the first two fields of Object class:
 ```
 public class Object {
     long reserved_1; int reserved_2; // Add two extra fields here
@@ -92,13 +95,60 @@ Build OpenJDK-8 using the following commands:
 ```
 $ cd ~/my_opejdk8
 $ bash ./configure
-```
-
-Note: you may need to following the hints of the outputs of above commend to install missing
-dependent packages required for building OpenJDK-8.
-
-```
 $ export DISABLE_HOTSPOT_OS_VERSION_CHECK=ok; make all
+```
+Note 1: you may need to follow the hints of the error message of configure command to install any missing
+dependent packages required for building OpenJDK-8.
+Note 2: you may get error during configure with the following messages even libfreetype6-dev has been installed:
+```
+configure: error: Could not find freetype! You might be able to fix this by running 'sudo apt-get install libfreetype6-dev'.
+configure exiting with result code 1
+```
+If that happens, please use the following command instead of "bash ./configure":
+```
+$ bash ./configure --with-freetype-include=/usr/include/freetype2 --with-freetype-lib=/usr/lib/x86_64-linux-gnu
+```
+Note 3: If you see the following error messages during make:
+```
+Creating sa.make ...
+/usr/bin/make: invalid option -- '8'
+/usr/bin/make: invalid option -- '/'
+/usr/bin/make: invalid option -- 'a'
+/usr/bin/make: invalid option -- '/'
+/usr/bin/make: invalid option -- 'c'
+```
+Then you need to modify ~/my_opejdk8/hotspot/make/linux/makefiles/adjust-mflags.sh file with the following patch:
+```
+diff -r 87ee5ee27509 make/linux/makefiles/adjust-mflags.sh
+--- a/make/linux/makefiles/adjust-mflags.sh Tue Mar 04 11:51:03 2014 -0800
++++ b/make/linux/makefiles/adjust-mflags.sh Wed Sep 30 16:51:55 2015 -0700
+@@ -64,7 +64,6 @@
+    echo "$MFLAGS" \
+    | sed '
+        s/^-/ -/
+-       s/ -\([^    ][^     ]*\)j/ -\1 -j/
+        s/ -j[0-9][0-9]*/ -j/
+        s/ -j\([^   ]\)/ -j -\1/
+        s/ -j/ -j'${HOTSPOT_BUILD_JOBS:-${default_build_jobs}}'/
+```
+Note 4: You may having the following problem when doing make:
+```
+make[1]: *** [~/my_opejdk8/build/linux-x86_64-normal-server-release/nashorn/classes/_the.nasgen.run] Error 1
+BuildNashorn.gmk:75: recipe for target '~/my_opejdk8/build/linux-x86_64-normal-server-release/nashorn/classes/_the.nasgen.run' failed
+```
+Then you need modify make/BuildNashorn.gmk file by applying the following patch:
+```
+diff -r 096dc407d310 make/BuildNashorn.gmk
+--- a/make/BuildNashorn.gmk     Tue Mar 04 11:52:23 2014 -0800
++++ b/make/BuildNashorn.gmk     Mon Jul 20 22:33:16 2020 -0700
+@@ -77,7 +77,7 @@
+        $(RM) -rf $(@D)/jdk $(@D)/netscape
+        $(CP) -R -p $(NASHORN_OUTPUTDIR)/nashorn_classes/* $(@D)/
+        $(FIXPATH) $(JAVA) \
+-           -cp "$(NASHORN_OUTPUTDIR)/nasgen_classes$(PATH_SEP)$(NASHORN_OUTPUTDIR)/nashorn_classes" \
++           -Xbootclasspath/p:"$(NASHORN_OUTPUTDIR)/nasgen_classes$(PATH_SEP)$(NASHORN_OUTPUTDIR)/nashorn_classes" \
+            jdk.nashorn.internal.tools.nasgen.Main $(@D) jdk.nashorn.internal.objects $(@D)
+        $(TOUCH) $@
 ```
 
 ## 4. Copy required OpenJDK components to Maple build directory
@@ -112,7 +162,7 @@ directory maple_engine/maple_build/jar/:
    charsets.jar
 ```
 
-Copy following built files from OpenJDK-8 build to directory maple/engine/maple_runtime/lib/x86_64/:
+Copy following built files from OpenJDK-8 build to directory maple_engine/maple_runtime/lib/x86_64/:
 ```
    libjava.so
    libjvm.so
@@ -137,3 +187,4 @@ $ $MAPLE_BUILD_TOOLS/asm2so.sh HelloWorld.s
 $ $MAPLE_BUILD_TOOLS/run-app.sh -classpath ./HelloWorld.so HelloWorld
 
 ```
+
