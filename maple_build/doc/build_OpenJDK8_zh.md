@@ -34,15 +34,13 @@ Please note that one of the components rt.jar is a customized version for Maple 
 to generate the customized version of rt.jar file, modification to Object.java file of OpenJDK-8
 and building OpenJDK-8 from source are required.
 
-请注意其中一个组件 rt.jar 是方舟引擎定制版. 要生成方舟引擎定制版的 rt.jar 文件, 首先需要修改 OpenJDK-8 
-的 Object.java ，然后从源代码构建  OpenJDK-8 
+其中一个组件 rt.jar 是方舟引擎定制版. 要生成方舟引擎定制版的 rt.jar 文件, 需要修改 OpenJDK-8 的 Object.java ，然后从源代码构建OpenJDK-8 
 
 The followings are instructions of how to build OpenJDK-8 components on OpenJDK-8 build machine,
 how to modify Object.java file or customize rt.jar, and where to copy required components built
 to the designated libcore.so build directories.
 
-以下是构建 OpenJDK-8 组件的指南，包括如何修改 Object.java 或者 定制 rt.jar ，以及如何将已经构建好的组
-件复制到指定的 libcore.so 构建目录
+以下是构建 OpenJDK-8 组件的指南，包括如何修改 Object.java 或者 定制 rt.jar ，以及如何将已经构建好的组件复制到指定的 libcore.so 构建目录
 ## 1. Download OpenJDK- 8 Source
 ## 1. 下载 OpenJDK- 8源代码
 
@@ -52,7 +50,8 @@ In order to build OpenJDK-8 from source, OpenJDK 7 JRE or JDK is required. To in
 on Ubuntu 16.04 Linux, use the following command:
 
 搭建 OpenJDK-8 构建环境以及下载 OpenJDK-8 的源代码
-要从源代码构建OpenJDK-8，首先需要OpenJDK 7 JRE 或者 JDK。要在Ubuntu 16.04上 安装OpenJDK 7，需要使用以下命令：
+
+要从源代码构建OpenJDK-8，首先需要OpenJDK 7 JRE 或者 JDK。使用以下命令在Ubuntu 16.04上安装OpenJDK 7：
 ```
 $ sudo add-apt-repository ppa:openjdk-r/ppa
 More info: https://launchpad.net/~openjdk-r/+archive/ubuntu/ppa
@@ -73,15 +72,16 @@ $ sudo apt-get install openjdk-7-jdk
 ```
 Note: Install all dependent software development packages required if they have not been already
 installed. You may install these packages with following commend:
+
+注意：你可能需要使用以下命令来安装需要的依赖。
 ```
 $ sudo apt install mercurial build-essential cpio zip libx11-dev libxext-dev libxrender-dev \
               libxtst-dev libxt-dev libcups2-dev libfreetype6-dev libasound2-dev
 ```
-注意：安装依赖（例如hg）
 
 Download OpenJDK-8 source:
 
-下载OpenJDK-8源代码：
+下载OpenJDK-8源代码：（此处需要从java.net下载OpenJDK-8的源代码，国内可能会很慢甚至下载错误，建议壁外调查 :new_moon_with_face: ）
 ```
 $ hg clone http://hg.openjdk.java.net/jdk8/jdk8 ~/my_opejdk8
 $ cd ~/my_opejdk8
@@ -91,14 +91,16 @@ $ bash ./get_source.sh
 
 ## 2. 定制 Object 类
 Add two extra fields in Object class by modifying Object.java file:
-修改Object.java文件，在Object类添加两个额外字段:
+
+修改Object.java文件，在Object类添加两个额外变量:
 
 Add reserved_1 and reserved_2 fields right after the line `public class Object {` in
  ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java file as the first two fields of Object class:
-编辑 ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java 文件，在`public class Object {`行之后插入字段声明：
+
+编辑 ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java 文件，在`public class Object {`行之后插入变量声明：
 ```
 public class Object {
-    long reserved_1; int reserved_2; // Add two extra fields here
+    long reserved_1; int reserved_2; // Add two extra fields here  在这添加两个额外变量
     private static native void registerNatives();
 ```
 
@@ -115,7 +117,9 @@ $ export DISABLE_HOTSPOT_OS_VERSION_CHECK=ok; make all
 ```
 Note 1: you may need to follow the hints of the error message of configure command to install any missing
 dependent packages required for building OpenJDK-8.
-注意 1：您可能需要遵循上述输出的提示以安装 构建 OpenJDK-8 所需的缺失的依赖包。
+
+注意 1：您可能需要遵循上述输出的提示以安装构建 OpenJDK-8 所需的依赖。
+
 Note 2: you may get error during configure with the following messages even libfreetype6-dev has been installed:
 
 注意 2：你可能在 `bash ./configure` 时被提示：
@@ -182,7 +186,7 @@ diff -r 096dc407d310 make/BuildNashorn.gmk
 
 ## 4. Copy required OpenJDK components to Maple build directory
 
-## 4. 构建libcore.so并运行HelloWorld
+## 4. 复制需要的 OpenJdk 组件到 Maple 构建目录
 
 Copy following built .jar files from OpenJDK-8 build to directory maple_engine/maple_build/jar/:
 
@@ -200,7 +204,7 @@ Copy following built .jar files from OpenJDK-8 build to directory maple_engine/m
 
 Build Maple compiler&engine and libcore.so:
 
-构建方舟编译器、方舟引擎以及 libcore.so
+构建方舟编译器、方舟引擎以及 libcore.so:（构建libcore极占内存，请确保 物理内存+swap ≥ 24G，否则可能会显示“killed”编译失败）
 ```
 $ cd maple_engine
 $ source ./envsetup.sh
