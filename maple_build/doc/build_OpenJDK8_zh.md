@@ -115,17 +115,23 @@ $ export DISABLE_HOTSPOT_OS_VERSION_CHECK=ok; make all
 ```
 Note 1: you may need to follow the hints of the error message of configure command to install any missing
 dependent packages required for building OpenJDK-8.
-注意：您可能需要遵循上述输出的提示以安装 构建 OpenJDK-8 所需的缺失的依赖包。
+注意 1：您可能需要遵循上述输出的提示以安装 构建 OpenJDK-8 所需的缺失的依赖包。
 Note 2: you may get error during configure with the following messages even libfreetype6-dev has been installed:
+
+注意 2：你可能在 `bash ./configure` 时被提示：
 ```
 configure: error: Could not find freetype! You might be able to fix this by running 'sudo apt-get install libfreetype6-dev'.
 configure exiting with result code 1
 ```
 If that happens, please use the following command instead of "bash ./configure":
+
+那么请使用以下命令代替"bash ./configure":
 ```
 $ bash ./configure --with-freetype-include=/usr/include/freetype2 --with-freetype-lib=/usr/lib/x86_64-linux-gnu
 ```
 Note 3: If you see the following error messages during make:
+
+注意 3：如果你在 make 时看到了以下错误提示：
 ```
 Creating sa.make ...
 /usr/bin/make: invalid option -- '8'
@@ -135,6 +141,8 @@ Creating sa.make ...
 /usr/bin/make: invalid option -- 'c'
 ```
 Then you need to modify ~/my_opejdk8/hotspot/make/linux/makefiles/adjust-mflags.sh file with the following patch:
+
+那么你需要按如下方法修改 ~/my_opejdk8/hotspot/make/linux/makefiles/adjust-mflags.sh ：（删除 ` s/ -\([^    ][^     ]*\)j/ -\1 -j/ `）
 ```
 diff -r 87ee5ee27509 make/linux/makefiles/adjust-mflags.sh
 --- a/make/linux/makefiles/adjust-mflags.sh Tue Mar 04 11:51:03 2014 -0800
@@ -149,11 +157,15 @@ diff -r 87ee5ee27509 make/linux/makefiles/adjust-mflags.sh
         s/ -j/ -j'${HOTSPOT_BUILD_JOBS:-${default_build_jobs}}'/
 ```
 Note 4: You may having the following problem when doing make:
+
+注意 4：当你 make 时可能发生以下问题：
 ```
 make[1]: *** [~/my_opejdk8/build/linux-x86_64-normal-server-release/nashorn/classes/_the.nasgen.run] Error 1
 BuildNashorn.gmk:75: recipe for target '~/my_opejdk8/build/linux-x86_64-normal-server-release/nashorn/classes/_the.nasgen.run' failed
 ```
 Then you need modify make/BuildNashorn.gmk file by applying the following patch:
+
+那么你需要按如下方法修改 make/BuildNashorn.gmk:（把` -cp `改成` -Xbootclasspath/p: `）
 ```
 diff -r 096dc407d310 make/BuildNashorn.gmk
 --- a/make/BuildNashorn.gmk     Tue Mar 04 11:52:23 2014 -0800
@@ -173,6 +185,9 @@ diff -r 096dc407d310 make/BuildNashorn.gmk
 ## 4. 构建libcore.so并运行HelloWorld
 
 Copy following built .jar files from OpenJDK-8 build to directory maple_engine/maple_build/jar/:
+
+从OpenJDK-8构建目录把如下的已经构建好的.jar文件复制到 maple_engine/maple_build/jar/ 目录：
+
 ```
    ./linux-x86_64-normal-server-release/images/lib/rt.jar
    ./linux-x86_64-normal-server-release/images/lib/jce.jar
@@ -181,6 +196,7 @@ Copy following built .jar files from OpenJDK-8 build to directory maple_engine/m
 ```
 
 ## 5. Build libcore.so and run HelloWorld
+## 5. 构建libcore.so 并运行HelloWorld
 
 Build Maple compiler&engine and libcore.so:
 
