@@ -19,7 +19,13 @@
 ![输入图片说明](https://images.gitee.com/uploads/images/2020/0721/050904_9b03f7b1_5583371.png "Maple-engine.PNG")
 
 ## Linux服务器环境设置
-  需要一台Linux 服务器，建议24GB 或更多内存，安装Ubuntu 16.04或18.04系统.
+  需要一台Linux 服务器，至少16GB或以上内存，安装Ubuntu 16.04或18.04系统.
+  若您的服务器只有16GB内存，需要创建8GB或以上的swap空间。
+
+  编译和链接 OpenJDK 核心库时，会占用很多内存。对于少于16GB内存的服务器，可以考虑
+在其它内存较多的服务器上先构建好libcore.so, 将maple_engine/maple_build/out/这个
+目录打包传到您的本地机器，展开后放到本地机器 同名目录下，再拷贝其中的文件 libcore.so
+到maple_engine/maple_runtime/lib/x86_64/libcore.so，就可以本地编译和运行应用程序了。
 
   登录服务器后，执行如下命令安装所需的软件包：
 
@@ -65,7 +71,8 @@
 ---
 
 ## Build envionment setup
-  Needs a Linux server with at least 24GB RAM and Ubuntu 16.04/18.04 installed.
+  Needs a Linux server with 16GB or more RAM and Ubuntu 16.04/18.04 installed.
+  If your server has 16GB RAM, please setup 8GB or more swap space.
 
   Execute the following command to install the packages used by the Maple build.
 
