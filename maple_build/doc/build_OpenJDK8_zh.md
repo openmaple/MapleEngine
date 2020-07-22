@@ -81,7 +81,7 @@ $ sudo apt install mercurial build-essential cpio zip libx11-dev libxext-dev lib
 
 Download OpenJDK-8 source:
 
-下载OpenJDK-8源代码：（此处需要从java.net下载OpenJDK-8的源代码，国内可能会很慢甚至下载错误，建议壁外调查 :new_moon_with_face: ）
+下载OpenJDK-8源代码：
 ```
 $ hg clone http://hg.openjdk.java.net/jdk8/jdk8 ~/my_opejdk8
 $ cd ~/my_opejdk8
@@ -97,10 +97,10 @@ Add two extra fields in Object class by modifying Object.java file:
 Add reserved_1 and reserved_2 fields right after the line `public class Object {` in
  ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java file as the first two fields of Object class:
 
-编辑 ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java 文件，在`public class Object {`行之后插入变量声明：
+编辑 ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java 文件，在`public class Object {`行之后插入字段声明：
 ```
 public class Object {
-    long reserved_1; int reserved_2; // Add two extra fields here  在这添加两个额外变量
+    long reserved_1; int reserved_2; // Add two extra fields here  在这添加两个额外字段
     private static native void registerNatives();
 ```
 
@@ -204,7 +204,8 @@ Copy following built .jar files from OpenJDK-8 build to directory maple_engine/m
 
 Build Maple compiler&engine and libcore.so:
 
-构建方舟编译器、方舟引擎以及 libcore.so:（构建libcore极占内存，请确保 物理内存+swap ≥ 24G，否则可能会显示“killed”编译失败）
+构建方舟编译器、方舟引擎以及 libcore.so:（构建OpenJDK核心库占用内存较多，请确保 物理内存+swap ≥ 24G，
+否则可能会显示“killed”编译失败）
 ```
 $ cd maple_engine
 $ source ./envsetup.sh
