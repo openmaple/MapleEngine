@@ -45,16 +45,24 @@ IRB_OPENARK=${PREBUILT_BIN}/irbuild
 IRB_MAPLE=${MAPLE_COMPILER_ROOT}/bin/ark-clang-release/irbuild
 MAPLE_COMPILER=${MAPLE_COMPILER_ROOT}/bin/ark-clang-release/maple
 AUX=${MAPLE_BUILD_ROOT}/tools/auxiliary
-
-ORIG_JAVA_CORE_LIB=orig-${JAVA_CORE_LIB}
+RUNTIME_LIB=${MAPLE_RUNTIME_ROOT}/lib/${MAPLE_TARGET_ARCH}
 OUT=${MAPLE_BUILD_ROOT}/out/${MAPLE_TARGET_ARCH}
 
-[ -f $OUT/${JAVA_CORE_LIB}.mpl -a -f $OUT/${JAVA_CORE_LIB}.mplt ] || { echo Need ${JAVA_CORE_LIB}.mpl file; exit 2; }
+ORIG_COREALL_MPLT=${RUNTIME_LIB}/orig-${JAVA_CORE_LIB}.mplt
+COREALL_MPLT=${RUNTIME_LIB}/${JAVA_CORE_LIB}.mplt
+
+if [ ! -f "${ORIG_COREALL_MPLT}" ]; then
+    [ -f "${OUT}"/orig-${JAVA_CORE_LIB}.mplt ] || { echo Need file "${ORIG_COREALL_MPLT}"; exit 2; }
+    cp "${OUT}"/orig-${JAVA_CORE_LIB}.mplt "${ORIG_COREALL_MPLT}" || \
+        { echo Failed to copy "${OUT}/orig-${JAVA_CORE_LIB}".mplt; exit 2; }
+fi
+if [ ! -f "${COREALL_MPLT}" ]; then
+    [ -f "${OUT}"/${JAVA_CORE_LIB}.mplt ] || { echo Need file "${COREALL_MPLT}"; exit 2; }
+    cp "${OUT}"/${JAVA_CORE_LIB}.mplt "${COREALL_MPLT}" || \
+        { echo Failed to copy "${OUT}/${JAVA_CORE_LIB}".mplt; exit 2; }
+fi
 
 JARLIST=$(find ${JAR} -name "*.jar" -type f | xargs | tr ' ' :)
-
-ORIG_COREALL_MPLT=${OUT}/${ORIG_JAVA_CORE_LIB}.mplt
-COREALL_MPLT_MAPLE=${OUT}/${JAVA_CORE_LIB}.mplt
 
 # compile each file .java -> .s
 for f in $* ; do
@@ -87,7 +95,7 @@ for f in $* ; do
     sed -e '/^var/d' -e '/^func/d' $FILE_ROOT_NAME.mplt > $FILE_ROOT_NAME.tmpl
     $IRB_MAPLE -srclang=java -b $FILE_ROOT_NAME.tmpl
     mv -f $FILE_ROOT_NAME.irb.mplt $OUTPUT_DIR/$FILE_ROOT_NAME.mplt
-    sed "s/^import.*libcore.mplt\"/import \"${COREALL_MPLT_MAPLE//\//\\/}\"/" $FILE_ROOT_NAME.mpl > $OUTPUT_DIR/$FILE_ROOT_NAME.mpl
+    sed "s/^import.*libcore.mplt\"/import \"${COREALL_MPLT//\//\\/}\"/" $FILE_ROOT_NAME.mpl > $OUTPUT_DIR/$FILE_ROOT_NAME.mpl
   fi
   cd -
   

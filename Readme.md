@@ -56,6 +56,7 @@
 ```
    ./maple_build/tools/build-libcore.sh
 ```
+  构建Java 核心库完成后，会将编译应用代码所需要的文件拷贝到maple_runtime/lib/x86_64/目录下。
 
 ## 编译和执行应用程序
 

@@ -31,7 +31,12 @@ fi
 
 # library path for -lcore -lcommon-bridge
 RUNTIME_LIB=${MAPLE_RUNTIME_ROOT}/lib/${MAPLE_TARGET_ARCH}
-OBJ=${MAPLE_BUILD_ROOT}/out/${MAPLE_TARGET_ARCH}
+OUT=${MAPLE_BUILD_ROOT}/out/${MAPLE_TARGET_ARCH}
+
+if [ ! -f ${RUNTIME_LIB}/mrt_module_init.o ]; then
+    [ -f "${OUT}"/mrt_module_init.o ] || { echo Need file "${RUNTIME_LIB}/mrt_module_init.o"; exit 2; } 
+    cp "${OUT}"/mrt_module_init.o ${RUNTIME_LIB}/ || { echo Failed to copy "${OUT}"/mrt_module_init.o; exit 2; }
+fi
 
 # link script
 LINKER=${MAPLE_BUILD_ROOT}/linker/${MAPLE_TARGET_ARCH}
@@ -52,5 +57,5 @@ for f in $* ; do
 done
 
 # .so
-g++ -g3 -pie -O2 -fPIC -shared -o $SO_ROOT_NAME.so $O_LIST ${OBJ}/mrt_module_init.o -rdynamic -L$RUNTIME_LIB -lcore -lcommon-bridge -T ${LINKER}/mapleld.so.lds || exit 2
+g++ -g3 -pie -O2 -fPIC -shared -o $SO_ROOT_NAME.so $O_LIST ${RUNTIME_LIB}/mrt_module_init.o -rdynamic -L$RUNTIME_LIB -lcore -lcommon-bridge -T ${LINKER}/mapleld.so.lds || exit 2
 

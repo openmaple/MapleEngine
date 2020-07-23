@@ -96,6 +96,6 @@ unified.groots.o \
 -L"${RUNTIME_LIB}" \
 "${JAVA_CORE_LIB}".VtableImpl.s \
 -T "${LINKER}"/mapleld.so.lds || exit 4
-cp "${JAVA_CORE_LIB}".so mrt_module_init.o "${RUNTIME_LIB}"/ || exit 4
-echo Copied "${JAVA_CORE_LIB}".so and mrt_module_init.o to "${RUNTIME_LIB}"/.
+cp "${JAVA_CORE_LIB}".so mrt_module_init.o *.mplt "${RUNTIME_LIB}"/ || exit 4
+echo Copied "${JAVA_CORE_LIB}".so and mrt_module_init.o *.mplt to "${RUNTIME_LIB}"/.
 echo Done.
