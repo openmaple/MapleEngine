@@ -89,7 +89,7 @@ for f in $* ; do
   
   cd $TMPDIR 
   CLASSES=`ls *.class | tr '\n' ',' | sed "s/^/$FILE_ROOT_NAME.class,/" | sed -e "s/,$FILE_ROOT_NAME.class//" -e "s/[,]*$//"`
-  $PREBUILT_BIN/jbc2mpl -use-string-factory -inclass $CLASSES -mplt $ORIG_COREALL_MPLT -asciimplt || exit 2
+  $PREBUILT_BIN/jbc2mpl -inclass $CLASSES -mplt $ORIG_COREALL_MPLT -asciimplt || exit 2
   
   if [ -f $FILE_ROOT_NAME.mpl ]; then
     sed -e '/^var/d' -e '/^func/d' $FILE_ROOT_NAME.mplt > $FILE_ROOT_NAME.tmpl

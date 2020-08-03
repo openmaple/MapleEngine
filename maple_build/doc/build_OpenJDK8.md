@@ -37,8 +37,9 @@ to the designated libcore.so build directories.
 
 Create OpenJDK-8 build environment and download OpenJDK-8 source 
 
-In order to build OpenJDK-8 from source, OpenJDK 7 JRE or JDK is required. To install OpenJDK 7 
-on Ubuntu 16.04 Linux, use the following command:
+In order to build OpenJDK-8 from source, OpenJDK-7-JRE or JDK is required, so using a separated
+machine other than the one which will run Maple Engine for building OpenJDK-8 is recommended.
+To install OpenJDK-7 on Ubuntu 16.04 Linux, use the following command:
 
 ```
 $ sudo add-apt-repository ppa:openjdk-r/ppa
@@ -55,8 +56,8 @@ gpg: imported: 1 (RSA: 1)
 OK
 ```
 ```
-$ sudo apt-get update
-$ sudo apt-get install openjdk-7-jdk
+$ sudo apt update
+$ sudo apt install openjdk-7-jdk
 ```
 Note: Install all dependent software development packages required if they have not been already
 installed. You may install these packages with following commend:
@@ -64,10 +65,16 @@ installed. You may install these packages with following commend:
 $ sudo apt install mercurial build-essential cpio zip libx11-dev libxext-dev libxrender-dev \
               libxtst-dev libxt-dev libcups2-dev libfreetype6-dev libasound2-dev
 ```
-
-Download OpenJDK-8 source:
+Determine the OpenJDK-8-JRE revision installed on the machine which will install and run Maple Engine. From the outputs of the following command, `8u252-b09` is the revision to be used to download the OpenJDK-8 source:
 ```
-$ hg clone http://hg.openjdk.java.net/jdk8/jdk8 ~/my_opejdk8
+$ apt list openjdk-8-jre
+Listing... Done
+openjdk-8-jre/xenial-updates,xenial-security,now 8u252-b09-1~16.04 amd64 [installed]
+```
+
+Download OpenJDK-8 source which matches the OpenJDK-8-JRE revision, 8u252-b09 for example, using `jdk8u252-b09` tag:
+```
+$ hg clone http://hg.openjdk.java.net/jdk8u/jdk8u -r jdk8u252-b09 ~/my_opejdk8
 $ cd ~/my_opejdk8
 $ bash ./get_source.sh
 ```
@@ -84,6 +91,8 @@ public class Object {
 ```
 
 ## 3. Build OpenJDK- 8
+
+You may skip this step if you prefer to update a copy of rt.jar from the installed package openjdk-8-jre.
 
 Build OpenJDK-8 using the following commands:
 ```
@@ -153,6 +162,21 @@ Copy following built .jar files from OpenJDK-8 build to directory maple_engine/m
    ./linux-x86_64-normal-server-release/images/lib/jce.jar
    ./linux-x86_64-normal-server-release/images/lib/jsse.jar
    ./linux-x86_64-normal-server-release/images/lib/charsets.jar
+```
+
+Alternatively you may copy these .jar files from the installed package openjdk-8-jre and update
+rt.jar with the customized Object.class.
+
+```
+  source maple_engine/envsetup.sh
+  cd maple_engine/maple_build/jar
+  for j in rt jce jsse charsets; do
+    cp ${JAVA_HOME}/jre/lib/$j.jar .
+  done
+  mkdir -p java/lang/
+  cp ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java java/lang/
+  javac -target 1.8 -g java/lang/Object.java
+  jar uf rt.jar java/lang/Object.class
 ```
 
 ## 5. Build libcore.so and run HelloWorld

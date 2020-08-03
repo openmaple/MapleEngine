@@ -30,9 +30,4 @@ exit 0
 // libcore patches
 extern "C" jboolean Ljava_2Flang_2FClassLoader_3B_7CregisterAsParallelCapable_7C_28_29Z(jclass);
 extern "C" void Ljava_2Flang_2FClassLoader_3B_7CloadLibrary_7C_28Ljava_2Flang_2FClass_3BLjava_2Flang_2FString_3BZ_29V(jclass, jstring, jboolean);
-extern "C" void Ljava_2Flang_2Freflect_2FField_3B_7Cset_7C_28Ljava_2Flang_2FObject_3BLjava_2Flang_2FObject_3B_29V(jobject, jobject, jobject);
-extern "C" jobject Ljava_2Flang_2Freflect_2FField_3B_7Cget_7C_28Ljava_2Flang_2FObject_3B_29Ljava_2Flang_2FObject_3B(jobject, jobject);
-extern "C" jobject Ljava_2Flang_2Freflect_2FField_3B_7CgetDeclaredAnnotations_7C_28_29ALjava_2Flang_2Fannotation_2FAnnotation_3B(jobject);
-extern "C" jobject Ljava_2Flang_2Freflect_2FExecutable_3B_7CdeclaredAnnotations_7C_28_29Ljava_2Futil_2FMap_3B(jobject);
-extern "C" jobject Ljava_2Flang_2Freflect_2FMethod_3B_7Cinvoke_7C_28Ljava_2Flang_2FObject_3BALjava_2Flang_2FObject_3B_29Ljava_2Flang_2FObject_3B(jobject, jobject, jobject);
 extern "C" jstring Ljava_2Flang_2FString_3B_7Cintern_7C_28_29Ljava_2Flang_2FString_3B(jstring);
