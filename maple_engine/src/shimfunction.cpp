@@ -57,7 +57,7 @@ extern "C" int64_t __engine_shim(int64_t first_arg, ...) {
         uint16_t arg_idx = 0;
         while(arg_idx < arg_num) {
             // Process all other argements
-            val.ptyp = (PrimType)(header->primtype_table[arg_idx]);
+            val.ptyp = (PrimType)(header->primtype_table[arg_idx*2]);  // each argument has 2B
             switch(val.ptyp) {
                 case PTY_i8:
                     val.x.i8 = va_arg(args, int);
