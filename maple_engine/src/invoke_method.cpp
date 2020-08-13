@@ -138,6 +138,7 @@ void collect_stack_refs(void* bp, std::set<void*>& refs);
 #endif // !MPLPRE_C
 
 extern "C" void MCC_DecRef_NaiveRCFast(void* obj);
+extern "C" void MCC_IncRef_NaiveRCFast(void* obj);
 
 MValue maple_invoke_method(const method_header_t* const mir_header, const MFunction *caller) {
     // Array of labels for threaded interpretion
@@ -244,7 +245,7 @@ label_OP_addrof:
         res.x.a64 = (uint8_t*)&arg.x;
     } else {
         MValue &local = MLOCALS(-idx);
-        local.ptyp = (PrimType)func.header->primtype_table[func.header->formals_num - idx];
+        local.ptyp = (PrimType)func.header->primtype_table[(func.header->formals_num - idx)*2]; // both formals and locals are 2B each
         res.x.a64 = (uint8_t*)&local.x;
     }
     MPUSH(res);
@@ -1229,9 +1230,17 @@ label_exception_handler:
         }
     }
 
-    { // Exception not handled; do reference counting cleanup for localrefvars
-      uint8_t* locals_table = (uint8_t*)&func.header->primtype_table + func.header->formals_num; // find start of table for locals; skip formals, which are 1B each
+    { // Exception not handled; do reference counting cleanup for formals and localrefvars
+      uint8_t* formals_table = (uint8_t*)&func.header->primtype_table;
+      for(int i=0; i<func.header->formals_num; i++) {
+        if(formals_table[2*i+1] == 1) { // 2B for each formal; clean up if the 2nd byte is 1.
+          MValue &arg = MARGS(i+1); // with MARGS(), formals index starts with 1
+          void* ref = (void*)arg.x.a64;
+          MCC_DecRef_NaiveRCFast(ref);
+        }
+      }
 
+      uint8_t* locals_table = (uint8_t*)&func.header->primtype_table + func.header->formals_num*2; // find start of table for locals; skip formals, which are 2B each
       for(int i=0; i<func.header->locals_num; i++) {
         if(locals_table[2*i+1] == 2 || locals_table[2*i+1] == 3) { // 2B for each local var; clean up if the 2nd byte is 2 or 3.
           if(func.operand_stack[i].ptyp != PTY_a64)
@@ -1239,6 +1248,13 @@ label_exception_handler:
           void* ref = (void*)func.operand_stack[i].x.a64;
           if(ref && ref != thrownval) {
             MCC_DecRef_NaiveRCFast(ref);
+          }
+        } else if(locals_table[2*i+1] == 4 || locals_table[2*i+1] == 5) {
+          if(func.operand_stack[i].ptyp != PTY_a64)
+            continue;
+          void* ref = (void*)func.operand_stack[i].x.a64;
+          if(ref) {
+            MCC_IncRef_NaiveRCFast(ref);
           }
         }
       }
