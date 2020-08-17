@@ -19,7 +19,10 @@ if [ "${BASH_SOURCE[0]}" -ef "$0" ]; then
     exit 1
 fi
 
-export MAPLE_ROOT=$(realpath $(dirname ${BASH_SOURCE[0]}))
+export MAPLE_ROOT=$(dirname ${BASH_SOURCE[0]})
+if [[ ${MAPLE_ROOT::1} != / ]]; then
+    export MAPLE_ROOT="$(pwd)/$MAPLE_ROOT"
+fi
 export MAPLE_COMPILER_ROOT="$MAPLE_ROOT/../mapleall"
 export MAPLE_ENGINE_ROOT="$MAPLE_ROOT/maple_engine"
 export MAPLE_RUNTIME_ROOT="$MAPLE_ROOT/maple_runtime"
@@ -28,7 +31,11 @@ export MAPLE_BUILD_TOOLS="$MAPLE_BUILD_ROOT/tools"
 export MAPLE_TARGET_ARCH="x86_64"
 export JAVA_CORE_LIB="libcore"
 export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-if [ ! -d "$JAVA_HOME" ]; then
+if [[ $MAPLE_COMPILER_ROOT =~ [[:space:]]+ ]]; then
+    export MAPLE_COMPILER_ROOT="$HOME/tmp/mapleall"
+    echo "MAPLE_COMPILER_ROOT is set to $MAPLE_COMPILER_ROOT"
+elif [ ! -d "$JAVA_HOME" ]; then
     echo "Error: directory $JAVA_HOME not found"
     echo "Please install the openjdk-8-jdk-headless package"
+    export MAPLE_ROOT=
 fi

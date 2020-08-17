@@ -73,7 +73,7 @@ namespace maple {
                 sp = header->locals_num;
                 // for all locals, return value, throw value and evaluation stack
                 operand_stack.resize(sp + header->eval_depth + 1, {.x.i64 = 0, PTY_void});
-                var_names = (char*)(&header->primtype_table) + header->formals_num*2 + header->locals_num*2; // *2 because formals and locals each have 2 bytes
+                var_names = (char*)(&header->primtype_table) + header->formals_num*2 + header->locals_num*2; // *2 because formals and locals_num each have 2 bytes
                 if(var_names >= (char*)pc)
                     var_names = nullptr;
             }

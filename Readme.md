@@ -63,10 +63,10 @@
 以HelloWorld为例，编译和执行一个应用程序：
 ```
   cd ./maple_build/examples/HelloWorld
-  $MAPLE_BUILD_TOOLS/java2asm.sh HelloWorld.java
-  $MAPLE_BUILD_TOOLS/asm2so.sh HelloWorld.s
+  "$MAPLE_BUILD_TOOLS"/java2asm.sh HelloWorld.java
+  "$MAPLE_BUILD_TOOLS"/asm2so.sh HelloWorld.s
 
-  $MAPLE_BUILD_TOOLS/run-app.sh -classpath ./HelloWorld.so HelloWorld
+  "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
 ```
 
 ---
@@ -100,8 +100,8 @@
 ## Build and run app
 ```
   cd ./maple_build/examples/HelloWorld
-  $MAPLE_BUILD_TOOLS/java2asm.sh HelloWorld.java
-  $MAPLE_BUILD_TOOLS/asm2so.sh HelloWorld.s
+  "$MAPLE_BUILD_TOOLS"/java2asm.sh HelloWorld.java
+  "$MAPLE_BUILD_TOOLS"/asm2so.sh HelloWorld.s
 
-  $MAPLE_BUILD_TOOLS/run-app.sh -classpath ./HelloWorld.so HelloWorld
+  "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
 ```

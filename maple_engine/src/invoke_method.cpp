@@ -59,26 +59,32 @@ extern "C" uint32_t __inc_opcode_cnt() {
     return ++__opcode_cnt;
 }
 
-#define DEBUGOPCODE(opc,msg)  if(debug_engine & kEngineDebugInstruction) \
+#define DEBUGOPCODE(opc,msg) \
+  __inc_opcode_cnt(); \
+  if(debug_engine & kEngineDebugInstruction) \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, op#=%2d,       OP_" \
         #opc ", " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
         (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
         typestr(func.operand_stack.at(func.sp).ptyp), \
-        func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *(func.pc+3), __inc_opcode_cnt())
-#define DEBUGCOPCODE(opc,msg) if(debug_engine & kEngineDebugInstruction) \
+        func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *(func.pc+3), __opcode_cnt)
+#define DEBUGCOPCODE(opc,msg) \
+  __inc_opcode_cnt(); \
+  if(debug_engine & kEngineDebugInstruction) \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, param=0x%04x, OP_" \
         #opc ", " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
         (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
         typestr(func.operand_stack.at(func.sp).ptyp), \
-        func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), __inc_opcode_cnt())
-#define DEBUGSOPCODE(opc,msg,idx) if(debug_engine & kEngineDebugInstruction) \
+        func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), __opcode_cnt)
+#define DEBUGSOPCODE(opc,msg,idx) \
+  __inc_opcode_cnt(); \
+  if(debug_engine & kEngineDebugInstruction) \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, param=0x%04x, OP_" \
         #opc " (%s), " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
         (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
         typestr(func.operand_stack.at(func.sp).ptyp), \
         func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), \
         func.var_names == nullptr ? "" : func.var_names + (idx > 0 ? idx - 1 : mir_header->formals_num - idx) * VARNAMELENGTH, \
-        __inc_opcode_cnt())
+        __opcode_cnt)
 #define DEBUGARGS() if(debug_engine & kEngineDebugInstruction) \
     do {   char buffer[1024]; \
             int argc = mir_header->formals_num; \

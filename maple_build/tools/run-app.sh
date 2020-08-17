@@ -23,25 +23,26 @@ done
 RUNTIME_LIB=${MAPLE_RUNTIME_ROOT}/lib/${MAPLE_TARGET_ARCH}
 RUNTIME_BIN=${MAPLE_RUNTIME_ROOT}/bin/${MAPLE_TARGET_ARCH}
 
-MPLSH=${RUNTIME_BIN}/mplsh
-[ -x ${MPLSH} ] || { echo ${MPLSH} not found, please download Maple runtime.; exit 2; }
+MPLSH="${RUNTIME_BIN}"/mplsh
+[ -x "${MPLSH}" ] || { echo "${MPLSH}" not found, please download Maple runtime.; exit 2; }
 
 export JAVA_NATIVE_LIB=libjava.so
-export LD_LIBRARY_PATH=.:${RUNTIME_LIB}:${JAVA_HOME}/jre/lib/amd64:${JAVA_HOME}/jre/lib/amd64/server:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=".:${RUNTIME_LIB}:${JAVA_HOME}/jre/lib/amd64:${JAVA_HOME}/jre/lib/amd64/server:${LD_LIBRARY_PATH}"
 export MAPLE_ENGINE_DEBUG=none
 
 GDB=
 if [ "x$1" = "x-gdb" ]; then
     GDB="gdb --args "
+    export MAPLE_ENGINE_DEBUG=all
     shift
 fi
 
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 -classpath <App-shared-lib> <Classname>"
+    echo "Usage: $0 [-gdb] -classpath <App-shared-lib> <Classname>"
     exit 1
 fi
 
 libcore="-Xbootclasspath:${JAVA_CORE_LIB}.so"
 grep -q -- "-Xbootclasspath:${JAVA_CORE_LIB}.so" <<< "$*" && libcore=
 
-$GDB ${MPLSH} $libcore "$@"
+$GDB "${MPLSH}" "$libcore" "$@"

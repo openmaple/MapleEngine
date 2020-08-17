@@ -19,16 +19,16 @@ cd HelloWorld
 ### Compile Java program to assembly code: .java -> .s
 
 ```
-  $MAPLE_BUILD_TOOLS/java2asm.sh HelloWorld.java
+  "$MAPLE_BUILD_TOOLS"/java2asm.sh HelloWorld.java
 ```
 
 ### Compile assembly code to shared library: .s -> .so
 ```
-  $MAPLE_BUILD_TOOLS/asm2so.sh HelloWorld.s
+  "$MAPLE_BUILD_TOOLS"/asm2so.sh HelloWorld.s
 ```
 
 ### Run program with Maple engine
 ```
-$MAPLE_BUILD_TOOLS/run-app.sh -classpath ./HelloWorld.so HelloWorld
+  "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
 ```
 

@@ -52,7 +52,7 @@ ${CC} ${CC_FLAGS} -c "${MAPLE_BUILD_ROOT}"/src/mrt_module_init.cpp -o mrt_module
  
 echo "Building ${JAVA_CORE_LIB}.so (It may take a few minutes depending on your server and its workload)"...
 ${CC} ${CC_FLAGS} -c "${MAPLE_BUILD_ROOT}"/src/mrt_primitive_class.cpp \
-    -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux -o mrt_primitive_class.o
+    -I"${JAVA_HOME}"/include -I"${JAVA_HOME}"/include/linux -o mrt_primitive_class.o
 [ $? -eq 0 ] || { echo Failed to compile mrt_primitive_class.cpp.; exit 2; }
 
 # Generate ${JAVA_CORE_LIB}.mpl and ${JAVA_CORE_LIB}.mplt
