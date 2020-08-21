@@ -32,3 +32,7 @@ cd HelloWorld
   "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
 ```
 
+### Debug program with Maple debugger
+```
+  "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
+```

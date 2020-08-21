@@ -69,6 +69,11 @@
   "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
 ```
 
+## 调试应用程序
+```
+  "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
+```
+
 ---
 
 ## Build envionment setup
@@ -104,4 +109,9 @@
   "$MAPLE_BUILD_TOOLS"/asm2so.sh HelloWorld.s
 
   "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
+```
+
+## Debug app with Maple debugger
+```
+  "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
 ```

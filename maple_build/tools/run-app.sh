@@ -32,8 +32,8 @@ export MAPLE_ENGINE_DEBUG=none
 
 GDB=
 if [ "x$1" = "x-gdb" ]; then
-    GDB="gdb --args "
-    export MAPLE_ENGINE_DEBUG=all
+    GDB='gdb -x "$MAPLE_DEBUGGER_ROOT/.mgdbinit" --args '
+    #export MAPLE_ENGINE_DEBUG=all
     shift
 fi
 
@@ -45,4 +45,4 @@ fi
 libcore="-Xbootclasspath:${JAVA_CORE_LIB}.so"
 grep -q -- "-Xbootclasspath:${JAVA_CORE_LIB}.so" <<< "$*" && libcore=
 
-$GDB "${MPLSH}" "$libcore" "$@"
+eval $GDB \"\${MPLSH}\" \"\$libcore\" \"\$@\"

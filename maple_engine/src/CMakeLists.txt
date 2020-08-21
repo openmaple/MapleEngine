@@ -30,7 +30,7 @@
 # Set include file based on if the headers are local or in the compile directory
 # Note: md5.h requires package libssl-dev to be installed
 
-add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O2 -fno-omit-frame-pointer -funsigned-char )
+add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O0 -fno-omit-frame-pointer -funsigned-char )
 
 if(DEFINED ENV{USE_LOCAL_REP_HEADERS})
 	SET(BASE_INC_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/../include)

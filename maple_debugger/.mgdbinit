@@ -1,0 +1,17 @@
+python
+import os.path
+gdb.execute(os.path.expandvars('source $MAPLE_DEBUGGER_ROOT/m_gdb.py'))
+end
+
+# add one maple_lib_asm_path into the search list
+mset -add maple_lib_asm_path $MAPLE_DEBUGGER_ROOT/out/x86_64/
+
+# add another one maple_lib_asm_path into the search list
+mset -add maple_lib_asm_path ./
+
+# add openjdk8 source code file search path in your development environment
+msrcpath -add $JAVA_CORE_SRC/build/linux-x86_64-normal-server-release/
+msrcpath -add $JAVA_CORE_SRC/jdk/src/
+
+# add local path where your application source code is in your development environment
+msrcpath -add ./

@@ -63,7 +63,7 @@ Note: Install all dependent software development packages required if they have 
 installed. You may install these packages with following commend:
 ```
 $ sudo apt install mercurial build-essential cpio zip libx11-dev libxext-dev libxrender-dev \
-              libxtst-dev libxt-dev libcups2-dev libfreetype6-dev libasound2-dev
+              libxtst-dev libxt-dev libcups2-dev libfreetype6-dev libasound2-dev libfontconfig1-dev
 ```
 Determine the OpenJDK-8-JRE revision installed on the machine which will install and run Maple Engine. From the outputs of the following command, `8u265-b01` is the revision to be used to download the OpenJDK-8 source:
 ```
@@ -74,8 +74,8 @@ openjdk-8-jre/xenial-updates,xenial-security,now 8u265-b01-0ubuntu2~16.04 amd64 
 
 Download OpenJDK-8 source which matches the OpenJDK-8-JRE revision, 8u265-b01 for example, using `jdk8u265-b01` tag:
 ```
-$ hg clone http://hg.openjdk.java.net/jdk8u/jdk8u -r jdk8u265-b01 ~/my_opejdk8
-$ cd ~/my_opejdk8
+$ hg clone http://hg.openjdk.java.net/jdk8u/jdk8u -r jdk8u265-b01 ~/my_openjdk8
+$ cd ~/my_openjdk8
 $ bash ./get_source.sh
 ```
 ## 2. Customize Object Class
@@ -83,7 +83,7 @@ $ bash ./get_source.sh
 Add two extra fields in Object class by modifying Object.java file:
 
 Add reserved_1 and reserved_2 fields right after the line `public class Object {` in
- ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java file as the first two fields of Object class:
+ ~/my_openjdk8/jdk/src/share/classes/java/lang/Object.java file as the first two fields of Object class:
 ```
 public class Object {
     long reserved_1; int reserved_2; // Add two extra fields here
@@ -96,7 +96,7 @@ You may skip this step if you prefer to update a copy of rt.jar from the install
 
 Build OpenJDK-8 using the following commands:
 ```
-$ cd ~/my_opejdk8
+$ cd ~/my_openjdk8
 $ bash ./configure
 $ export DISABLE_HOTSPOT_OS_VERSION_CHECK=ok; make all
 ```
@@ -120,7 +120,7 @@ Creating sa.make ...
 /usr/bin/make: invalid option -- '/'
 /usr/bin/make: invalid option -- 'c'
 ```
-Then you need to modify ~/my_opejdk8/hotspot/make/linux/makefiles/adjust-mflags.sh file with the following patch:
+Then you need to modify ~/my_openjdk8/hotspot/make/linux/makefiles/adjust-mflags.sh file with the following patch:
 ```
 diff -r 87ee5ee27509 make/linux/makefiles/adjust-mflags.sh
 --- a/make/linux/makefiles/adjust-mflags.sh Tue Mar 04 11:51:03 2014 -0800
@@ -136,8 +136,8 @@ diff -r 87ee5ee27509 make/linux/makefiles/adjust-mflags.sh
 ```
 Note 4: You may having the following problem when doing make:
 ```
-make[1]: *** [~/my_opejdk8/build/linux-x86_64-normal-server-release/nashorn/classes/_the.nasgen.run] Error 1
-BuildNashorn.gmk:75: recipe for target '~/my_opejdk8/build/linux-x86_64-normal-server-release/nashorn/classes/_the.nasgen.run' failed
+make[1]: *** [~/my_openjdk8/build/linux-x86_64-normal-server-release/nashorn/classes/_the.nasgen.run] Error 1
+BuildNashorn.gmk:75: recipe for target '~/my_openjdk8/build/linux-x86_64-normal-server-release/nashorn/classes/_the.nasgen.run' failed
 ```
 Then you need modify make/BuildNashorn.gmk file by applying the following patch:
 ```
@@ -174,7 +174,7 @@ rt.jar with the customized Object.class.
     cp "${JAVA_HOME}"/jre/lib/$j.jar .
   done
   mkdir -p java/lang/
-  cp ~/my_opejdk8/jdk/src/share/classes/java/lang/Object.java java/lang/
+  cp ~/my_openjdk8/jdk/src/share/classes/java/lang/Object.java java/lang/
   javac -target 1.8 -g java/lang/Object.java
   jar uf rt.jar java/lang/Object.class
 ```
