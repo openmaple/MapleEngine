@@ -112,10 +112,6 @@ extern "C" uint32_t __inc_opcode_cnt() {
 #define THROWVAL   (func.operand_stack.at(1))
 #define MLOCALS(x) (func.operand_stack.at(x))
 
-#if defined(MPLRE_C)
-#define THROWJAVAEXCEPTION_WITH_MSG
-#define THROWJAVAEXCEPTION(ex) THROWJAVAEXCEPTION_WITH_MSG
-#else
 #define THROWJAVAEXCEPTION_WITH_MSG(ex, msg) \
     do { \
         MRT_ThrowNewException("java/lang/" #ex, msg); \
@@ -126,7 +122,6 @@ extern "C" uint32_t __inc_opcode_cnt() {
     } while(0)
 
 #define THROWJAVAEXCEPTION(ex) THROWJAVAEXCEPTION_WITH_MSG(ex, nullptr)
-#endif // MPLRE_C
 
 #define NULLPTRCHECK(ptr) \
     if((uintptr_t)ptr < (uintptr_t)0x1000ul) /* first 4 KiB page */ { \
@@ -134,14 +129,12 @@ extern "C" uint32_t __inc_opcode_cnt() {
         goto label_exception_handler; \
     }
 
-#if !(defined(MPLRE_C))
 extern "C" std::ptrdiff_t __maple_java_PC_offset;
 extern "C" void *__maple_method_address;
 extern "C" bool MCC_JavaInstanceOf(void* obj, void* java_class);
 extern "C" void MRT_YieldpointHandler_x86_64();
-extern "C" void MRT_set_collect_stack_refs_cb(void (*cb)(void*, std::set<void*>&));
+extern "C" void MRT_SetCollectStackRefsCb(void (*cb)(void*, std::set<void*>&));
 void collect_stack_refs(void* bp, std::set<void*>& refs);
-#endif // !MPLPRE_C
 
 extern "C" void MCC_DecRef_NaiveRCFast(void* obj);
 extern "C" void MCC_IncRef_NaiveRCFast(void* obj);
@@ -157,26 +150,22 @@ MValue maple_invoke_method(const method_header_t* const mir_header, const MFunct
 
     MFunction func(mir_header, caller);
 
-#if !(defined(MPLRE_C))
 #if defined(__x86_64__)
     if(__maple_java_PC_offset == 0) {
         void *frame_pointer;
         asm ("mov %%rbp, %0\n" : "=r" (frame_pointer));
         __maple_java_PC_offset = (uint8_t *)&func.pc - (uint8_t *)frame_pointer;
         __maple_method_address = (void *)&maple_invoke_method;
-        MRT_set_collect_stack_refs_cb(collect_stack_refs);
+        MRT_SetCollectStackRefsCb(collect_stack_refs);
     }
 #endif
-#endif // !MPLRE_C
 
     DEBUGMETHODSYMBOL(mir_header, "Running Java method:", mir_header->eval_depth);
 
     MFunction::MStack::size_type const caller_args = caller->sp - mir_header->formals_num;
     DEBUGARGS();
 
-#if !(defined(MPLRE_C))
     MRT_YieldpointHandler_x86_64();
-#endif
 
     // Get the first mir instruction of this method
     goto *(labels[((base_node_t *)func.pc)->op]);
@@ -1197,9 +1186,6 @@ label_OP_endtry:
 
 label_exception_handler:
   {
-#if defined(MPLRE_C)
-    MASSERT(false, "maple_invoke_method: exception handling not execpted in C environment");
-#else
     uint8_t* &thrownval = THROWVAL.x.a64;
     if(thrownval == nullptr)
         THROWJAVAEXCEPTION_WITH_MSG(NullPointerException, "unknown reason");
@@ -1270,7 +1256,6 @@ label_exception_handler:
     DEBUGOPCODE(: THROW EXCEPTION, Throw);
     // No matched exception type
     throw thrownval;
-#endif // MPLRE_C
   }
 
 label_OP_membaracquire:
@@ -1334,9 +1319,7 @@ label_OP_checkpoint:
   {
     // Handle statement node: checkpoint
     DEBUGOPCODE(checkpoint, Stmt);
-#if !(defined(MPLRE_C))
     MRT_YieldpointHandler_x86_64();
-#endif
     func.pc += sizeof(base_node_t);
     goto *(labels[*func.pc]);
   }
@@ -1904,7 +1887,6 @@ label_OP_cpptry:
     for(;;);
 }
 
-#if !(defined(MPLRE_C))
 // Collect object references on the internal stack for the purpose of collecting
 // root set for GC
 void collect_stack_refs(void* bp, std::set<void*>& refs)
@@ -1919,7 +1901,6 @@ void collect_stack_refs(void* bp, std::set<void*>& refs)
     func = func->caller;
   }
 }
-#endif
 
 
 } // namespace maple

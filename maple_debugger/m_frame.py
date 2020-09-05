@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,11 +11,14 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
 import m_info
 import m_breakpoint
-from inspect import currentframe, getframeinfo
+from m_util import gdb_print
 import m_util
+import m_debug
 
 def get_newest_frame():
     """
@@ -84,30 +86,21 @@ def get_frame_info(frame):
     frame_sal = frame.find_sal()
 
     if frame_symbol:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame symbol name: ", frame_symbol.name)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame symbol line: ", frame_symbol.line)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame symbol linkage_name: ", frame_symbol.linkage_name)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame symbol print_name: ", frame_symbol.print_name)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame symbol value: ", frame_symbol.value())
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame symbol address: ", frame_symbol.addr_class)
+        if m_debug.Debug:
+            m_debug.dbg_print("frame symbol name: ", frame_symbol.name)
+            m_debug.dbg_print("frame symbol line: ", frame_symbol.line)
+            m_debug.dbg_print("frame symbol linkage_name: ", frame_symbol.linkage_name)
+            m_debug.dbg_print("frame symbol print_name: ", frame_symbol.print_name)
+            m_debug.dbg_print("frame symbol value: ", frame_symbol.value())
+            m_debug.dbg_print("frame symbol address: ", frame_symbol.addr_class)
 
     if frame_sal:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame sal pc: ", hex(frame_sal.pc) if frame_sal.pc != None else "None")
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame sal last: ", hex(frame_sal.last) if frame_sal.last != None else "None")
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame sal line: ", frame_sal.line)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame sal.symtab filename: ", frame_sal.symtab.filename)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_frame_info,\
-                        "frame sal.symtab full filename: ", frame_sal.symtab.fullname())
+        if m_debug.Debug:
+            m_debug.dbg_print("frame sal pc: ", hex(frame_sal.pc) if frame_sal.pc != None else "None")
+            m_debug.dbg_print("frame sal last: ", hex(frame_sal.last) if frame_sal.last != None else "None")
+            m_debug.dbg_print("frame sal line: ", frame_sal.line)
+            m_debug.dbg_print("frame sal.symtab filename: ", frame_sal.symtab.filename)
+            m_debug.dbg_print("frame sal.symtab full filename: ", frame_sal.symtab.fullname())
 
     return info_buffer, frame_symbol, frame_sal
 
@@ -128,8 +121,7 @@ def get_current_frame_rip(frame):
 
     arch = frame.architecture()
     current_pc = frame.read_register("pc")
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_current_frame_rip,\
-                        "current_pc obj=", current_pc)
+    if m_debug.Debug: m_debug.dbg_print("current_pc obj=", current_pc)
     current_pc = int(current_pc)
 
     # arch.disassemble(start_pc) returns a list of disassembled instructions from start_pc.
@@ -137,9 +129,8 @@ def get_current_frame_rip(frame):
     # memory address of the instruction.
     # see https://sourceware.org/gdb/onlinedocs/gdb/Architectures-In-Python.html#Architectures-In-Python
     disa = arch.disassemble(current_pc)[0]
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_current_frame_rip,\
-                        "disa=", disa)
-        
+    if m_debug.Debug: m_debug.dbg_print("disa=", disa)
+
     return disa['addr']
 
 
@@ -161,7 +152,7 @@ def get_closest_maple_frame_func_lib_info():
 
     frame = get_selected_frame()
     if not frame:
-        print('Unable to locate Maple frame')
+        gdb_print('Unable to locate Maple frame')
         return None, None, None, None, None
 
     index = 0
@@ -199,9 +190,9 @@ def get_maple_frame_func_lib_info(frame):
     """
 
     frame_rip = get_current_frame_rip(frame)
-    bp_addr, bp_info = m_breakpoint.get_maple_invoke_bp_stop_addr()
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_frame_func_lib_info,\
-                        "frame_rip =", frame_rip, "bp_addr=", bp_addr)
+    buf = m_util.gdb_exec_to_string("info b")
+    bp_addr, bp_info = m_breakpoint.get_maple_invoke_bp_stop_addr(buf)
+    if m_debug.Debug: m_debug.dbg_print("frame_rip =", frame_rip, "bp_addr=", bp_addr)
 
     # if breakpoint address is not same to frame_rip (first instruction address of the frame),
     # this means program already passed first instruction of the function
@@ -209,13 +200,11 @@ def get_maple_frame_func_lib_info(frame):
         func_addr_offset = m_info.get_initialized_maple_func_addrs()
         # func_addr_offset in string
         if not func_addr_offset:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_frame_func_lib_info,\
-                        "func_addr_offset=None")
+            if m_debug.Debug: m_debug.dbg_print("func_addr_offset=None")
             return None, None, None, None, None
         func_header = m_info.get_initialized_maple_func_attr('func.header')
         start_addr, so_path, asm_path = m_info.get_lib_so_info(func_header)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_frame_func_lib_info,\
-                        "func_addr_offset=", func_addr_offset, "so_path=", so_path, "asm_path=", asm_path, \
+        if m_debug.Debug: m_debug.dbg_print("func_addr_offset=", func_addr_offset, "so_path=", so_path, "asm_path=", asm_path, \
                         "func_header=", func_header, "frame=", frame)
         return func_addr_offset, so_path, asm_path, func_header, frame
 
@@ -226,7 +215,6 @@ def get_maple_frame_func_lib_info(frame):
 
     # func_addr_offset in string , format of func_addr:offset:
     if not func_addr_offset or not so_path or not asm_path or not func_addr_offset:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_frame_func_lib_info,\
-                        "returns None")
+        if m_debug.Debug: m_debug.dbg_print("returns None")
         return None, None, None,None,None
     return func_addr_offset, so_path, asm_path,func_header, frame

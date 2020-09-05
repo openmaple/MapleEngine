@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,14 +11,17 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
-import sys
 import m_datastore
 import m_frame
 import m_list
 import m_info
-from inspect import currentframe, getframeinfo
 import m_util
+from m_util import MColors
+from m_util import gdb_print
+import m_debug
 
 def print_maple_frame(frame, index, asm_format):
     """
@@ -33,9 +35,9 @@ def print_maple_frame(frame, index, asm_format):
 
     data = m_datastore.get_stack_frame_data(frame)
     if not data:
-        sys.stdout.write('#%i no info\n' % (index))
+        gdb_print('#%i no info' % (index))
         return
-    
+
     so_path = data['frame_func_header_info']['so_path']
     asm_path = data['frame_func_header_info']['asm_path']
     func_addr_offset = data['frame_func_header_info']['func_addr_offset']
@@ -46,7 +48,7 @@ def print_maple_frame(frame, index, asm_format):
     src_file_line = data['frame_func_src_info']['short_src_file_line']
 
     func_argus_locals = data['func_argus_locals']
-    
+
     if src_file_short_name:
         file_full_path = None
         for source_path in m_list.maple_source_path_list:
@@ -57,7 +59,7 @@ def print_maple_frame(frame, index, asm_format):
                 break
     else:
         file_full_path = 'unknown'
-    
+
     # buffer format
     # index func_offset func_symbol (type argu=value, ...) at source-file-full-path:line_num
     args_buffer = ""
@@ -77,33 +79,40 @@ def print_maple_frame(frame, index, asm_format):
         args_buffer += func_argus_locals['formals_type'][i]
         args_buffer += '<' + mtype + '>'
         args_buffer += ' '
-        args_buffer += func_argus_locals['formals_name'][i]
+        args_buffer += MColors.BT_ARGNAME + func_argus_locals['formals_name'][i] + MColors.ENDC
+        #args_buffer += func_argus_locals['formals_name'][i]
         args_buffer += '='
         args_buffer += arg_value
         args_buffer += ', '
     if arg_num > 0:
         args_buffer = args_buffer[:-2]
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, print_maple_frame,\
-                        "arg_num=", arg_num, " args_buffer=", args_buffer)
-        
+    if m_debug.Debug: m_debug.dbg_print("arg_num=", arg_num, " args_buffer=", args_buffer)
+
     if asm_format:
-        buffer = '#%i %s:%s %s(%s) at %s:%s\n' % (index, so_path.split('/')[-1],func_addr_offset, func_name, args_buffer, asm_path, asm_line_num)
+        buffer = '#%i %s:%s %s(%s) at %s:%s' % \
+           (index, MColors.BT_ADDR + so_path.split('/')[-1] + MColors.ENDC,MColors.BT_ADDR + func_addr_offset + MColors.ENDC,\
+             m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + asm_path + MColors.ENDC, asm_line_num)
     else:
-        buffer = '#%i %s:%s %s(%s) at %s:%s\n' % (index, so_path.split('/')[-1],func_addr_offset, func_name, args_buffer, file_full_path, src_file_line)
-    sys.stdout.write(buffer)
+        buffer = '#%i %s:%s %s(%s) at %s:%s' % \
+           (index, MColors.BT_ADDR + so_path.split('/')[-1] + MColors.ENDC, MColors.BT_ADDR + func_addr_offset + MColors.ENDC,\
+            m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + file_full_path + MColors.ENDC, src_file_line)
+    gdb_print(buffer)
 
 def print_gdb_frame(frame, index):
     """ print one gdb native backtrace frame """
 
-    s   = gdb.execute('bt', to_string = True)
+    s   = m_util.gdb_exec_to_string('bt')
     bt  = s.split('#' + str(index))
     bt  = bt[1].split('#')[0][:-1]
     bt  = '#' + str(index) + bt
-    print(bt)
+    gdb_print(bt)
 
 class MapleBacktrace(gdb.Command):
-    """
-    This class defines a Maple backtrace command, to print stack frames in calling sequence.
+    """Display Maple backtrace in multiple modes
+    mbt is the alias of mbacktrace command
+    mbacktrace: print backtrace of Maple frames
+    mbacktrace -asm: print backtrace of Maple frames in assembly format
+    mbreaktrace -full: print backtrace of mixed gdb native frames and Maple frames
     """
 
     def __init__(self):
@@ -112,12 +121,10 @@ class MapleBacktrace(gdb.Command):
                               gdb.COMMAND_STACK,
                               gdb.COMPLETE_NONE)
 
-        gdb.execute('alias mbt = mbacktrace')
+        m_util.gdb_exec('alias mbt = mbacktrace')
 
     def invoke(self, args, from_tty):
-        gdb.execute('set pagination off', to_string = True)
         self.mbt_func(args, from_tty)
-        gdb.execute('set pagination on', to_string = True)
 
     def mbt_func(self, args, from_tty):
         s = str(args)
@@ -127,11 +134,11 @@ class MapleBacktrace(gdb.Command):
             full = True
         elif s == "-asm":
             asm = True
-        
+
         selected_frame = m_frame.get_selected_frame()
         newest_frame = m_frame.get_newest_frame()
         if not selected_frame or not newest_frame:
-            print('Unable to locate Maple frame')
+            gdb_print('Unable to locate Maple frame')
             return
 
         # walk through from innermost frame to selected frame
@@ -142,11 +149,11 @@ class MapleBacktrace(gdb.Command):
             index += 1
 
         if not frame:
-            print('No valid frames found')
+            gdb_print('No valid frames found')
             return
 
         start_level = index
-        sys.stdout.write('Maple Traceback (most recent call first):\n')
+        gdb_print('Maple Traceback (most recent call first):')
         while frame:
             if m_frame.is_maple_frame(frame):
                 print_maple_frame(frame, index, asm)
@@ -155,15 +162,16 @@ class MapleBacktrace(gdb.Command):
             index += 1
             frame = m_frame.get_next_older_frame(frame)
             if frame:
-                gdb.execute('up-silently ', to_string = True)
+                m_util.gdb_exec_to_null('up-silently')
 
         # move frame back to the original stack level
-        gdb.execute('down-silently ' + str(index - start_level - 1), to_string = True)
+        m_util.gdb_exec_to_null('down-silently ' + str(index - start_level - 1))
 
 
 class MapleUpCmd(gdb.Command):
-    """
-    This class defines Maple command mup, to move up the Maple frame in stack.
+    """Select and print Maple stack frame that called this one
+    mup: move up one Maple frame that called selected Maple frame
+    mup -n: move up n Maple frames from currently selected Maple frame
     """
     def __init__(self):
         gdb.Command.__init__ (self,
@@ -172,13 +180,11 @@ class MapleUpCmd(gdb.Command):
                               gdb.COMPLETE_NONE)
 
     def invoke(self, args, from_tty):
-        gdb.execute('set pagination off', to_string = True)
         self.mup_func(args, from_tty)
-        gdb.execute('set pagination on', to_string = True)
 
     def usage(self):
-        print("mup : move Maple frame up one level")
-        print("mup -n: move Maple frame up n levels")
+        gdb_print("mup : move Maple frame up one level")
+        gdb_print("mup -n: move Maple frame up n levels")
 
     def mup_func(self, args, from_tty):
         steps = 1
@@ -188,14 +194,14 @@ class MapleUpCmd(gdb.Command):
                 steps = int(s[0])
             except:
                 pass
-        elif len(s) > 1: 
+        elif len(s) > 1:
             self.usage()
             return
 
         selected_frame = m_frame.get_selected_frame()
         newest_frame = m_frame.get_newest_frame()
         if not selected_frame or not newest_frame:
-            print('Unable to locate Maple frame')
+            gdb_print('Unable to locate Maple frame')
             return
 
         # walk through from innermost frame to selected frame
@@ -206,7 +212,7 @@ class MapleUpCmd(gdb.Command):
             frame = m_frame.get_next_older_frame(frame)
             index += 1
         if not frame:
-            print('No valid frames found')
+            gdb_print('No valid frames found')
             return
 
         prev_maple_frame = frame
@@ -214,14 +220,14 @@ class MapleUpCmd(gdb.Command):
         while frame and steps > 0:
             frame = m_frame.get_next_older_frame(frame)
             if frame:
-                gdb.execute('up-silently ', to_string = True)
+                m_util.gdb_exec_to_null('up-silently')
                 index += 1
             else:
                 frame = prev_maple_frame
-                gdb.execute('down-silently ' + str(index - prev_maple_frame_index), to_string = True)
+                m_util.gdb_exec_to_null('down-silently ' + str(index - prev_maple_frame_index))
                 index = prev_maple_frame_index
                 break
-            
+
             if m_frame.is_maple_frame(frame):
                 prev_maple_frame = frame
                 prev_maple_frame_index = index
@@ -231,8 +237,9 @@ class MapleUpCmd(gdb.Command):
         print_maple_frame(frame, index, asm_format)
 
 class MapleDownCmd(gdb.Command):
-    """
-    This class defines Maple command mdown, to move down the Maple frame in stack.
+    """Select and print Maple stack frame called by this one
+    mdown: move down one Maple frame called by selected Maple frame
+    mdown -n: move down n Maple frames called from currently selected Maple frame
     """
     def __init__(self):
         gdb.Command.__init__ (self,
@@ -241,13 +248,11 @@ class MapleDownCmd(gdb.Command):
                               gdb.COMPLETE_NONE)
 
     def invoke(self, args, from_tty):
-        gdb.execute('set pagination off', to_string = True)
         self.mdown_func(args, from_tty)
-        gdb.execute('set pagination on', to_string = True)
 
     def usage(self):
-        print("mdown : move Maple frame down one level")
-        print("mdown -n: move Maple frame down n levels")
+        gdb_print("mdown : move Maple frame down one level")
+        gdb_print("mdown -n: move Maple frame down n levels")
 
     def mdown_func(self, args, from_tty):
         steps = 1
@@ -257,14 +262,14 @@ class MapleDownCmd(gdb.Command):
                 steps = int(s[0])
             except:
                 pass
-        elif len(s) > 1: 
+        elif len(s) > 1:
             self.usage()
             return
 
         selected_frame = m_frame.get_selected_frame()
         newest_frame = m_frame.get_newest_frame()
         if not selected_frame or not newest_frame:
-            print('Unable to locate Maple frame')
+            gdb_print('Unable to locate Maple frame')
             return
 
         # walk through from innermost frame to selected frame
@@ -276,7 +281,7 @@ class MapleDownCmd(gdb.Command):
             index += 1
 
         if not frame:
-            print('No valid frames found')
+            gdb_print('No valid frames found')
             return
 
         prev_maple_frame = frame
@@ -284,14 +289,14 @@ class MapleDownCmd(gdb.Command):
         while frame and steps > 0:
             frame = m_frame.get_next_newer_frame(frame)
             if frame:
-                gdb.execute('down-silently ', to_string = True)
+                m_util.gdb_exec_to_null('down-silently')
                 index -= 1
             else:
                 frame = prev_maple_frame
-                gdb.execute('up-silently ' + str(index - prev_maple_frame_index), to_string = True)
+                m_util.gdb_exec_to_null('up-silently ' + str(index - prev_maple_frame_index))
                 index = prev_maple_frame_index
                 break
-            
+
             if m_frame.is_maple_frame(frame):
                 prev_maple_frame = frame
                 prev_maple_frame_index = index

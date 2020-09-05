@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,6 +11,8 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
 import os
 import sys
@@ -19,47 +20,52 @@ import sys
 mgdb_path=os.path.dirname(__file__)
 sys.path.append(os.path.expanduser(mgdb_path))
 
-from m_stack_cmds import *
-from m_breakpoints_cmds import *
-from m_symbol import *
-from m_stepi import *
-from m_list import *
-from m_stack_data import *
-from m_print import *
-from m_nexti import *
-from m_set import *
-from m_type import *
-from m_help import *
+from m_stack_cmds import MapleBacktrace, MapleUpCmd, MapleDownCmd
+from m_bp_cmds import MapleBreakpointCmd
+from m_stepi import MapleStepiCmd,MapleFinishCmd
+from m_list import MapleListCmd, MapleSourcePathCmd
+from m_stack_data import MapleLocalCmd
+from m_print import MaplePrintCmd
+from m_nexti import MapleNextiCmd
+from m_set import MapleSetCmd
+from m_type import MapleTypeCmd, MapleSymbolCmd
+from m_help import MapleHelpCmd
+import m_util
+from m_util import gdb_print
 
 def init_alert():
-    print("")
-    print("Before start to use Maple debugger, please make sure to setup two sets of search paths:")
-    print("1, The search paths of user's program and library source code.")
-    print("   This is required to display source code of your application and library")
-    print("   Use msrcpath command to show/add/del source code search paths")
-    print("2, The search paths of the generated assembly files of user's program and library.")
-    print("   This is required by many of Maple debugger commands")
-    print("   Use mset command to show/add/del libaray asm file search paths")
-    print("")
+    gdb_print("")
+    gdb_print("Before start to use Maple debugger, please make sure to setup two sets of search paths:")
+    gdb_print("1, The search paths of user's program and library source code.")
+    gdb_print("   This is required to display source code of your application and library")
+    gdb_print("   Use msrcpath command to show/add/del source code search paths")
+    gdb_print("2, The search paths of the generated assembly files of user's program and library.")
+    gdb_print("   This is required by many of Maple debugger commands")
+    gdb_print("   Use mset command to show/add/del libaray asm file search paths")
+    gdb_print("")
     return
 
 def init_gdb():
-    gdb.execute('set auto-load python-scripts off')
+    m_util.gdb_exec('set auto-load python-scripts off')
+    m_util.enable_color_output(True)
 
 def main():
-    mbt =  MapleBacktrace()
-    mbreak = MapleBreakpointCmd()
-    mstepi = MapleStepiCmd()
-    msource = MapleSourcePathCmd()
-    mlist = MapleListCmd()
-    mup = MapleUpCmd()
-    mdown = MapleDownCmd()
-    mlocal = MapleLocalCmd()
-    mprint = MaplePrintCmd()
-    mnexti = MapleNextiCmd()
-    mset   = MapleSetCmd()
-    mtype  = MapleTypeCmd()
-    mhelp  = MapleHelpCmd()
+    # Register commands for Maple debugger
+    MapleBacktrace()
+    MapleBreakpointCmd()
+    MapleStepiCmd()
+    MapleSourcePathCmd()
+    MapleListCmd()
+    MapleUpCmd()
+    MapleDownCmd()
+    MapleLocalCmd()
+    MaplePrintCmd()
+    MapleNextiCmd()
+    MapleSetCmd()
+    MapleTypeCmd()
+    MapleHelpCmd()
+    MapleSymbolCmd()
+    MapleFinishCmd()
 
     init_alert()
     init_gdb()

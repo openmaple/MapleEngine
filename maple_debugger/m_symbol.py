@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,10 +11,10 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
-import gdb
-from inspect import currentframe, getframeinfo
-import m_util
+#
 
+import m_util
+import m_debug
 
 def get_symbol_address(symbol):
     """
@@ -25,34 +24,11 @@ def get_symbol_address(symbol):
 
     cmd = 'p ' + symbol
     try:
-        result  = gdb.execute(cmd, to_string=True)
+        result  = m_util.gdb_exec_to_string(cmd)
     except:
         return None
 
     match_pattern = '<' + symbol + '>'
-
-    if result.find(match_pattern) is -1:
-        return None
-    else:
-        x = result.split()
-        pattern_index = x.index(match_pattern)
-        return x[pattern_index - 1]
-
-def get_symbol_address_by_current_frame_args(symbol):
-    """
-    For a given Maple symbol, return its address in hex string via 'info args' command
-    or None if not found
-    """
-
-    cmd = 'info args'
-    try:
-        result  = gdb.execute(cmd, to_string=True)
-    except:
-        return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_symbol_address_by_current_frame_args,\
-                        "result=", result)
-
-    match_pattern = '<' + symbol + '_mirbin_info>'
 
     if result.find(match_pattern) is -1:
         return None
@@ -68,23 +44,50 @@ def get_symbol_name_by_current_func_args():
 
     cmd = 'p func'
     try:
-        result = gdb.execute(cmd, to_string = True)
+        result = m_util.gdb_exec_to_string(cmd)
     except:
         return None, None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_symbol_name_by_current_func_args,\
-                        "result=", result)
+    if m_debug.Debug: m_debug.dbg_print("result=", result)
 
-    
+
     if 'header = ' in result and '_mirbin_info>' in result:
         s = result.split('header = ')
         address = s[1].split()[0]
         name = s[1].split()[1].split('>')[0][1:]
         caller = result.split('caller = ')[1].split(',')[0]
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_symbol_name_by_current_func_args,\
-                            "address=", address, "name=", name, "caller=", caller)
+        if m_debug.Debug: m_debug.dbg_print("address=", address, "name=", name, "caller=", caller)
         return address, name
     else:
         return None, None
+
+def get_symbol_addr_by_current_frame_args():
+    """
+    get the Maple symbol address in currect frame stack via gdb print command
+    """
+    cmd = 'p/x *(long long*)&mir_header'
+    try:
+        result = m_util.gdb_exec_to_string(cmd)
+    except:
+        return None
+
+    if result[0] == '$' and ' = 0x' in result:
+        return result.split(' = ')[1].rstrip()
+    else:
+        return None
+
+def get_mirheader_name_by_mirheader_addr(addr):
+    cmd = 'x ' + addr
+    try:
+        result = m_util.gdb_exec_to_string(cmd)
+    except:
+        return None
+    result = result.rstrip()
+    if m_debug.Debug: m_debug.dbg_print("result=", result, "addr=", addr)
+
+    if addr in result:
+        return result.split()[1][1:-2]
+    else:
+        return None
 
 def get_symbol_name_by_current_frame_args():
     """
@@ -93,11 +96,10 @@ def get_symbol_name_by_current_frame_args():
 
     cmd = 'info args'
     try:
-        result  = gdb.execute(cmd, to_string=True)
+        result  = m_util.gdb_exec_to_string(cmd)
     except:
         return None, None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_symbol_name_by_current_frame_args,\
-                        "result=", result)
+    if m_debug.Debug: m_debug.dbg_print("result=", result)
 
     offset = result.find('_mirbin_info>')
     if offset is -1: #no Maple metadata pattern
@@ -116,7 +118,7 @@ def check_symbol_in_current_frame(symbol):
 
     cmd = 'info frame '
     try:
-        result  = gdb.execute(cmd, to_string=True)
+        result  = m_util.gdb_exec_to_string(cmd)
     except:
         return False
 
@@ -135,7 +137,7 @@ def get_variable_value(variable):
 
     cmd = 'p ' + variable
     try:
-        result  = gdb.execute(cmd, to_string=True)
+        result  = m_util.gdb_exec_to_string(cmd)
     except:
         return None
 
@@ -145,7 +147,7 @@ def get_variable_value(variable):
     x = result.split()
     return x[2]
 
-def get_demangled_maple_symbol(symbol):
+def get_demangled_maple_symbol(symbol, to_filename=False):
     """
     for a given Maple symbol, convert it to demangled symbol name
     """
@@ -153,7 +155,7 @@ def get_demangled_maple_symbol(symbol):
     if not '_7C' in symbol:
         return None
     s = symbol
-    s = s.replace('_7C', '|')
+    s = s.replace('_7C', '') # use the jni format
     s = s.replace('_3B', ';')
     s = s.replace('_2F', '.')
     s = s.replace('_28', '(')
@@ -162,14 +164,16 @@ def get_demangled_maple_symbol(symbol):
     s = s.replace('_3E', '>')
     s = s.replace('_24', '$')
 
+    if to_filename == False:
+        return s
+
     # to here, label becomes something like "Ljava.lang.Class;|getComponentType|()Ljava.lang.Class;"
     s = s.split('|')[0]
     s = s.replace(';', '')
     s = s[1:]
     f = s.replace('.', '/')
     f = f + '.java'
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_demangled_maple_symbol,\
-                        "s=", s, "f=", f)
+    if m_debug.Debug: m_debug.dbg_print("s=", s, "f=", f)
 
     return f
 
@@ -270,7 +274,7 @@ def get_maple_symbol_full_syntax(symbol):
         boolean my_var
     """
 
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_symbol_full_syntax,"symbol=", symbol)
+    if m_debug.Debug: m_debug.dbg_print("symbol=", symbol)
     # check a special symbol for Java native array string
     if symbol is '__cinf_Ljava_2Flang_2FString_3B':
         return 'array string', 0
@@ -285,8 +289,7 @@ def get_maple_symbol_full_syntax(symbol):
             type_size = java_type_to_size_dict[symbol[7]]
         else:
             type_size = 1
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_symbol_full_syntax,\
-                        "full_syntax=", full_syntax, "type_size=", type_size)
+        if m_debug.Debug: m_debug.dbg_print("full_syntax=", full_syntax, "type_size=", type_size)
         return full_syntax, type_size
 
     # to check if it is array of class, or array of primitive type.

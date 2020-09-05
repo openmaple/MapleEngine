@@ -38,8 +38,10 @@ On #2, a search path list should be set, for Maple Debugger to search assembly f
 * **_mlocal_**     : Display selected Maple frame arguments, local variables and stack dynamic data
 * **_mprint_**     : Print Maple runtime object data
 * **_mtype_**      : Print a matching class and its inheritance hierarchy by a given search expression
+* **_msymbol_**    : Print a matching symbol list or its detailed infomatioin
 * **_mstepi_**     : Step specified number of Maple instructions
 * **_mnexti_**     : Step one Maple instruction, but proceed through subroutine calls
+* **_mfinish_**    : Execute until selected Maple stack frame returns
 * **_mset_**       : Sets and displays Maple debugger settings
 * **_mhelp_**      : Help command, Usage etc
 
@@ -56,7 +58,7 @@ mbreak -clear <symbol|index>: delete an existing Maple breakpoint at symbol
 mbreak -clearall : delete all existing Maple breakpoints
 mbreak -listall : list all existing Maple breakpoints
 mbreak -ignore <symbol | index> <count> : set ignore count for specified Maple breakpoints
-mbreak : usage and syntax 
+mbreak : usage and syntax
 
 #### 2. Set Maple breakpoint
 use command 'mbreak <mangled Maple symbol>' or 'mbreak -set <mangled Maple symbol>'
@@ -201,7 +203,7 @@ Maple Traceback (most recent call first):
 ***Note***: #0,#2, #4 are Maple frames, others are gdb native frames
 ### mup command
 #### 1. mup
-If mbt shows current Maple frame is at stack level 0, then mup command will make next older Maple frame at its new current frame.  
+If mbt shows current Maple frame is at stack level 0, then mup command will make next older Maple frame at its new current frame.
 example:
 ```
 (gdb) mbt
@@ -364,6 +366,26 @@ Thread 1 "main" hit Breakpoint 3, __inc_opcode_cnt () at /home/test/gitee/maple_
 ```
 ***Note***: Maple instruction 363412 is a OP_return from OP_icall at 344658.
 
+### mfinish command
+#### 1. Execute until selected Maple stack frame returns
+example:
+```
+Thread 1 "main" hit Breakpoint 1, maple::maple_invoke_method (mir_header=0x7fffe02d3178 <LFibonacci_3B_7Cfib_7C_28I_29I_mirbin_info>, caller=0x7fffffff78e8) at /home/che/maple_engine_standalone/maple_engine/maple_engine/src/invoke_method.cpp:158
+158             __maple_method_address = (void *)&maple_invoke_method;
+Breakpoint 2 at 0x7ffff5b51c14: file /home/che/maple_engine_standalone/maple_engine/maple_engine/src/invoke_method.cpp, line 59.
+
+Thread 1 "main" hit Breakpoint 2, __inc_opcode_cnt () at /home/che/maple_engine_standalone/maple_engine/maple_engine/src/invoke_method.cpp:59
+59          return ++__opcode_cnt;
+0x00007ffff5b608f9 in maple::maple_invoke_method (mir_header=0x7fffe02d3178 <LFibonacci_3B_7Cfib_7C_28I_29I_mirbin_info>, caller=0x7fffffff78e8)
+    at /home/che/maple_engine_standalone/maple_engine/maple_engine/src/invoke_method.cpp:924
+924     label_OP_dassign:
+Value returned is $3844 = 304296
+214  :          .byte OP_addroffpc, 0xe, 0x0, 0x0                 // 0000
+215  :          .long _PTR__cinf_LFibonacci_3B-.
+216  :          .byte OP_intrinsiccall, 0x0, 0x4, 0x1             // 0008: MPL_CLINIT_CHECK
+```
+
+
 ## Maple File Commands
 ### msrcpath command
 **_msp_** is the alias of msrcpath command
@@ -407,7 +429,7 @@ file:  /home/test/gitee/maple_engine/maple_build/examples/TypeTest/TypeTest.java
 58
 ```
 #### 2. mlist -asm
-list the current instruction in co-responding assembly file 
+list the current instruction in co-responding assembly file
 example:
 ```
 (gdb) mlist -asm
@@ -461,14 +483,14 @@ local #28 :name=%25 type=a64 value=0x0
 local #29 :name=%27 type=a64 value=0x0
 ```
 #### 2. mlocal -stack or mlocal -s
-This is used to display all stack frame's dynamic data. 
+This is used to display all stack frame's dynamic data.
 example:
 ```
 (gdb) mlocal -stack
 sp= 1 :type= a64  value= 0x7ffff49915e8 <_C_STR_aa6c9e888c754e206fadbf41fdc90033> "0u\214\366\377\177"
 sp= 2 :type= a64  value= 0x0
 ```
-### mprint command 
+### mprint command
 This command is used to display the object data and object type includind the inheritence hierarchy
 #### 1. syntax: mprint <hex address>
 example:
@@ -498,7 +520,7 @@ level 2 class Ljava_2Flang_2FThreadGroup_3B:
 example:
 ```
 (gdb) mtype Nodes_24ToArrayTask_24OfRef
-#1 class name Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B:
+#1 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B:
   level 1 Ljava_2Flang_2FObject_3B:
     #1,off= 0,len= 8,"reserved__1     "
     #2,off= 8,len= 4,"reserved__2     "
@@ -511,18 +533,47 @@ example:
     #6,off=28,len= 4,"offset          "
     #7,off=32,len= 8,"node            "
   level 5 Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B:
-    #8,off=40,len= 8,"array   
+    #8,off=40,len= 8,"array           "
+
+  Method list:
+    #1 Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B_7C_3Cinit_3E_7C_28Ljava_2Futil_2Fstream_2FNode_3BALjava_2Flang_2FObject_3BILjava_2Futil_2Fstream_2FNodes_241_3B_29V
+    #2 Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B_7C_3Cinit_3E_7C_28Ljava_2Futil_2Fstream_2FNode_3BALjava_2Flang_2FObject_3BI_29V
+    #3 Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B_7C_3Cinit_3E_7C_28Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3BLjava_2Futil_2Fstream_2FNode_3BI_29V
+    #4 Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B_7CcopyNodeToArray_7C_28_29V
+    #5 Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B_7CmakeChild_7C_28II_29Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B
+    #6 Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B_7CmakeChild_7C_28II_29Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_3B
 ```
 #### 2. If multiple classes match
 example:
 ```
 (gdb) mtype Nodes_24ToArrayTask
-#1 class name Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfPrimitive_3B:
-#2 class name Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfLong_3B:
-#3 class name Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfInt_3B:
-#4 class name Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_3B:
-#5 class name Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfDouble_3B:
-#6 class name Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B:
+#1 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfPrimitive_3B:
+#2 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfLong_3B:
+#3 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfInt_3B:
+#4 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_3B:
+#5 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfDouble_3B:
+#6 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B:
+```
+
+### msymbol command
+**_syntax_**: msymbol <regex-of-symbol-name-search-pattern>
+
+#### 1. If only one matches
+example:
+```
+(gdb) msymbol Lsun_2Fsecurity_2Fprovider_2FPolicyParser_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
+#1 symbol name: Lsun_2Fsecurity_2Fprovider_2FPolicyParser_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
+demangled name: Lsun.security.provider.PolicyParser;main(ALjava.lang.String;)V
+assembly file : //home/che/maple_engine_standalone/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s
+source        : /home/che/my_openjdk8/jdk/src/share/classes/sun/security/provider/PolicyParser.java
+```
+#### 2. If multiple symbols match
+example:
+```
+(gdb) msymbol executor
+#1 symbol name: Lsun_2Fnio_2Fch_2FAsynchronousChannelGroupImpl_3B_7Cexecutor_7C_28_29Ljava_2Futil_2Fconcurrent_2FExecutorService_3B
+#2 symbol name: Lsun_2Fnio_2Fch_2FAsynchronousFileChannelImpl_3B_7Cexecutor_7C_28_29Ljava_2Futil_2Fconcurrent_2FExecutorService_3B
+#3 symbol name: Lsun_2Fnio_2Fch_2FThreadPool_3B_7Cexecutor_7C_28_29Ljava_2Futil_2Fconcurrent_2FExecutorService_3B
 ```
 
 ## Maple Miscellaneous Commands
@@ -550,6 +601,33 @@ delete ~/gitee/maple_engine/maple_build/out/x86_64/ from maple_lib_asm_path asm 
 ```
 (gdb)mset -del maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x86_64/
 ```
+#### 5. mset linecount <n>
+set the number of lines mlist will display for source file and assembly file
+```
+(gdb) mset linecount 20
+(gdb) mlist
+src file: /home/che/my_openjdk8/jdk/src/share/classes/java/util/AbstractMap.java line: 74
+      65  * @since 1.2
+      66  */
+      67
+      68 public abstract class AbstractMap<K,V> implements Map<K,V> {
+      69     /**
+      70      * Sole constructor.  (For invocation by subclass constructors, typically
+      71      * implicit.)
+      72      */
+      73     protected AbstractMap() {
+=>    74     }
+      75
+      76     // Query Operations
+      77
+      78     /**
+      79      * {@inheritDoc}
+      80      *
+      81      * @implSpec
+      82      * This implementation returns <tt>entrySet().size()</tt>.
+      83      */
+      84     public int size() {
+```
 
 ### mhelp command
 #### 1. List all the commands and Maple Debugger version
@@ -570,6 +648,8 @@ mtype:      Print a matching class and its inheritance hierarchy by a given sear
 mstepi:     Step specified number of Maple instructions
 mnexti:     Step one Maple instruction, but proceed through subroutine calls
 mset:       Sets and displays Maple debugger settings
+mfinish:    Execute until selected Maple stack frame returns
+mhelp:      list Maple help information
 ```
 #### 2. Help of individual Maple command
 mhelp <command name>

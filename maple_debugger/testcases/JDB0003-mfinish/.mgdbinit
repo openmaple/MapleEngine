@@ -1,0 +1,12 @@
+mb LFibonacci_3B_7Cfib_7C_28I_29I
+run
+mb -disable LFibonacci_3B_7Cfib_7C_28I_29I
+python
+for i in range(1000):
+    gdb_echo_and_exec('msi')
+gdb_echo_and_exec('mbt')
+for i in range(20):
+    gdb_echo_and_exec('mfinish')
+    gdb_echo_and_exec('mbt')
+end
+q

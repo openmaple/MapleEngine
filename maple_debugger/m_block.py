@@ -1,7 +1,19 @@
-#!/usr/bin/env python3
+#
+# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+#
+# Licensed under the Mulan Permissive Software License v2.
+# You can use this software according to the terms and conditions of the MulanPSL - 2.0.
+# You may obtain a copy of MulanPSL - 2.0 at:
+#
+#   https://opensource.org/licenses/MulanPSL-2.0
+#
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
+# FIT FOR A PARTICULAR PURPOSE.
+# See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
-from inspect import currentframe, getframeinfo
-import m_util
 
 def get_block(frame):
     '''
@@ -12,7 +24,7 @@ def get_block(frame):
         return None
     if not frame.is_valid():
         return None
-    
+
     try:
         block = frame.block()
     except :
@@ -28,7 +40,7 @@ def get_block(frame):
 def get_block_from_pc(pc):
     '''
     :param pc: frame's resume address
-    :type pc: gdb.Frame.pc() 
+    :type pc: gdb.Frame.pc()
     :returns: a gdb.Block object or None
     '''
     return gdb.block_for_pc(pc)

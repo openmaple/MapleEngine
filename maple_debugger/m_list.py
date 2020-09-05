@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,26 +11,45 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
 import os
-import sys
 import m_frame
 import m_datastore
-from inspect import currentframe, getframeinfo
 import m_util
+import m_set
+import m_debug
+from m_util import MColors
+from m_util import gdb_print
 
 maple_source_path_list = []
 
 def find_one_file(name, path):
     """ Find the file with specified name and given base path """
+    if not name:
+        return None
+    exist = m_datastore.mgdb_rdata.in_fullpath_cache(name, path)
+    if exist:
+        return m_datastore.mgdb_rdata.get_fullpath_cache(name, path)
+    res = None
     for root, dirs, files in os.walk(path):
         if name in files:
-            return os.path.join(root, name)
+            res = os.path.join(root, name)
+            if not res:
+                if m_debug.Debug: m_debug.dbg_print("fine_one_file found file with None fullpath")
+            break
+    if res:
+        m_datastore.mgdb_rdata.add_fullpath_cache(name, path, res)
+    return res
 
 class MapleSourcePathCmd(gdb.Command):
-    """
-    This class defines msrcpath command, to manage the paths used for searching
-    Maple application source files
+    """Add and manage the Maple source code search paths
+    msp is the alias of msrcpath command
+    msrcpath: display all the search paths of Maple application and library source code
+    msrcpath -show: same to msrcpath command without arugment
+    msrcpath -add <path>:  add one path to the top of the list
+    msrcpath -del <path>:  delete specified path from the list
     """
 
     def __init__(self):
@@ -43,32 +61,31 @@ class MapleSourcePathCmd(gdb.Command):
         global maple_source_path_list
 
         # add current working directory at the top
-        line = gdb.execute('pwd', to_string=True)
+        line = m_util.gdb_exec_to_string('pwd')
         if line:
             s = line.split()
             line = s[2][:-1] if len(s) is 3 else None
             if line:
-                #maple_source_path_list.append(line)
-                maple_source_path_list.append(os.path.expanduser(line))
+                maple_source_path_list.append(os.path.expandvars(os.path.expanduser(line)))
         '''
         if len(maple_source_path_list) == 1:
-            print("Maple application source code search path only has one path as following:")
-            print("  ", maple_source_path_list[0])
-            print("Please add more search paths using msrcpath -add <path> command")
+            gdb_print("Maple application source code search path only has one path as following:")
+            gdb_print("  ", maple_source_path_list[0])
+            gdb_print("Please add more search paths using msrcpath -add <path> command")
         '''
 
-        gdb.execute('alias msp = msrcpath')
+        m_util.gdb_exec('alias msp = msrcpath')
 
     def invoke(self, args, from_tty):
         self.msrcpath_func(args, from_tty)
 
     def usage(self):
-        print ("  msrcpath : ")
-        print ("    msrcpath -show or msrcpath: display all the source code search paths")
-        print ("    msrcpath -add <path>:  add one path to the top of the list")
-        print ("    msrcpath -del <path>:  delete specified path from the list")
-        print ("    msrcpath -help:        print this message")
-        print ("\n")
+        gdb_print ("  msrcpath : ")
+        gdb_print ("    msrcpath -show or msrcpath: display all the source code search paths")
+        gdb_print ("    msrcpath -add <path>:  add one path to the top of the list")
+        gdb_print ("    msrcpath -del <path>:  delete specified path from the list")
+        gdb_print ("    msrcpath -help:        print this message")
+        gdb_print ("\n")
 
     def msrcpath_func(self, args, from_tty):
         s = str(args)
@@ -93,14 +110,15 @@ class MapleSourcePathCmd(gdb.Command):
             else:
                 self.usage()
                 return
- 
+
     def show_path(self):
-        print ("Maple source path list: --")
+        gdb_print ("Maple source path list: --")
         if len(maple_source_path_list) is 0:
-            print ("none")
+            gdb_print ("none")
             return
         for path in maple_source_path_list:
-            print (path)
+            gdb_print (path)
+        if m_debug.Debug: m_datastore.mgdb_rdata.show_file_cache()
 
     def add_path(self, path):
         # we add path into the top of the list
@@ -114,11 +132,14 @@ class MapleSourcePathCmd(gdb.Command):
         global maple_source_path_list
         if path in maple_source_path_list:
             maple_source_path_list.remove(path)
+            m_datastore.mgdb_rdata.del_fullpath_cache()
+            m_datastore.mgdb_rdata.del_src_lines()
+            if m_debug.Debug: m_datastore.mgdb_rdata.show_file_cache()
 
 class MapleListCmd(gdb.Command):
-    """
-    This class defines Maple command mlist, to display the proper lines of Maple
-    application source file or its compiled asm file
+    """List source code in multiple modes
+    mlist: list source code associated with current Maple frame
+    mlist -asm: list assemble instructions associated with current Maple frame
     """
 
     def __init__(self):
@@ -135,13 +156,11 @@ class MapleListCmd(gdb.Command):
         self.asm_func_header_name = None
 
     def invoke(self, args, from_tty):
-        gdb.execute('set pagination off', to_string = True)
         self.mlist_func(args, from_tty)
-        gdb.execute('set pagination on', to_string = True)
 
     def usage(self):
-        print ("  mlist      : list source code associated with current Maple frame")
-        print ("  mlist -asm : list assemble instructions associated with current Maple frame")
+        gdb_print ("  mlist      : list source code associated with current Maple frame")
+        gdb_print ("  mlist -asm : list assemble instructions associated with current Maple frame")
 
 
     def mlist_func(self, args, from_tty):
@@ -165,37 +184,32 @@ class MapleListCmd(gdb.Command):
         if not ds:
             return
 
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func, "ds=", ds)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func,\
-                        "asm_file_full_path=", ds['frame_func_header_info']['asm_path'])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func,\
-                        "asm_file_line=", ds['frame_func_src_info']['asm_line'])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func,\
-                        "asm_func_header_name=", ds['frame_func_header_info']['func_header_name'])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func,\
-                        "self.asm_file_full_name: ", self.asm_file_full_path)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func,\
-                        "self.asm_file_line: ", self.asm_file_line)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func,\
-                        "self.asm_func_header_name: ", self.asm_func_header_name)
+        if m_debug.Debug:
+            m_debug.dbg_print("ds=", ds)
+            m_debug.dbg_print("asm_file_full_path=", ds['frame_func_header_info']['asm_path'])
+            m_debug.dbg_print("asm_file_line=", ds['frame_func_src_info']['asm_line'])
+            m_debug.dbg_print("asm_func_header_name=", ds['frame_func_header_info']['func_header_name'])
+            m_debug.dbg_print("self.asm_file_full_name: ", self.asm_file_full_path)
+            m_debug.dbg_print("self.asm_file_line: ", self.asm_file_line)
+            m_debug.dbg_print("self.asm_func_header_name: ", self.asm_func_header_name)
 
         if not self.asm_file_full_path:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func)
+            if m_debug.Debug: m_debug.dbg_print()
             self.asm_file_full_path = ds['frame_func_header_info']['asm_path']
             self.asm_file_line = ds['frame_func_src_info']['asm_line']
             self.asm_func_header_name = ds['frame_func_header_info']['func_header_name']
         else:
             if self.asm_file_full_path != ds['frame_func_header_info']['asm_path']:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func)
+                if m_debug.Debug: m_debug.dbg_print()
                 self.asm_file_full_path = ds['frame_func_header_info']['asm_path']
                 self.asm_file_line = ds['frame_func_src_info']['asm_line']
                 self.asm_func_header_name = ds['frame_func_header_info']['func_header_name']
             else:
                 if self.asm_func_header_name == ds['frame_func_header_info']['func_header_name']:
-                    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func)
+                    if m_debug.Debug: m_debug.dbg_print()
                     pass
                 else:
-                    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_asm_file_func)
+                    if m_debug.Debug: m_debug.dbg_print()
                     self.asm_file_line = ds['frame_func_src_info']['asm_line']
                     self.asm_func_header_name = ds['frame_func_header_info']['func_header_name']
 
@@ -210,19 +224,14 @@ class MapleListCmd(gdb.Command):
         if not ds:
             return
 
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_source_file_func, "ds=", ds)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_source_file_func,\
-                        "src_file_short_name: ", ds['frame_func_src_info']['short_src_file_name'])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_source_file_func,\
-                        "src_file_line: ", ds['frame_func_src_info']['short_src_file_line'])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_source_file_func,\
-                        "func_header_name: ", ds['frame_func_header_info']['func_header_name'])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_source_file_func,\
-                        "self.src_file_short_name: ", self.short_src_file_name)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_source_file_func,\
-                        "self.src_file_line: ", self.src_file_line)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.mlist_source_file_func,\
-                        "self.func_header_name: ", self.func_header_name)
+        if m_debug.Debug:
+            m_debug.dbg_print("ds=", ds)
+            m_debug.dbg_print("src_file_short_name: ", ds['frame_func_src_info']['short_src_file_name'])
+            m_debug.dbg_print("src_file_line: ", ds['frame_func_src_info']['short_src_file_line'])
+            m_debug.dbg_print("func_header_name: ", ds['frame_func_header_info']['func_header_name'])
+            m_debug.dbg_print("self.src_file_short_name: ", self.short_src_file_name)
+            m_debug.dbg_print("self.src_file_line: ", self.src_file_line)
+            m_debug.dbg_print("self.func_header_name: ", self.func_header_name)
 
         if not self.short_src_file_name:
             self.short_src_file_name = ds['frame_func_src_info']['short_src_file_name']
@@ -247,36 +256,45 @@ class MapleListCmd(gdb.Command):
                 continue
             else:
                 break
-        
+
         if not file_full_path:
-            print ("source code file ", self.short_src_file_name, " not found in any path")
+            if self.short_src_file_name:
+                gdb_print ("source code file " + self.short_src_file_name + " not found in any path")
+            else:
+                gdb_print ("source code file not found. try 'mlist -asm' instead")
             return
         self.display_src_lines(file_full_path, self.src_file_line)
 
 
     def display_src_lines(self, filename, line_num):
-        if line_num <= 5:
-            start_line = 1
+        exist = m_datastore.mgdb_rdata.in_src_lines(filename)
+        if exist:
+            total = m_datastore.mgdb_rdata.get_src_lines(filename)
         else:
-            start_line = line_num - 4
+            with open (filename) as fp:
+                total = len(fp.readlines())
+            m_datastore.mgdb_rdata.add_src_lines(filename, total)
+        try:
+            count = int(m_set.msettings["linecount"])
+            if count < 5:
+                count = 10 if count != 0 else total << 1
+        except:
+            count = 10
+        half = (count - 1) >> 1
+        s_line = str(line_num - half) if line_num > half + 1 else '1'
+        half = count - half - 1
+        e_line = str(line_num + half) if line_num + half <= total else str(total)
+        gdb_print("src file: %s%s%s line: %s" % (MColors.BT_SRC, filename, MColors.ENDC, str(line_num)))
+        if m_util.Highlighted:
+            buf =m_util.shell_cmd('highlight -O xterm256 --force -s %s %s | sed -n %s,%sp |'
+                ' nl -ba -s" " -w8 -v%s | sed "s/^  \\( *%s \\)/=>\\1/"' \
+                % (m_util.HighlightStyle, filename, s_line, e_line, s_line, str(line_num)))
+        else:
+            buf = m_util.shell_cmd('sed -n %s,%sp %s | nl -ba -s" " -w8 -v%s | sed "s/^  \\( *%s \\)/=>\\1/"' \
+                % (s_line, e_line, filename, s_line, str(line_num)))
+        m_util.gdb_write(buf)
+        self.src_file_line = line_num + count if line_num + count <= total else total
 
-        print ("file: ", filename, " line: ", line_num)
-        f = open(filename, 'r')
-        count = 1
-        for line in f:
-            if count < start_line:
-                count += 1
-                continue
-            elif count >= start_line and count <= line_num + 4:
-                print(count, "   ", line.rstrip())
-                count += 1
-            else:
-                self.src_file_line = count + 4
-                break
-        print ("\n")
-        f.close()
-
-    
 
     def display_asm_file_lines(self, filename, line_num, asm_tuple):
         """
@@ -285,37 +303,44 @@ class MapleListCmd(gdb.Command):
           line_num: int. line number of this asm file
           asm_tuple: (maple_symbol_block_start_line, block_start_offset, block_end_offset)
         """
-
-        if line_num <= 5:
-            start_line = 1
-            end_line = 9
+        exist = m_datastore.mgdb_rdata.in_asmblock_lines(filename, asm_tuple[0])
+        if exist:
+            total = m_datastore.mgdb_rdata.get_asmblock_lines(filename, asm_tuple[0])
         else:
-            start_line = line_num - 4
-            end_line = line_num + 4
- 
-        block_line = asm_tuple[0] #this offset is the label's starting line number
-        block_offset = asm_tuple[1]
-
-        
-        f = open(filename, 'r')
-        f.seek(block_offset)
-        ln = block_line
-        offset = asm_tuple[1]
-        while start_line > ln:
-            line = f.readline()
-            offset += len(line)
-            ln += 1
-
-        print ("file: ", filename, " line: ", line_num)
-        count = start_line
-        for count in range(start_line, end_line):
-            line = f.readline()
-            if not line:
-                break
-            else:
-                print(count, "   ", line.rstrip())
-        f.close()
-        print ("\n")
-    
-        self.asm_file_line = end_line + 4
-
+            with open(filename) as fp:
+                offset = asm_tuple[1]
+                fp.seek(offset)
+                total = 0
+                while offset < asm_tuple[2]:
+                    line = fp.readline()
+                    offset += len(line)
+                    total += 1
+            m_datastore.mgdb_rdata.add_asmblock_lines(filename, asm_tuple[0], total)
+        try:
+            count = int(m_set.msettings["linecount"])
+            if count < 9:
+                count = 20 if count != 0 else total << 1
+        except:
+            count = 20
+        if line_num < asm_tuple[0] or line_num > asm_tuple[0] + total:
+            return
+        curr_num = line_num - asm_tuple[0] + 1
+        half = (count - 1) >> 1
+        s_line = curr_num - half if curr_num > half + 1 else 1
+        half = count - half - 1
+        e_line = curr_num + half if curr_num + half <= total else total
+        gdb_print("asm file: %s%s%s line: %s" % (MColors.BT_SRC, filename, MColors.ENDC, str(line_num)))
+        ss_line = asm_tuple[0] + s_line - 1
+        if m_util.Highlighted:
+            buf =m_util.shell_cmd('dd skip=%s bs=1 count=%s if=%s 2> /dev/null |'
+                ' highlight -O xterm256 -S asm -s %s | sed -n %s,%sp |'
+                ' nl -ba -s" " -w12 -v%s | sed "s/^  \\( *%s \\)/=>\\1/"' \
+                % (str(asm_tuple[1]), str(asm_tuple[2] - asm_tuple[1]), filename, \
+                   m_util.HighlightStyle, str(s_line), str(e_line), str(ss_line), str(line_num)))
+        else:
+            buf =m_util.shell_cmd('dd skip=%s bs=1 count=%s if=%s 2> /dev/null |'
+                ' sed -n %s,%sp | nl -ba -s" " -w12 -v%s | sed "s/^  \\( *%s \\)/=>\\1/"' \
+                % (str(asm_tuple[1]), str(asm_tuple[2] - asm_tuple[1]), filename, \
+                   str(s_line), str(e_line), str(ss_line), str(line_num)))
+        m_util.gdb_write(buf)
+        self.asm_file_line = line_num + count if line_num + count < asm_tuple[0] + total else asm_tuple[0] + total - 1

@@ -1,0 +1,6 @@
+mb LFibonacci_3B_7Cfib_7C_28I_29I
+mb LFibonacci_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
+mb LFibonacci_3B_7C_3Cinit_3E_7C_28_29V
+run
+mb -listall
+q

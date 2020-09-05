@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,18 +11,20 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
-import os
-import sys
 import m_datastore
 import m_symbol
-from inspect import currentframe, getframeinfo
 import m_util
+from m_util import MColors
+from m_util import gdb_print
+import m_debug
 
 class MaplePrintCmd(gdb.Command):
-    """
-    This class defines a Maple command mprint to print a Maple object or Maple
-    primitive type of data at a specifed stack address
+    """Print Maple runtime object data
+    print a Maple object data:
+    mprint <addr-in-hex>: e.g mprint 0x13085
     """
 
     def __init__(self):
@@ -33,19 +34,17 @@ class MaplePrintCmd(gdb.Command):
                               gdb.COMPLETE_NONE)
 
     def invoke(self, args, from_tty):
-        gdb.execute('set pagination off', to_string = True)
         self.mprint_func(args, from_tty)
-        gdb.execute('set pagination on', to_string = True)
 
     def usage(self):
-        print ("  mprint      : print Maple object data")
-        print ("  mprint <addr-in-hex>: e.g mprint 0x13085")
+        gdb_print ("  mprint      : print Maple object data")
+        gdb_print ("  mprint <addr-in-hex>: e.g mprint 0x13085")
 
     def mprint_func(self, args, from_tty):
         s = str(args)
 
         x = s.split()
-        if len(x) == 1: # address 
+        if len(x) == 1: # address
             try:
                 addr = int(x[0],16)
             except:
@@ -57,19 +56,19 @@ class MaplePrintCmd(gdb.Command):
 
         class_name, full_syntax, type_size  = self.get_class_name_syntax(addr)
         if not full_syntax:
-            return 
-        
+            return
+
         # if it is a array of class obj, or just non-array regular class obj
         if 'array' in full_syntax and class_name[0] == 'L' \
             or 'class' in full_syntax and class_name[0] == 'L' :
             class_list = self.get_class_list(class_name, full_syntax, type_size)
 
             if not class_list or len(class_list) is 0:
-                print("no class data found")
+                gdb_print("no class data found")
                 return
 
             self.display_class_data(class_list, addr)
-        
+
         # if it is an array of primitive type
         elif 'array' in full_syntax and class_name in m_symbol.java_primitive_type_dict:
             ### array is a object that takes 12 bytes per java standard
@@ -92,13 +91,13 @@ class MaplePrintCmd(gdb.Command):
         """
 
         try:
-            buffer = gdb.execute('x/gx ' + hex(addr), to_string = True)
+            buffer = m_util.gdb_exec_to_string('x/gx ' + hex(addr))
         except:
             return None,None,None
         obj_addr = buffer.split(':')[1].strip(' ')
 
         try:
-            buffer = gdb.execute('x ' + obj_addr, to_string = True)
+            buffer = m_util.gdb_exec_to_string('x ' + obj_addr)
         except:
             return None,None,None
         if not '<' in buffer or not '>' in buffer:
@@ -113,10 +112,9 @@ class MaplePrintCmd(gdb.Command):
         else:
             return None,None,None
 
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_class_name_syntax,\
-                        "return class_name:", class_name, "full_syntax:", full_syntax, "type_size:", type_size)
+        if m_debug.Debug: m_debug.dbg_print("return class_name:", class_name, "full_syntax:", full_syntax, "type_size:", type_size)
         return class_name, full_syntax, type_size
-    
+
     def get_class_list(self, class_name, full_syntax, type_size):
         """
         For a given class name and its full syntax, find out all the derived classes.
@@ -152,9 +150,8 @@ class MaplePrintCmd(gdb.Command):
         name = class_name
         count = 0
         while True:
-            obj_class_dict = m_datastore.mgdb_rdata.get_class_def(name) 
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_class_list,\
-                            "count=", count, "obj_class_dict=", obj_class_dict)
+            obj_class_dict = m_datastore.mgdb_rdata.get_class_def(name)
+            if m_debug.Debug: m_debug.dbg_print("count=", count, "obj_class_dict=", obj_class_dict)
             if not obj_class_dict:
                 return  None
             if count is 0: # only the first class_name, we know its type at runtime
@@ -171,55 +168,55 @@ class MaplePrintCmd(gdb.Command):
             else:
                 name = obj_class_dict['base_class']
 
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_class_list,\
-                            "count=", count, "obj_class_dict=", obj_class_dict)
-        for i in range(len(inherit_list)):
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_class_list,\
-                        "  inherit_list #",i, inherit_list[i])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_class_list)
+        if m_debug.Debug: m_debug.dbg_print("count=", count, "obj_class_dict=", obj_class_dict)
+        for i, v in enumerate(inherit_list):
+            if m_debug.Debug: m_debug.dbg_print("  inherit_list #",i, v)
+        if m_debug.Debug: m_debug.dbg_print()
 
         return inherit_list
 
     def display_class_data(self, class_list, addr):
         level = len(class_list)
         if level is 0:
-            print("no data found")
-            return 
+            gdb_print("no data found")
+            return
 
         '''print head line before printing level'''
         if 'array' in class_list[level-1]['full_syntax']:
-            buffer = 'object type: {}'.format(class_list[level-1]['full_syntax'])
+            buffer = 'object type: {}'.format(MColors.MP_FSYNTAX + class_list[level-1]['full_syntax'] + MColors.ENDC)
         else:
-            buffer = 'object type: {} {}'.format(class_list[level-1]['full_syntax'], class_list[level-1]['class_name'])
-        print(buffer)
+            buffer = 'object type: {} {}'.format(MColors.MP_FSYNTAX + class_list[level-1]['full_syntax'] + MColors.ENDC,\
+                                                 MColors.MP_FSYNTAX + class_list[level-1]['class_name'] + MColors.ENDC)
+        gdb_print(buffer)
 
         field_count = 1
         for i in range(level):
             if 'array' in class_list[i]['full_syntax']:
                 if class_list[i]['obj_class']['base_class'] == "THIS_IS_ROOT":
                     arr_length = self.get_array_length(addr + class_list[i]['obj_class']['size'])
-                    buffer = 'level {} {}: length={}'.format(i+1, class_list[i]['full_syntax'],arr_length)
-                    print(buffer)
+                    buffer = 'level {} {}: length={}'.format(i+1, MColors.MP_CNAME + class_list[i]['full_syntax'] + MColors.ENDC,arr_length)
+                    gdb_print(buffer)
                     self.print_array_class_values(addr+class_list[i]['obj_class']['size'])
                 else:
                     arr_length = self.get_array_length(addr + class_list[i-1]['obj_class']['size'])
-                    buffer = 'level {} {}: length={}'.format(i+1, class_list[i]['full_syntax'],arr_length)
-                    print(buffer)
+                    buffer = 'level {} {}: length={}'.format(i+1, MColors.MP_CNAME + class_list[i]['full_syntax'] + MColors.ENDC,arr_length)
+                    gdb_print(buffer)
                     self.print_array_class_values(addr+class_list[i-1]['obj_class']['size'])
             else:
-                buffer = 'level {} {} {}: '.format(i+1, class_list[i]['full_syntax'], class_list[i]['class_name'])
-                print(buffer)
+                buffer = 'level {} {} {}: '.format(i+1, MColors.MP_FSYNTAX + class_list[i]['full_syntax'] + MColors.ENDC,\
+                                                    MColors.MP_CNAME + class_list[i]['class_name'] + MColors.ENDC)
+                gdb_print(buffer)
 
                 slist = sorted(class_list[i]['obj_class']['fields'], key=lambda x:x['offset'])
-                for field_idx in range(len(slist)):
-                    value_string = self.get_value_from_memory(addr, slist[field_idx]['offset'],slist[field_idx]['length'])
+                for v in slist:
+                    value_string = self.get_value_from_memory(addr, v['offset'],v['length'])
                     if not value_string:
-                        buffer ='  #{0:d},off={1:2d},len={2:2d},"{3:<16s}",value=None'.format(field_count, slist[field_idx]['offset']\
-                                ,slist[field_idx]['length'],slist[field_idx]['name'])
+                        buffer ='  #{0:d},off={1:2d},len={2:2d},"{3:<16s}",value=None'.format(field_count, v['offset']\
+                                ,v['length'],v['name'])
                     else:
-                        buffer ='  #{0:d},off={1:2d},len={2:2d},"{3:<16s}",value={4}'.format(field_count, slist[field_idx]['offset']\
-                                ,slist[field_idx]['length'],slist[field_idx]['name'],value_string)
-                    print(buffer)
+                        buffer ='  #{0:d},off={1:2d},len={2:2d},"{3:<16s}",value={4}'.format(field_count, v['offset']\
+                                ,v['length'],v['name'],value_string)
+                    gdb_print(buffer)
                     field_count += 1
 
         return
@@ -227,19 +224,19 @@ class MaplePrintCmd(gdb.Command):
     def get_array_length(self, addr):
         cmd = 'x/1xw ' + hex(addr)
         try:
-            buffer = gdb.execute(cmd, to_string = True)
+            buffer = m_util.gdb_exec_to_string(cmd)
         except:
             return 0
         item_num = int(buffer.split(':')[1].strip(),16)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_array_length, "item_num=", item_num)
+        if m_debug.Debug: m_debug.dbg_print("item_num=", item_num)
         return item_num
 
     def display_array_primitive_values(self, addr, full_syntax, type_size):
-        buffer = 'Object Type: {}'.format(full_syntax)
-        print(buffer)
+        buffer = 'Object Type: {}'.format(MColors.MP_FSYNTAX + full_syntax + MColors.ENDC)
+        gdb_print(buffer)
         item_num = self.get_array_length(addr)
-        buffer = 'Level 1 {}: length={}'.format(full_syntax, item_num)
-        print(buffer)
+        buffer = 'Level 1 {}: length={}'.format(MColors.MP_FSYNTAX + full_syntax + MColors.ENDC, item_num)
+        gdb_print(buffer)
 
         if item_num > 10:
             item_list = [0,1,2,3,4,5,6, item_num-3,item_num-2,item_num-1]
@@ -260,13 +257,12 @@ class MaplePrintCmd(gdb.Command):
                 cmd = 'x/1xb ' + hex(obj_addr)
             else:
                 return
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.display_array_primitive_values,\
-                             "cmd=", cmd)
+            if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
             try:
-                buffer = gdb.execute(cmd, to_string = True)
+                buffer = m_util.gdb_exec_to_string(cmd)
             except:
                 buf = '  [{}] {}'.format(i,'no-data')
-                print (buf)
+                gdb_print (buf)
                 steps += 1
                 continue
 
@@ -274,10 +270,10 @@ class MaplePrintCmd(gdb.Command):
             v = buffer.split(':')[1].strip()
             v = hex(int(v, 16)) #remove leading 0s. e.g 0x000123 to 0x123
             buf = '  [{}] {}'.format(i, v)
-            print (buf)
+            gdb_print (buf)
 
             if item_num > 10 and steps > 6 and show_snip == True:
-                print("  ...")
+                gdb_print("  ...")
                 show_snip = False
 
         return
@@ -297,13 +293,12 @@ class MaplePrintCmd(gdb.Command):
         for i in item_list:
             obj_addr = addr + 4 + 8 * i  # class reference is a pointer, 8 bytes
             cmd = 'x/1gx ' + hex(obj_addr)
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.print_array_class_values,\
-                             "cmd=", cmd)
+            if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
             try:
-                buffer = gdb.execute(cmd, to_string = True)
+                buffer = m_util.gdb_exec_to_string(cmd)
             except:
                 buf = '  [{}] {}'.format(i,'no-data')
-                print (buf)
+                gdb_print (buf)
                 steps += 1
                 continue
 
@@ -311,10 +306,10 @@ class MaplePrintCmd(gdb.Command):
             v = buffer.split(':')[1].strip()
             v = hex(int(v, 16)) #remove leading 0s. e.g 0x000123 to 0x123
             buf = '  [{}] {}'.format(i, v)
-            print (buf)
+            gdb_print (buf)
 
             if item_num > 10 and steps > 6 and show_snip == True:
-                print("  ...")
+                gdb_print("  ...")
                 show_snip = False
 
         return
@@ -331,8 +326,7 @@ class MaplePrintCmd(gdb.Command):
           value in string
         """
 
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory,\
-                            "addr=", addr, " offset=", offset, " length=", length)
+        if m_debug.Debug: m_debug.dbg_print("addr=", addr, " offset=", offset, " length=", length)
         hex_string = None
         doulbe_string = None
         long_string = None
@@ -345,108 +339,108 @@ class MaplePrintCmd(gdb.Command):
         if length == 8: # 8 byte, could be a long, a 8 byte address ptr, or a double
             cmd = 'x/1gx ' + hex(addr + offset) # cmd to get 8 byte address
             try:
-                hex_string = gdb.execute(cmd, to_string = True)
+                hex_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             hex_string = hex_string.split()[1]
             hex_string = hex(int(hex_string,16))
 
             cmd = 'x/1gf ' + hex(addr + offset) # cmd to get 8 byte double value
             try:
-                double_string = gdb.execute(cmd, to_string = True)
+                double_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             double_string = double_string.split()[1]
 
             cmd = 'x/1dg ' + hex(addr + offset) # cmd to get 8 byte long value
             try:
-                long_string = gdb.execute(cmd, to_string = True)
+                long_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             long_string = long_string.split()[1]
 
             ret = 'hex:' + hex_string + ',long:' + long_string + ',double:' + double_string
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory, "ret=", ret)
+            if m_debug.Debug: m_debug.dbg_print("ret=", ret)
             return ret
-        elif length == 4: # 4 byte,could be int, float, hex 
+        elif length == 4: # 4 byte,could be int, float, hex
             cmd = 'x/1xw ' + hex(addr + offset) # cmd to get 4 byte hex address
             try:
-                hex_string = gdb.execute(cmd, to_string = True)
+                hex_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             hex_string = hex_string.split()[1]
 
-            cmd = 'x/1dw ' + hex(addr + offset) # cmd to get 4 byte int 
+            cmd = 'x/1dw ' + hex(addr + offset) # cmd to get 4 byte int
             try:
-                int_string = gdb.execute(cmd, to_string = True)
+                int_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             int_string = int_string.split()[1]
 
-            cmd = 'x/1fw ' + hex(addr + offset) # cmd to get 4 byte float 
+            cmd = 'x/1fw ' + hex(addr + offset) # cmd to get 4 byte float
             try:
-                float_string = gdb.execute(cmd, to_string = True)
+                float_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             float_string = float_string.split()[1]
 
             ret = 'hex:'+hex_string+',int:'+int_string+',float:'+float_string
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory, "ret=", ret)
+            if m_debug.Debug: m_debug.dbg_print("ret=", ret)
             return ret
         elif length == 2: # 2 byte, could be short, hex, 2 character
             cmd = 'x/1xh ' + hex(addr + offset) # cmd to get 2 byte hex address
             try:
-                hex_string = gdb.execute(cmd, to_string = True)
+                hex_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             hex_string = hex_string.split()[1]
 
-            cmd = 'x/1dh ' + hex(addr + offset) # cmd to get 2 byte short int 
+            cmd = 'x/1dh ' + hex(addr + offset) # cmd to get 2 byte short int
             try:
-                short_string = gdb.execute(cmd, to_string = True)
+                short_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             short_string = short_string.split()[1]
 
             cmd = 'x/2b ' + hex(addr + offset) # cmd to get 2 byte characters
             try:
-                byte_string = gdb.execute(cmd, to_string = True)
+                byte_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             byte_string = byte_string.split(':')[1].strip()
 
             ret = 'hex:'+hex_string+',short:'+short_string+',byte:'+byte_string
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory, "ret=", ret)
+            if m_debug.Debug: m_debug.dbg_print("ret=", ret)
             return ret
-        elif length == 1: # 1 byte. could be hex, c 
+        elif length == 1: # 1 byte. could be hex, c
             cmd = 'x/1xb ' + hex(addr + offset) # cmd to get 1 byte hex
             try:
-                hex_string = gdb.execute(cmd, to_string = True)
+                hex_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             hex_string = hex_string.split()[1]
 
             cmd = 'x/1cb ' + hex(addr + offset) # cmd to get 1 byte characters
             try:
-                byte_string = gdb.execute(cmd, to_string = True)
+                byte_string = m_util.gdb_exec_to_string(cmd)
             except:
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+                if m_debug.Debug: m_debug.dbg_print()
                 return None
             byte_string = byte_string.split(':')[1].strip()
 
             ret = 'hex:'+hex_string+',byte:'+byte_string
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory, "ret=", ret)
+            if m_debug.Debug: m_debug.dbg_print("ret=", ret)
             return ret
         else:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_value_from_memory)
+            if m_debug.Debug: m_debug.dbg_print()
             return None

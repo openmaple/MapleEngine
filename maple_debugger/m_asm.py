@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,14 +11,10 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
-import os
-import gdb
-import m_datastore 
-import copy
-import subprocess
-import time
-from inspect import currentframe, getframeinfo
+#
+
 import m_util
+import m_debug
 
 """ Maple types defined in Maple Engine source code """
 MAPLE_TYPES = [
@@ -70,17 +65,11 @@ MAPLE_TYPES = [
 
 def create_asm_mirbin_label_cache(asm_path):
     """ read index of all records in .s file and return the result in a dict """
-
     cmd="bash -c \"paste <(grep -bn _mirbin_info: '" + asm_path \
         + "') <(grep -Fb .cfi_endproc '" + asm_path \
         + "')\" | awk -F: -v a='\"' -v b='\":(' -v c=',' -v d='),' " \
         + "'BEGIN { print \"{\" } { print a$3b$1c$2c$4d } END { print \"}\" }'"
-    
-    command = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-    (output, err) = command.communicate()
-    line = output.decode("utf-8")
-    d = eval(line)
-    return d
+    return eval(m_util.shell_cmd(cmd))
 
 def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func_pc_offset):
     """
@@ -105,8 +94,7 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
             'asm_offset': int. offset of the asm file were source code info was found.
         }
     """
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, look_up_src_file_info,\
-                       "func_pc_offset=", func_pc_offset, " asm_path=", asm_path, \
+    if m_debug.Debug: m_debug.dbg_print("func_pc_offset=", func_pc_offset, " asm_path=", asm_path, \
                        "label_asm_ln=", label_asm_ln, "start_offset=", start_offset, \
                        "end_offset=", end_offset)
 
@@ -121,12 +109,10 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
         line = f.readline()
         if "// LINE " in line:
             src_info_line = line
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, look_up_src_file_info,\
-                               "src_info_line=", src_info_line, " line_num=", line_num )
+            if m_debug.Debug: m_debug.dbg_print("src_info_line=", src_info_line, " line_num=", line_num )
         elif func_pc_offset in line:
             ''' this is the line that matches the func_pc_offset '''
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, look_up_src_file_info,\
-                               "found func_pc_offset = ", func_pc_offset, " line_num = ", line_num)
+            if m_debug.Debug: m_debug.dbg_print("found func_pc_offset = ", func_pc_offset, " line_num = ", line_num)
             if not src_info_line: #there is no co-responding source code file
                 short_src_file_name = None
                 short_src_file_linenum = 0
@@ -141,8 +127,7 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
             d["short_src_file_line"] = short_src_file_linenum
             d["asm_line"] = line_num
             d["asm_offset"] = offset
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, look_up_src_file_info,\
-                               "result in dict ", d)
+            if m_debug.Debug: m_debug.dbg_print("result in dict ", d)
             return d
         elif ".cfi_endproc" in line:
             break
@@ -166,8 +151,7 @@ def look_up_next_src_file_info(asm_path, asm_line, asm_offset):
         source code short file name or None if not found
         source code line number or 0 if not found
     """
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, look_up_next_src_file_info,\
-                       "asm_path = ", asm_path, "asm_line = ", asm_line, "asm_offset=", asm_offset)
+    if m_debug.Debug: m_debug.dbg_print("asm_path = ", asm_path, "asm_line = ", asm_line, "asm_offset=", asm_offset)
 
     f = open(asm_path, "r")
     f.seek(asm_offset)
@@ -181,8 +165,7 @@ def look_up_next_src_file_info(asm_path, asm_line, asm_offset):
             x = line.split()
             short_src_file_name = x[2]
             short_src_file_linenum = int(x[4][:-1])
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, look_up_next_src_file_info,\
-                               "short_src_file_name = ", short_src_file_name, "short_src_file_linenum", short_src_file_linenum,\
+            if m_debug.Debug: m_debug.dbg_print("short_src_file_name = ", short_src_file_name, "short_src_file_linenum", short_src_file_linenum,\
                                "found in asm line_num =", asm_line + additional_lines )
             f.close()
             return short_src_file_name, short_src_file_linenum
@@ -232,40 +215,39 @@ def get_func_arguments(asm_path, mirbin_label, offset):
     method_flags = None
 
     line = f.readline()
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments,\
-                       "line=", line, "mirbin_label=", mirbin_label)
+    if m_debug.Debug: m_debug.dbg_print("line=", line, "mirbin_label=", mirbin_label)
     if mirbin_label in line:
         pre_line = line
     else:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+        if m_debug.Debug: m_debug.dbg_print()
         f.close()
         return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
-        
+    if m_debug.Debug: m_debug.dbg_print()
+
     line = f.readline()
     if ".long" in line and mirbin_label in pre_line:
         pre_line = line
     else:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+        if m_debug.Debug: m_debug.dbg_print()
         f.close()
         return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
-        
-    line = f.readline()    
+    if m_debug.Debug: m_debug.dbg_print()
+
+    line = f.readline()
     if "// func storage info" in line and ".long" in pre_line:
         x = line.split()
         formals_num = int(x[1][:-1])
         locals_num = int(x[2][:-1])
         eval_depth = int(x[3][:-1])
         method_flags = int(x[4])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments, "formals_num=", formals_num,\
+        if m_debug.Debug: m_debug.dbg_print("formals_num=", formals_num,\
                           "locals_num=", locals_num, "eval_depth=", eval_depth, "method_flags=", method_flags)
         pre_line = line
-    else:  
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+    else:
+        if m_debug.Debug: m_debug.dbg_print()
         f.close()
         return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+    if m_debug.Debug: m_debug.dbg_print()
 
     if formals_num > 0:
         line = f.readline()
@@ -273,8 +255,8 @@ def get_func_arguments(asm_path, mirbin_label, offset):
             pre_line = line
             f_num = formals_num
             while f_num != 0:
-                line = f.readline() 
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments, "line=", line)
+                line = f.readline()
+                if m_debug.Debug: m_debug.dbg_print("line=", line)
                 s = line.split()
                 if s[1][-1] == ",":
                     formal_index = int(line.split()[1][:-1],16)
@@ -284,10 +266,10 @@ def get_func_arguments(asm_path, mirbin_label, offset):
                 f_num -= 1
                 pre_line = line
         else:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+            if m_debug.Debug: m_debug.dbg_print()
             f.close()
             return None
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+        if m_debug.Debug: m_debug.dbg_print()
 
     if locals_num > 0:
         line = f.readline()
@@ -295,7 +277,7 @@ def get_func_arguments(asm_path, mirbin_label, offset):
             pre_line = line
             l_num = locals_num
             while l_num != 0:
-                line = f.readline() 
+                line = f.readline()
                 s = line.split()
                 if s[1][-1] == ",":
                     local_index = int(line.split()[1][:-1],16)
@@ -305,26 +287,26 @@ def get_func_arguments(asm_path, mirbin_label, offset):
                 l_num -= 1
                 pre_line = line
         else:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+            if m_debug.Debug: m_debug.dbg_print()
             f.close()
             return None
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
-            
+        if m_debug.Debug: m_debug.dbg_print()
+
     if formals_num > 0:
         line = f.readline()
         if "// Name of formal arguments" in line:
             pre_line = line
             f_num = formals_num
             while f_num != 0:
-                line = f.readline() 
+                line = f.readline()
                 formals_name.append(line.split()[1].split("\\0")[0][1:])
                 f_num -= 1
                 pre_line = line
         else:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+            if m_debug.Debug: m_debug.dbg_print()
             f.close()
             return None
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+        if m_debug.Debug: m_debug.dbg_print()
 
     if locals_num > 0:
         line = f.readline()
@@ -332,16 +314,16 @@ def get_func_arguments(asm_path, mirbin_label, offset):
             pre_line = line
             l_num = locals_num
             while l_num != 0:
-                line = f.readline() 
+                line = f.readline()
                 locals_name.append(line.split()[1].split('\\0')[0][1:])
                 l_num -= 1
                 pre_line = line
         else:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
+            if m_debug.Debug: m_debug.dbg_print()
             f.close()
             return None
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_func_arguments)
-            
+        if m_debug.Debug: m_debug.dbg_print()
+
     line = f.readline()
     if ".p2align" in line:
         pass

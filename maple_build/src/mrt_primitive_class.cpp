@@ -1525,15 +1525,18 @@ extern "C" jboolean Ljava_2Flang_2Freflect_2FMethod_3B_7CisVarArgs_7C_28_29Z_(jo
 extern "C" jboolean Ljava_2Flang_2Freflect_2FMethod_3B_7CisVarArgs_7C_28_29Z(jobject javaThis) {
 return Ljava_2Flang_2Freflect_2FMethod_3B_7CisVarArgs_7C_28_29Z_(javaThis);
 }
-
 extern "C" jstring Ljava_2Flang_2Freflect_2FMethod_3B_7CtoString_7C_28_29Ljava_2Flang_2FString_3B_(jobject javaThis) ;
 extern "C" jstring Ljava_2Flang_2Freflect_2FMethod_3B_7CtoString_7C_28_29Ljava_2Flang_2FString_3B(jobject javaThis) {
 return Ljava_2Flang_2Freflect_2FMethod_3B_7CtoString_7C_28_29Ljava_2Flang_2FString_3B_(javaThis);
 }
-
 extern "C" jstring Ljava_2Flang_2FString_3B_7Cintern_7C_28_29Ljava_2Flang_2FString_3B_(jstring str) ;
 extern "C" jstring Ljava_2Flang_2FString_3B_7Cintern_7C_28_29Ljava_2Flang_2FString_3B(jstring str) {
 return Ljava_2Flang_2FString_3B_7Cintern_7C_28_29Ljava_2Flang_2FString_3B_(str);
+}
+extern "C" void Ljava_2Flang_2FShutdown_3B_7CbeforeHalt_7C_28_29V_(jclass klass) ;
+extern "C" void Ljava_2Flang_2FShutdown_3B_7CbeforeHalt_7C_28_29V(jclass klass) {
+Ljava_2Flang_2FShutdown_3B_7CbeforeHalt_7C_28_29V_(klass);
+return;
 }
 extern "C" jclass Lsun_2Freflect_2FReflection_3B_7CgetCallerClass_7C_28_29Ljava_2Flang_2FClass_3B_() ;
 extern "C" jclass Lsun_2Freflect_2FReflection_3B_7CgetCallerClass_7C_28_29Ljava_2Flang_2FClass_3B() {

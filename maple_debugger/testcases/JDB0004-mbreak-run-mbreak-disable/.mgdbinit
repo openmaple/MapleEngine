@@ -1,0 +1,6 @@
+mb LFibonacci_3B_7Cfib_7C_28I_29I
+run
+mb -disable 1
+mb -list
+info b
+q

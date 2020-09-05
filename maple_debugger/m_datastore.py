@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,15 +11,14 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
-import os
-import sys
-import copy
 import m_frame
-import m_asm_interpret
+import m_asm
 import m_symbol
-from inspect import currentframe, getframeinfo
-import m_util
+import m_debug
+from m_util import gdb_print
 
 class MapleClassDefInfo():
     """
@@ -98,19 +96,19 @@ class MapleClassDefInfo():
 
     def get_maple_class_def(self, class_name):
         if class_name in self.maple_class_def_cache:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_maple_class_def, \
-                                "class_name", class_name, "found")
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_maple_class_def,\
-                         "return maple_class_def_cache[class_name]:", self.maple_class_def_cache[class_name])
+            if m_debug.Debug:
+                m_debug.dbg_print("class_name", class_name, "found")
+                m_debug.dbg_print("return maple_class_def_cache[class_name]:", self.maple_class_def_cache[class_name])
             return self.maple_class_def_cache[class_name]
 
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_maple_class_def, \
-                        "class_name", class_name, "Not found")
+        if m_debug.Debug: m_debug.dbg_print("class_name", class_name, "Not found")
         return None
 
     def get_maple_class_def_list(self):
-        """ return a list of class names in the cache """
-        return [*self.maple_class_def_cache]
+        """ return a sorted list of class names in the cache """
+        relist = [*self.maple_class_def_cache]
+        relist.sort()
+        return relist
 
 
 class MapleMirbinInfoIndex():
@@ -143,7 +141,7 @@ class MapleMirbinInfoIndex():
 
         """
         self.mirbin_info_cache = {}
-        
+
     def init_new_asm(self, asm):
         if not asm in self.mirbin_info_cache:
             self.mirbin_info_cache[asm] = {}
@@ -153,7 +151,7 @@ class MapleMirbinInfoIndex():
 
     def assign_new_asm(self, asm, d):
         self.init_new_asm(asm)
-        self.mirbin_info_cache[asm] = copy.deepcopy(dict(d))
+        self.mirbin_info_cache[asm] = dict(d)
 
     def has_key(self, asm):
         r = asm in self.mirbin_info_cache
@@ -161,18 +159,81 @@ class MapleMirbinInfoIndex():
 
     def get_asm_mirbin_item(self, asm, mirbin_name):
         if not asm in self.mirbin_info_cache:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_asm_mirbin_item, \
-                                "asm", asm, "not found in mirbin info cache ")
+            if m_debug.Debug: m_debug.dbg_print("asm", asm, "not found in mirbin info cache ")
             return None
         if not mirbin_name in self.mirbin_info_cache[asm]:
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_asm_mirbin_item, \
-                                "Maple label", mirbin_name, "not found in mirbin info cache ")
+            if m_debug.Debug: m_debug.dbg_print("Maple label", mirbin_name, "not found in mirbin info cache ")
             return None
 
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.get_asm_mirbin_item, \
-                            "return ", self.mirbin_info_cache[asm][mirbin_name])
+        if m_debug.Debug: m_debug.dbg_print("return ", self.mirbin_info_cache[asm][mirbin_name])
         return self.mirbin_info_cache[asm][mirbin_name]
 
+    def get_asm_list(self):
+        relist = [*self.mirbin_info_cache]
+        relist.sort()
+        return relist
+
+    def get_symbol_list(self, asm_path):
+        relist = [*self.mirbin_info_cache[asm_path]]
+        relist.sort()
+        return relist
+
+class MapleFileCache():
+    def __init__(self):
+        self.general_fullpath = {}
+        self.src_file_lines   = {}
+        self.asm_block_lines  = {}
+
+    # api for general file short name, path and its combined fullpath.
+    def in_general_fullpath(self, name, path):
+        return (name, path) in self.general_fullpath
+
+    def add_general_fullpath(self, name, path, fullpath):
+        self.general_fullpath[(name, path)] = fullpath
+
+    def get_general_fullpath(self, name, path):
+        return self.general_fullpath[(name, path)]
+
+    def del_general_fullpath(self):
+        self.general_fullpath.clear()
+    
+    def show_general_fullpath(self):
+        gdb_print("mgdb_rdata.general_fullpath cache ==== ")
+        gdb_print(str(self.general_fullpath))
+    
+    # api for source code file info cache
+    def in_src_file_lines(self, name):
+        return name in self.src_file_lines
+
+    def add_src_file_lines(self, name, lines):
+        self.src_file_lines[name] = lines
+
+    def get_src_file_lines(self, name):
+        return self.src_file_lines[name]
+
+    def del_src_file_lines(self):
+        self.src_file_lines.clear() 
+
+    def show_src_file_lines(self):
+        gdb_print("mgdb_rdata.src_file_lines cache ==== ")
+        gdb_print(str(self.src_file_lines))
+
+    # api for asm block lines cache
+    def in_asm_block_lines(self, name, start):
+        return (name, start) in self.asm_block_lines
+
+    def add_asm_block_lines(self, name, start, lines):
+        self.asm_block_lines[(name, start)] = lines
+
+    def get_asm_block_lines(self, name, start):
+        return self.asm_block_lines[(name, start)]
+
+    def del_asm_block_lines(self):
+        self.asm_block_lines.clear()
+
+    def show_asm_block_lines(self):
+        gdb_print("mgdb_rdata.asm_block_lines cache ==== ")
+        gdb_print(str(self.asm_block_lines))
 
 class MapleGDBRuntimeData():
     """
@@ -190,7 +251,8 @@ class MapleGDBRuntimeData():
         """
         self.mirbin_info = MapleMirbinInfoIndex()
         self.class_def = MapleClassDefInfo()
-        
+        self.file_cache = MapleFileCache()
+
     #####################################
     # api for mirbin_info_cache
     #####################################
@@ -200,21 +262,27 @@ class MapleGDBRuntimeData():
 
         self.mirbin_info.init_new_asm(asm_file)
 
-        d = m_asm_interpret.create_asm_mirbin_label_cache(asm_file)
+        d = m_asm.create_asm_mirbin_label_cache(asm_file)
         self.mirbin_info_cache_assign(asm_file, d)
 
-        count = len(self.mirbin_info.mirbin_info_cache[asm_file].keys())
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.create_mirbin_info_cache, \
-                            "asm file ", asm_file, count, "labels found")
+        if m_debug.Debug:
+            count = len(self.mirbin_info.mirbin_info_cache[asm_file].keys())
+            m_debug.dbg_print("asm file ", asm_file, count, "labels found")
 
     def get_one_label_mirbin_info_cache(self, asm, label):
         return self.mirbin_info.get_asm_mirbin_item(asm, label)
-    
+
     def mirbin_info_cache_has_key(self, asm):
         return self.mirbin_info.has_key(asm)
 
     def mirbin_info_cache_assign(self, asm, d):
         self.mirbin_info.assign_new_asm(asm, dict(d))
+
+    def get_mirbin_cache_asm_list(self):
+        return self.mirbin_info.get_asm_list()
+
+    def get_mirbin_cache_symbol_list(self, asm_path):
+        return self.mirbin_info.get_symbol_list(asm_path)
 
     #####################################
     # api for class_def_cache
@@ -231,6 +299,52 @@ class MapleGDBRuntimeData():
     def get_class_def_list(self):
         return self.class_def.get_maple_class_def_list()
 
+    #####################################
+    # api for Maple File Cache 
+    #####################################
+    def in_fullpath_cache(self, name, path):
+        return self.file_cache.in_general_fullpath(name, path)
+
+    def add_fullpath_cache(self, name, path, fullpath):
+        self.file_cache.add_general_fullpath(name, path, fullpath)
+
+    def get_fullpath_cache(self, name, path):
+        return self.file_cache.get_general_fullpath(name, path)
+
+    def del_fullpath_cache(self):
+        self.file_cache.del_general_fullpath()
+
+    # api for source code file info cache
+    def in_src_lines(self, name):
+        return self.file_cache.in_src_file_lines(name)
+
+    def add_src_lines(self, name, lines):
+        self.file_cache.add_src_file_lines(name, lines)
+
+    def get_src_lines(self,name):
+        return self.file_cache.get_src_file_lines(name)
+
+    def del_src_lines(self):
+        self.file_cache.del_src_file_lines()
+
+    # api for asm block lines cache
+    def in_asmblock_lines(self, name, start):
+        return self.file_cache.in_asm_block_lines(name,start)
+
+    def add_asmblock_lines(self, name, start, lines):
+        self.file_cache.add_asm_block_lines(name, start, lines)
+
+    def get_asmblock_lines(self, name, start):
+        return self.file_cache.get_asm_block_lines(name, start)
+
+    def del_asmblock_lines(self):
+        self.file_cache.del_asm_block_lines()
+
+    def show_file_cache(self):
+        self.file_cache.show_asm_block_lines()
+        self.file_cache.show_src_file_lines()
+        self.file_cache.show_general_fullpath()
+        
 
     #####################################
     # advanced api for other module to use
@@ -238,20 +352,21 @@ class MapleGDBRuntimeData():
     def update_gdb_runtime_data(self):
 
         addr_offset, so_path, asm_path, func_header, frame  = m_frame.get_closest_maple_frame_func_lib_info()
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.update_gdb_runtime_data, "addr_offset", addr_offset)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.update_gdb_runtime_data, "so_path", so_path)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.update_gdb_runtime_data, "asm_path", asm_path)
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, self.update_gdb_runtime_data, "func_header", func_header)
+        if m_debug.Debug:
+            m_debug.dbg_print("addr_offset", addr_offset)
+            m_debug.dbg_print("so_path", so_path)
+            m_debug.dbg_print("asm_path", asm_path)
+            m_debug.dbg_print("func_header", func_header)
         if not addr_offset or not so_path or not asm_path or not func_header or not frame:
             return
 
         if not self.mirbin_info_cache_has_key(asm_path):
-            print("create Maple symbol cache using file: ", asm_path)
+            gdb_print("create Maple symbol cache using file: " + asm_path)
             self.create_mirbin_info_cache(asm_path)
 
         def_file_path = asm_path[:-1] + 'macros.def' if 'VtableImpl' in asm_path else asm_path[:-1] + 'VtableImpl.macros.def'
         if not def_file_path in self.class_def.def_paths:
-            print("create def cache using file: ", def_file_path)
+            gdb_print("create def cache using file: " + def_file_path)
             self.create_class_def(def_file_path)
 
 
@@ -270,7 +385,7 @@ def get_stack_frame_data(frame):
 
     returns:
        a dict contains following keys and values
-        'frame_func_src_info':  whatever m_asm_interpret.look_up_src_file_info() returns
+        'frame_func_src_info':  whatever m_asm.look_up_src_file_info() returns
                 {'short_src_file_name': a string. source code short name
                  'short_src_file_line': a int. source code file line
                  'asm_line': a int. line number where func_header_name offset is found in asm file
@@ -284,83 +399,65 @@ def get_stack_frame_data(frame):
                  'func_header_name' : func_header_name, a string. e.g xxxxxxxxxxx_mirbin_info
                  'func_header_asm_tuple': func_header_name_block_asm_tuple, (asm line, asm_start_offset, asm_end_offset)
                 }
-        'func_argus_locals': same return as m_asm_interpret.get_func_arguments() returns
+        'func_argus_locals': same return as m_asm.get_func_arguments() returns
                 {'locals_type': local variable type list, e.g ['void', 'v2i64'],
                  'locals_name': local variable name list['%%retval', '%%thrownval'],
                  'formals_type': func argument type list. e.g ['a64'],
                  'formals_name': func argument name list. e.g ['%1']
                 }
     """
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                     "==== get_stack_frame_data =====")
+    if m_debug.Debug: m_debug.dbg_print("==== get_stack_frame_data =====")
 
     func_addr_offset, so_path, asm_path, func_header, frame = m_frame.get_maple_frame_func_lib_info(frame)
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "func_addr_offset =", func_addr_offset, "func_header=", func_header)
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "so_path =", so_path, "asm_path=", asm_path)
+    if m_debug.Debug:
+        m_debug.dbg_print("func_addr_offset =", func_addr_offset, "func_header=", func_header)
+        m_debug.dbg_print("so_path =", so_path, "asm_path=", asm_path)
     if not func_addr_offset or not so_path or not asm_path or not func_header:
         return None
 
     ### get the function label of the frame
     label_addr, func_header_name = m_symbol.get_symbol_name_by_current_frame_args()
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "func_header_name=", func_header_name)
+    if m_debug.Debug: m_debug.dbg_print("func_header_name=", func_header_name)
     if func_header_name:
         func_name = func_header_name[:-12]
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                             "func_name=", func_name)
+        if m_debug.Debug: m_debug.dbg_print("func_name=", func_name)
     else:
         label_addr, func_header_name = m_symbol.get_symbol_name_by_current_func_args()
         func_name = func_header_name[:-12]
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                             "func_name=", func_name)
-    
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "func_header_name=", func_header_name)
+        if m_debug.Debug: m_debug.dbg_print("func_name=", func_name)
+
+    if m_debug.Debug: m_debug.dbg_print("func_header_name=", func_header_name)
     if not func_header_name:
         return None
 
     # if mirbin_info_cache for this asm file is not created yet in m_datastore, create it
     # if not m_datastore.mgdb_rdata.mirbin_info_cache_has_key(asm_path):
     if not mgdb_rdata.mirbin_info_cache_has_key(asm_path):
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                         "create mirbin info cache for asm file", asm_path)
+        if m_debug.Debug: m_debug.dbg_print("create mirbin info cache for asm file", asm_path)
         mgdb_rdata.create_mirbin_info_cache(asm_path)
-    else:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                         "mirbin info cache for ", asm_path, "is already created")
-        pass
-
 
     asm_line_tuple = mgdb_rdata.get_one_label_mirbin_info_cache(asm_path, func_header_name)
     if not asm_line_tuple:
         return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "asm_line_tuple=", asm_line_tuple)
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "func_addr_offset=", func_addr_offset)
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "func_addr_offset.split(':')[1]=", func_addr_offset.split(':')[1])
+    if m_debug.Debug:
+        m_debug.dbg_print("asm_line_tuple=", asm_line_tuple)
+        m_debug.dbg_print("func_addr_offset=", func_addr_offset)
+        m_debug.dbg_print("func_addr_offset.split(':')[1]=", func_addr_offset.split(':')[1])
     func_addr_offset_pc = func_addr_offset.split(':')[1]
-    d = m_asm_interpret.look_up_src_file_info(asm_path, asm_line_tuple[0], asm_line_tuple[1], asm_line_tuple[2],\
+    d = m_asm.look_up_src_file_info(asm_path, asm_line_tuple[0], asm_line_tuple[1], asm_line_tuple[2],\
                                               func_addr_offset_pc)
     if not d:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                            "look_up_src_file_info returns None")
+        if m_debug.Debug: m_debug.dbg_print("look_up_src_file_info returns None")
         return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "first round returns dict d:", d)
+    if m_debug.Debug: m_debug.dbg_print("first round returns dict d:", d)
 
     # In some cases, when func_addr_offset's pc partion is 0000, the source code file information can be
     # missing. In this case, we can check few more lines from its reported asm line ONLT for pc = '0000' situation
     if not d['short_src_file_name'] and func_addr_offset_pc == '0000' and d['asm_offset'] != 0 and d['asm_line'] != 0:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                            "func offset pc is 0000, check short_src_file again")
+        if m_debug.Debug: m_debug.dbg_print("func offset pc is 0000, check short_src_file again")
         d['short_src_file_name'], d['short_src_file_line'] = \
-            m_asm_interpret.look_up_next_src_file_info(asm_path, d['asm_line'], d['asm_offset'])
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "second round for func offset pc 0000 returns dict d:", d)
+            m_asm.look_up_next_src_file_info(asm_path, d['asm_line'], d['asm_offset'])
+        if m_debug.Debug: m_debug.dbg_print("second round for func offset pc 0000 returns dict d:", d)
 
     asm_line_offset = asm_line_tuple[1]
     asm_line_num = d['asm_line']
@@ -371,9 +468,8 @@ def get_stack_frame_data(frame):
         return None
 
     ### get the method arguments and local variables
-    func_argus_locals = m_asm_interpret.get_func_arguments(asm_path, func_header_name, asm_line_offset)
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_stack_frame_data,\
-                        "func_argus_locals:", func_argus_locals)
+    func_argus_locals = m_asm.get_func_arguments(asm_path, func_header_name, asm_line_offset)
+    if m_debug.Debug: m_debug.dbg_print("func_argus_locals:", func_argus_locals)
     if not func_argus_locals:
         return None
 

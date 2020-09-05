@@ -30,6 +30,7 @@ Maple Multi-language Debugger, short for Maple Debugger, is an important part of
 * Python version: 3.5 and later
 * GDB version: 8.1 and later
 * Build user's application, see https://gitee.com/openarkcompiler-incubator/maple_engine
+* Installation of highlight package. If not installed, run `sudo apt install highlight`
 
 
 ## Recommendation
@@ -60,6 +61,15 @@ msrcpath -add $JAVA_CORE_SRC/jdk/src/
 
 # add local path where your application source code is in your development environment
 msrcpath -add ./
+
+python
+if os.path.isfile(os.path.expanduser('~/.mgdbinit')):
+    cmd = "source " + os.path.expanduser('~/.mgdbinit')
+    gdb.execute(cmd)
+
+if os.path.isfile('./.mgdbinit'):
+    gdb.execute('source ./.mgdbinit')
+end
 ```
 
 ## Launch Up
@@ -72,20 +82,12 @@ $ source ~/gitee/maple_engine/envsetup.sh
 $ "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
 ```
 
-Maple Debugger can work with demangling tool provided by Maple Engine, to display Maple symbols (including function names, class object names, etc) in a demangled format with different colors. This is a feature for developers to see same output with demangled and mangled format in one command. To enable this feature, launch Maple Debugger using following commands
-```
-$ cd ~/gitee/maple_engine/maple_build/examples/HelloWorld
-$ source ~/gitee/maple_engine/envsetup.sh
-$ "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld | "$MAPLE_BUILD_TOOLS"/demangle.sh
-```
-
-
 ## Commands and Categories
 * **Breakpoint**: _mbreakpoint_
 * **Stack**     : _mbacktrace_, _mup_, _mdown_
-* **Data**      : _mlocal_, _mprint_, _mtype_
+* **Data**      : _mlocal_, _mprint_, _mtype_, _msymbol_
 * **File**      : _mlist_, _msrcpath_
-* **Control**   : _mstepi_, _mnexti_
+* **Control**   : _mstepi_, _mnexti_, _mfinish_
 * **Misc**      : _mset_, _mhelp_
 
 
@@ -101,5 +103,8 @@ $ "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld | "
 * _mprint_     : Print Maple runtime object data
 * _mtype_      : Print a matching class and its inheritance hierarchy by a given search expression
 * _mstepi_     : Step specified number of Maple instructions
+* _msymbol_    : Print a matching symbol list or its detailed infomatioin
 * _mnexti_     : Step one Maple instruction, but proceed through subroutine calls
+* _mfinish_    : Execute until selected Maple stack frame returns
 * _mset_       : Sets and displays Maple debugger settings
+* _mhelp_      : Prints command help and usage

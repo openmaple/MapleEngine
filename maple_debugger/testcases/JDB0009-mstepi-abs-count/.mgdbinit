@@ -1,0 +1,7 @@
+mb LFibonacci_3B_7Cfib_7C_28I_29I
+run
+# disable this breakpoint because it will be hit before msi reaches to 400000 opcode count
+mb -disable LFibonacci_3B_7Cfib_7C_28I_29I
+msi -abs 400000
+msi -c
+q

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,10 +11,13 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
+from m_util import gdb_print
 
 maple_debugger_version_major = 1
-maple_debugger_version_minor = 0
+maple_debugger_version_minor = 1
 
 maple_commands_info = '\n'\
     'mbreak:     Set and manage Maple breakpoints\n'\
@@ -27,9 +29,11 @@ maple_commands_info = '\n'\
     'mlocal:     Display selected Maple frame arguments, local variables and stack dynamic data\n'\
     'mprint:     Print Maple runtime object data\n'\
     'mtype:      Print a matching class and its inheritance hierarchy by a given search expression\n'\
+    'msymbol:    Print a matching symbol list or its detailed infomatioin\n'\
     'mstepi:     Step specified number of Maple instructions\n'\
     'mnexti:     Step one Maple instruction, but proceed through subroutine calls\n'\
     'mset:       Sets and displays Maple debugger settings\n'\
+    'mfinish:    Execute until selected Maple stack frame returns\n'\
     'mhelp:      list Maple help information\n'
 
 maple_commands_detail_info = {
@@ -46,7 +50,7 @@ maple_commands_detail_info = {
                     'mbacktrace: print backtrace of Maple frames\n'\
                     'mbacktrace -asm: print backtrace of Maple frames in assembly format\n'\
                     'mbreaktrace -full: print backtrace of mixed gdb native frames and Maple frames\n',
-    
+
     'mup':      'mup: move up one Maple frame that called selected Maple frame\n'\
                 'mup -n: move up n Maple frames from currently selected Maple frame\n',
 
@@ -72,6 +76,10 @@ maple_commands_detail_info = {
                 'information of class inheritance hierarchy if only one match is found\n'\
                 'mtype <regular-express>: e.g mtype _2Fjava \n',
 
+    'msymbol' : 'given a regex, search and print all matching symbol names if multiple are found, or print detail\n'\
+                'information of the symbol if only one match is found\n'\
+                'msymbol <regular-express>: e.g msymbol sun.*executor\n',
+
     'mstepi':   'msi is the alias of mstepi command\n'\
                 'mstepi: step in next Maple instruction\n'\
                 'mstepi [n]: step in to next nth Maple instruction\n'\
@@ -79,12 +87,14 @@ maple_commands_detail_info = {
 
     'mnexti':   'mnexti: Step one Maple instruction, but proceed through subroutine calls\n',
 
+    'mfinish':  'mfinish: Execute until selected Maple stack frame returns\n',
+
     'mset':     'mset <name> <value>: set Maple debugger environment settings\n'\
                 'mset verbose on|off: turn on or off of Maple debugger verbose mode\n'\
                 'mset -add  <key name of list> <list item value>: add new key/value into a list\n'\
-                '  example: mset -add maple_lib_asm_path /home/carl/gitee/maple_engine/maple_build/out/x864\n'\
+                '  example: mset -add maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864\n'\
                 'mset -del  <key name of list> <list item value>: delete one key/value from a list\n'\
-                '  example: maple_lib_asm_path /home/carl/gitee/maple_engine/maple_build/out/x864\n'\
+                '  example: maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864\n'\
                 'mset -show: view current settings\n',
 
     'mhelp':    'mhelp: to list all Maple commands and command summary\n'\
@@ -92,8 +102,9 @@ maple_commands_detail_info = {
 }
 
 class MapleHelpCmd(gdb.Command):
-    """
-    show help information of all Maple commands
+    """list Maple help information
+    mhelp: to list all Maple commands and command summary
+    mhelp <maple-command-full-name>: detail usage of specified Maple command
     """
 
     def __init__(self):
@@ -101,17 +112,15 @@ class MapleHelpCmd(gdb.Command):
                               "mhelp",
                               gdb.COMMAND_USER,
                               gdb.COMPLETE_NONE)
-        
+
 
     def invoke(self, args, from_tty):
-        gdb.execute('set pagination off', to_string = True)
         self.mhelp_func(args, from_tty)
-        gdb.execute('set pagination on', to_string = True)
 
 
     def usage(self):
-        print("mhelp [command name]")
-        
+        gdb_print("mhelp [command name]")
+
 
     def mhelp_func(self, args, from_tty):
         s = args.split()
@@ -122,7 +131,7 @@ class MapleHelpCmd(gdb.Command):
         if len(s) > 1:
             self.usage()
             return
-        
+
         if s[0] in maple_commands_detail_info:
             self.help_one_command(s[0])
             return
@@ -132,13 +141,13 @@ class MapleHelpCmd(gdb.Command):
 
     def help_all(self):
         version = str(maple_debugger_version_major) + '.' + str(maple_debugger_version_minor)
-        print("Maple Version", version)
-        print(maple_commands_info)
+        gdb_print("Maple Version " + version)
+        gdb_print(maple_commands_info)
 
     def help_one_command(self, cmd_name):
         version = str(maple_debugger_version_major) + '.' + str(maple_debugger_version_minor)
-        print("Maple Version", version)
+        gdb_print("Maple Version " + version)
         if not cmd_name in maple_commands_detail_info:
             return
-        print (maple_commands_detail_info[cmd_name])
-        
+        gdb_print (maple_commands_detail_info[cmd_name])
+

@@ -79,7 +79,7 @@ ME_FLAG="-O2 --quiet --no-nativeopt --noignoreipa"
 MPL2MPL_FLAG="-O1 --quiet --regnativefunc --no-nativeopt --maplelinker --emitVtableImpl --maplelinker-nolocal"
 MPLCG_FLAG="-O2 --quiet --no-pie --verbose-asm --gen-groot-list --gen-c-macro-def --maplelinker --gen-mir-mpl --fpic"
 "${MAPLE_COMPILER}" -exe=me,mpl2mpl,mplcg -option="${ME_FLAG}:${MPL2MPL_FLAG}:${MPLCG_FLAG}" "${JAVA_CORE_LIB}".mpl || exit 3
-
+"${AUX}"/patch-asm.sh "${JAVA_CORE_LIB}".VtableImpl.s
 "${MAPLE_COLLECT_ROOTS}" -o unified.groots.s "${JAVA_CORE_LIB}".VtableImpl.groots.txt
 ${CC} -c unified.groots.s -o unified.groots.o || exit 4
 ${CXX} -g -O2 \

@@ -39,9 +39,7 @@
 
 #define NONDECLAREDINTRINSIC(x) static constexpr auto x = nullptr;
 #define DECLAREDINTRINSIC(x) extern "C" void x(void *);
-#if !(defined(MPLRE_C))
 #include "declared_intrinsics.def"
-#endif // !MPLRE_C
 #undef DECLAREDINTRINSIC
 #undef NONDECLAREDINTRINSIC
 
@@ -158,10 +156,6 @@ namespace maple {
         }
     }
 
-#if (defined(MPLRE_C))
-    static const FuncTableTy intrinsic_table[] = {
-        };
-#else
     static const FuncTableTy intrinsic_table[] = {
 #define DEF_MIR_INTRINSIC(STR, NAME, INTRN_CLASS, RETURN_TYPE, ...) \
         { sizeof(#NAME) - 1, #NAME, (ffi_fp_t)NAME }, /* INTRN_##STR, INTRN_CLASS, RETURN_TYPE, NAME(__VA_ARGS__) */
@@ -176,7 +170,6 @@ namespace maple {
     extern "C" bool MRT_EnterSaferegion();
     extern "C" bool MRT_LeaveSaferegion();
     extern "C" bool __MRT_Reflect_ObjIsInstanceOfClassError(void *ex);
-#endif // !MPLRE_C
 
     void MFunction::invoke_intrinsic(PrimType ret_ptyp, const uint32_t arg_num, MIRIntrinsicID intrinsic) {
         DEBUGINTRINSIC(intrinsic);
@@ -192,7 +185,6 @@ namespace maple {
             return;
         }
         switch(intrinsic) {
-#if !(defined(MPLRE_C))
             case INTRN_MPL_CLINIT_CHECK:
                 {
                     MValue &val = MPOP();
@@ -295,22 +287,17 @@ namespace maple {
                     MRT_LeaveSaferegion();
                     break;
                 }
-#endif // !MPLRE_C
             default:
                 MASSERT(false, "Error: hit unsupported/unregistered intrinsic %d", (int)intrinsic);
         } // switch
     }
 
     void MFunction::throw_exception() {
-#if defined(MPLRE_C)
-        MASSERT(false, "MFunction::throw_exception() do not expect execptions from libmplre_c");
-#else
         try {
         MCC_ThrowException(THROWVAL.x.a64);
         } catch(const MException e) {
             THROWVAL.x.a64 = reinterpret_cast<uint8_t *>(e);
         }
-#endif // MPLRE_C
     }
 
     // Call statically-compiled method or C/C++ function with ffi

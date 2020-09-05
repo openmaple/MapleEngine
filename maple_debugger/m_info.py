@@ -1,4 +1,3 @@
-# !/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,14 +11,31 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
-import os
+#
+
 import gdb
-from inspect import currentframe, getframeinfo
-import m_util
+import os
+import re
 import m_set
+import m_util
+from m_util import gdb_print
+import m_debug
 
 def get_current_thread():
     return gdb.selected_thread()
+
+num_objfiles = 0
+cached_proc_mapping = ""
+def get_info_proc_mapping():
+    """
+    wrapper of 'info proc mapping' cmd with cached mapping info
+    """
+    global num_objfiles, cached_proc_mapping
+    num = len(gdb.objfiles())
+    if num_objfiles != num:
+        num_objfiles = num
+        cached_proc_mapping = m_util.gdb_exec_to_string('info proc mapping')
+    return cached_proc_mapping
 
 def get_maple_frame_addr():
     """
@@ -29,7 +45,7 @@ def get_maple_frame_addr():
         address in string. e.g 0x7fff6021c308
         or None if not found.
     """
-    buf = gdb.execute('info args', to_string = True)
+    buf = m_util.gdb_exec_to_string('info args')
     if buf.find('_mirbin_info') != -1 and buf.find('mir_header') != -1:
         x = buf.split()
         return x[2]
@@ -47,7 +63,7 @@ def get_so_base_addr(name):
 
     if not name:
         return None
-    buf = gdb.execute('info proc mapping', to_string = True)
+    buf = get_info_proc_mapping()
     if not buf:
         return None
 
@@ -68,30 +84,19 @@ def get_initialized_maple_func_attr(name):
     For a given attribute name, return its value via 'print' command in string format.
     """
 
-    if not name:
-        return None
-
-    if name in ['func.header', 'func.lib_addr', 'func.pc']:
-        cmd = 'p ' + name
+    if name and name in ['func.header', 'func.lib_addr', 'func.pc']:
+        cmd = 'p/x *(long long*)&' + name
     else:
         return None
 
     try:
-        buf = gdb.execute(cmd, to_string = True)
+        buf = m_util.gdb_exec_to_string(cmd)
     except:
         return None
 
-    if not buf:
-        return None
-    if 'error' in buf:
-        # this means error reported in output of p func.pc command
-        return None
-
-    x = buf.split(') ')
-    addr = x[1].split()[0]
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_initialized_maple_func_attr,\
-                       "returns name=", name, "addr=",addr )
-    return addr
+    if buf and buf[0] == '$' and ' = 0x' in buf:
+        return buf.split(' = ')[1].rstrip()
+    return None
 
 def get_initialized_maple_func_addrs():
     """
@@ -106,8 +111,7 @@ def get_initialized_maple_func_addrs():
     header = get_initialized_maple_func_attr('func.header')
     pc = get_initialized_maple_func_attr('func.pc')
 
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_initialized_maple_func_addrs,\
-                       "header=", header, "pc=", pc)
+    if m_debug.Debug: m_debug.dbg_print("header=", header, "pc=", pc)
     if not header or not pc:
         return None
 
@@ -121,12 +125,11 @@ def get_initialized_maple_func_addrs():
         return None
 
     lib_addr = get_lib_addr_from_proc_mapping(header)
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_initialized_maple_func_addrs,\
-                       "header=", header, "lib_addr=",lib_addr, "pc=", pc)
+    if m_debug.Debug: m_debug.dbg_print("header=", header, "lib_addr=",lib_addr, "pc=", pc)
     if not lib_addr:
         return None
     try:
-        buf = gdb.execute('x/1xw ' + str(header), to_string = True)
+        buf = m_util.gdb_exec_to_string('x/1xw ' + str(header))
     except:
         return None
 
@@ -135,10 +138,10 @@ def get_initialized_maple_func_addrs():
     header_size = int(buf.split(':')[1],16)
 
     if (header < lib_addr):
-        print ("header address is found less than lib_addr, something is wrong")
+        gdb_print ("header address is found less than lib_addr, something is wrong")
         return None
     if (pc < header):
-        print ("pc address is found less than header, something is wrong")
+        gdb_print ("pc address is found less than header, something is wrong")
         return None
 
     xxxxxx = header - lib_addr
@@ -149,57 +152,7 @@ def get_initialized_maple_func_addrs():
 #####################################################
 ### function section related to 'info proc mapping'
 #####################################################
-def parse_one_proc_mapping_line(line):
-    x = line.split()
-    if len(x) < 5:
-        return None, None, None
-    if x[0] == 'Start':
-        return None, None, None
-    if x[4][0] == '[':
-        return None, None, None
-
-    try:
-        start = int(x[0],0)
-    except:
-        return None, None, None
-    try:
-        end = int(x[1],0)
-    except:
-        return None, None, None
-
-    filename = ""
-    for i in range(4, len(x)):
-        filename = filename + x[i] + " "
-
-    return start, end, filename
-
-def get_lib_so_path_from_proc_mapping(addr):
-    """
-    For a given Maple method address, find out which .so lib
-    from the output of gdb command 'info proc mapping' this address belongs to
-
-    params:
-      addr: address of a method in hex string with prefix '0x', i.e 0x7fff6021c308
-
-    returns:
-      lib so file full path without suffix 'so', i.e. /home/che/maple/out/common/share/libcore
-    """
-
-    a = int(addr, 0)
-
-    buf = gdb.execute('info proc mapping', to_string = True)
-    x = buf.split('\n')
-    start = None
-    end = None
-    path = None
-    for line in x:
-        start, end, path = parse_one_proc_mapping_line(line)
-        if not start or not end or not path:
-            continue
-        if a >= start and a <= end:
-            return path.split('.so')[0]
-    return None
-
+proc_mapping_re = re.compile(r'(0x[0-9a-f]+)[ \t]+(0x[0-9a-f]+)[ \t]+0x[0-9a-f]+[ \t]+0x[0-9a-f]+[ \t]+(/\S+)', re.M)
 def get_lib_addr_from_proc_mapping(addr):
     """
     For a given Maple method address, find out the base address of the .so lib
@@ -212,8 +165,7 @@ def get_lib_addr_from_proc_mapping(addr):
       lib so base address in int
     """
 
-    buf = gdb.execute('info proc mapping', to_string = True)
-    x = buf.split('\n')
+    buf = get_info_proc_mapping()
     start = None
     start_min = None
     end = None
@@ -221,8 +173,15 @@ def get_lib_addr_from_proc_mapping(addr):
     path = None
     so_path = None
     asm_path = None
-    for line in x:
-        start, end, path = parse_one_proc_mapping_line(line)
+    for (hexstart, hexend, path) in re.findall(proc_mapping_re, buf):
+        try:
+            start = int(hexstart, 16)
+        except:
+            start = None
+        try:
+            end = int(hexend, 16)
+        except:
+            end = None
         if not start or not end or not path:
             continue
 
@@ -237,13 +196,11 @@ def get_lib_addr_from_proc_mapping(addr):
             else:
                 end_max = end if end > end_max else end
 
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_lib_addr_from_proc_mapping,\
-                    "start = ", hex(start), " start_min = ", hex(start_min), " end = ", hex(end), "end_max = ", hex(end_max), " addr = ", hex(addr))
+            if m_debug.Debug: m_debug.dbg_print("start = ", hex(start), " start_min = ", hex(start_min), " end = ", hex(end), "end_max = ", hex(end_max), " addr = ", hex(addr))
 
             return start
 
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_lib_addr_from_proc_mapping,\
-               "return lib addr None")
+    if m_debug.Debug: m_debug.dbg_print("return lib addr None")
     return None
 
 def get_lib_so_info(addr):
@@ -261,37 +218,44 @@ def get_lib_so_info(addr):
     """
     a = int(addr, 0)
 
-    buf = gdb.execute('info proc mapping', to_string = True)
-    x = buf.split('\n')
+    buf = get_info_proc_mapping()
     start = None
     end = None
     path = None
     so_path = None
     asm_path = None
-    for line in x:
-        start, end, path = parse_one_proc_mapping_line(line)
+    for (hexstart, hexend, path) in re.findall(proc_mapping_re, buf):
+        try:
+            start = int(hexstart, 16)
+        except:
+            start = None
+        try:
+            end = int(hexend, 16)
+        except:
+            end = None
         if not start or not end or not path:
             continue
+
         if a >= start and a <= end:
             if not path.rstrip().lower().endswith('.so'):
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_lib_so_info,\
-                       "path does not end with .so, path = ", path)
+                if m_debug.Debug: m_debug.dbg_print("path does not end with .so, path = ", path)
                 return None, None, None
-            so_path = path.rstrip()
+            so_path = path.rstrip().replace('/./','/')
+            if m_debug.Debug: m_debug.dbg_print("gdb.solib_name(addr)=", gdb.solib_name(a))
             asm_path = so_path[:-3] + '.VtableImpl.s'
+            asm_path = os.path.realpath(asm_path)
             if os.path.exists(so_path) and os.path.exists(asm_path):
                 # both .so file and co-responding .s file exist in same directory
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_lib_so_info,\
-                       "return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
+                if m_debug.Debug: m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
                 return start, so_path, asm_path
 
             asm_path = so_path[:-3] + '.s'
+            asm_path = os.path.realpath(asm_path)
             if os.path.exists(so_path) and os.path.exists(asm_path):
                 # both .so file and co-responding .s file exist in same directory
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_lib_so_info,\
-                       "return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
+                if m_debug.Debug: m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
                 return start, so_path, asm_path
-                
+
             so_path_short_name = so_path.split('/')[-1][:-3]
 
             base = so_path.split('/')
@@ -299,26 +263,98 @@ def get_lib_so_info(addr):
             for i in range(len(base) - 4):
                 asm_path += '/' + base[i]
             asm_path += '/maple_build/out/x86_64/'+ so_path_short_name + '.VtableImpl.s'
+            asm_path = os.path.realpath(asm_path)
             if os.path.exists(so_path) and os.path.exists(asm_path):
                 # special case where .so and .VtableImpl.s are in such a different folders
-                m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_lib_so_info,\
-                    "return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
+                if m_debug.Debug:
+                    m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
                 return start, so_path, asm_path
 
             if not 'maple_lib_asm_path' in m_set.msettings:
                 return None,None, None
-            for i in range(len(m_set.msettings['maple_lib_asm_path'])):
-                asm_path = os.path.expanduser(m_set.msettings['maple_lib_asm_path'][i]) + '/' + so_path_short_name + '.VtableImpl.s'
+            for v in m_set.msettings['maple_lib_asm_path']:
+                asm_path = v + '/' + so_path_short_name + '.VtableImpl.s'
+                asm_path = os.path.realpath(asm_path)
                 #asm_path = path.split('maple/out')[0] + 'maple/out/common/share/' + so_path_short_name + '.VtableImpl.s'
                 if os.path.exists(so_path) and os.path.exists(asm_path):
                     # .s file is in the search path list
-                    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_lib_so_info,\
-                        "return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
+                    if m_debug.Debug:
+                        m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
                     return start, so_path, asm_path
-            
+
             return None, None, None
     return None, None, None
 
+
+exclude_lib_path = ['/lib/', '/lib64/', '/usr/']
+def lib_file_filter(path):
+    if path[0] != '/':
+        return False
+    if not path.rstrip().lower().endswith('.so'):
+        return False
+    for item in exclude_lib_path:
+        if path.startswith(item):
+            return False
+    return True
+
+def get_loaded_lib_asm_path():
+    asm_path_list = []
+    objfiles = gdb.objfiles()
+    for objfile in objfiles:
+        if not lib_file_filter(objfile.filename):
+            continue
+
+        so_path = os.path.realpath(objfile.filename)
+        if m_debug.Debug: m_debug.dbg_print("realpath so_path=",so_path)
+        asm_path = so_path[:-3] + '.VtableImpl.s'
+        asm_path = os.path.realpath(asm_path)
+        if os.path.exists(so_path) and os.path.exists(asm_path):
+            # both .so file and co-responding .s file exist in same directory
+            if m_debug.Debug: m_debug.dbg_print("return lib info: so_path=",so_path, "asm_path=", asm_path)
+            asm_path_list.append(asm_path)
+            continue
+
+        asm_path = so_path[:-3] + '.s'
+        asm_path = os.path.realpath(asm_path)
+        if os.path.exists(so_path) and os.path.exists(asm_path):
+            # both .so file and co-responding .s file exist in same directory
+            if m_debug.Debug: m_debug.dbg_print("return lib info: so_path=",so_path, "asm_path=", asm_path)
+            asm_path_list.append(asm_path)
+            continue
+
+        so_path_short_name = so_path.split('/')[-1][:-3]
+
+        base = so_path.split('/')
+        asm_path = ''
+        for i in range(len(base) - 4):
+            asm_path += '/' + base[i]
+        asm_path += '/maple_build/out/x86_64/'+ so_path_short_name + '.VtableImpl.s'
+        asm_path = os.path.realpath(asm_path)
+        if os.path.exists(so_path) and os.path.exists(asm_path):
+            # special case where .so and .VtableImpl.s are in such a different folders
+            if m_debug.Debug:
+                m_debug.dbg_print("return lib info: so_path=",so_path, "asm_path=", asm_path)
+            asm_path_list.append(asm_path)
+            continue
+
+        if not 'maple_lib_asm_path' in m_set.msettings:
+            continue
+        for v in m_set.msettings['maple_lib_asm_path']:
+            asm_path = v + '/' + so_path_short_name + '.VtableImpl.s'
+            asm_path = os.path.realpath(asm_path)
+            #asm_path = path.split('maple/out')[0] + 'maple/out/common/share/' + so_path_short_name + '.VtableImpl.s'
+            if os.path.exists(so_path) and os.path.exists(asm_path):
+                # .s file is in the search path list
+                if m_debug.Debug:
+                    m_debug.dbg_print("return lib info: so_path=",so_path, "asm_path=", asm_path)
+                asm_path_list.append(asm_path)
+                continue
+
+    if m_debug.Debug:
+       m_debug.dbg_print("returning asm_path_list length", len(asm_path_list))
+       m_debug.dbg_print("returning asm_path_list ", asm_path_list)
+
+    return asm_path_list
 
 def get_uninitialized_maple_func_addrs():
     """
@@ -337,20 +373,17 @@ def get_uninitialized_maple_func_addrs():
     func_header = get_maple_frame_addr()
     if not func_header:
         return None, None, None, None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_uninitialized_maple_func_addrs,\
-                       "func_header=", func_header)
+    if m_debug.Debug: m_debug.dbg_print("func_header=", func_header)
 
     func_lib_addr, so_path, asm_path = get_lib_so_info(func_header)
     if not func_lib_addr or not so_path or not asm_path:
         return None, None, None, None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_uninitialized_maple_func_addrs,\
-                       "func_lib_addr=", func_lib_addr)
+    if m_debug.Debug: m_debug.dbg_print("func_lib_addr=", func_lib_addr)
 
     header = int(func_header, 16)
     if (header < func_lib_addr):
-        #print ("header address is found less than lib_addr, something is wrong")
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_uninitialized_maple_func_addrs,\
-                        "header address is found less than lib_addr, something is wrong")
+        #gdb_print ("header address is found less than lib_addr, something is wrong")
+        if m_debug.Debug: m_debug.dbg_print("header address is found less than lib_addr, something is wrong")
         return None,None,None, None
 
     offset = header - func_lib_addr
@@ -371,7 +404,7 @@ must be available.
 
 def get_maple_caller_sp():
     try:
-        buffer = gdb.execute('p caller.sp', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p caller.sp')
     except:
         return None
 
@@ -384,7 +417,7 @@ def get_maple_caller_sp():
 
 def get_maple_caller_full():
     try:
-        buffer = gdb.execute('p *caller', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p *caller')
     except:
         return None
 
@@ -403,18 +436,17 @@ def get_maple_caller_argument_value(arg_idx, arg_num, mtype):
                e.g method1(int a, long b, string c), for
                argument "a", its arg index is 0, c is 2.
       arg_num: number of argument a method has
-      mtype  : a string. definition in m_asm_interpret.py
+      mtype  : a string. definition in m_asm.py
                for "a", it could be 'i32', 'i64'
     returns:
        the argument value in string.
     """
 
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_caller_argument_value,\
-                       "pass in arg_idx=", arg_idx, "arg_num=", arg_num, "mtype=", mtype)
+    if m_debug.Debug: m_debug.dbg_print("pass in arg_idx=", arg_idx, "arg_num=", arg_num, "mtype=", mtype)
 
     # get the caller.sp first
     try:
-        buffer = gdb.execute('p caller.sp', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p caller.sp')
     except:
         return None
 
@@ -424,14 +456,14 @@ def get_maple_caller_argument_value(arg_idx, arg_num, mtype):
         sp = int(buffer.split(' = ')[-1])
     else:
         return None
-    
+
     if  arg_idx > sp: #sp must be >= num of args
         return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_caller_argument_value, "sp=", sp)
+    if m_debug.Debug: m_debug.dbg_print("sp=", sp)
 
     # get the caller.operand_stack length
     try:
-        buffer = gdb.execute('p caller.operand_stack.size()', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p caller.operand_stack.size()')
     except:
         return None
 
@@ -444,22 +476,22 @@ def get_maple_caller_argument_value(arg_idx, arg_num, mtype):
             return None
     else:
         return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_caller_argument_value, "length=", length)
-    
+    if m_debug.Debug: m_debug.dbg_print("length=", length)
+
     if length < arg_idx:
         return None
 
     # get the caller.operand_stack[arg_idx]
     idx = sp - arg_num + arg_idx + 1
     try:
-        buffer = gdb.execute('p caller.operand_stack[' + str(idx) + ']', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p caller.operand_stack[' + str(idx) + ']')
     except:
         return None
 
     vline = buffer.split('x = ')[1][1:].split('}')[0]
     v = vline.split(mtype+' = ')[1].split(',')[0] if mtype in vline else None
     return v
-    
+
 def get_maple_a64_pointer_type(arg_value):
     """
     params:
@@ -473,16 +505,16 @@ def get_maple_a64_pointer_type(arg_value):
 
     addr = arg_value.split()[0]
     try:
-        buf = gdb.execute('x/2xw ' + addr, to_string = True)
+        buf = m_util.gdb_exec_to_string('x/2xw ' + addr)
     except:
         return None
     addr = buf.split(':')[1].split()
     addr0 = addr[0]
     addr1 = addr[1]
     addr = addr1 + addr0[2:]
-    
+
     try:
-        buf = gdb.execute('x ' + addr, to_string = True)
+        buf = m_util.gdb_exec_to_string('x ' + addr)
     except:
         return None
     if not addr0[2:] in buf:
@@ -511,7 +543,7 @@ def get_maple_frame_stack_sp_index(func_header_name):
 
     # get the func.operand_stack length
     try:
-        buffer = gdb.execute('p func', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p func')
     except:
         return None
 
@@ -520,8 +552,7 @@ def get_maple_frame_stack_sp_index(func_header_name):
 
     stack_header_name = buffer.split('header = ')[1].split()[1][1:-2]
     if stack_header_name != func_header_name:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_frame_stack_sp_index,\
-                        "func_header_name=", func_header_name, "stack_header_name=", stack_header_name)
+        if m_debug.Debug: m_debug.dbg_print("func_header_name=", func_header_name, "stack_header_name=", stack_header_name)
         return None
 
     sp_str = buffer.split('sp = ')[1].split()[0][:-1]
@@ -554,7 +585,7 @@ def get_one_frame_stack_local(index, sp, name, ltype):
 
     # get the func.operand_stack length
     try:
-        buffer = gdb.execute('p func', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p func')
     except:
         return None,None
 
@@ -566,7 +597,7 @@ def get_one_frame_stack_local(index, sp, name, ltype):
 
     # get the caller.operand_stack[index]
     try:
-        buffer = gdb.execute('p func.operand_stack[' + str(index) + ']', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p func.operand_stack[' + str(index) + ']')
     except:
         return None,None
 
@@ -579,7 +610,7 @@ def get_one_frame_stack_local(index, sp, name, ltype):
 
     if name == "%%thrownval":
         try:
-            maple_type = gdb.execute('p func.operand_stack[' + str(index) + '].ptyp', to_string = True)
+            maple_type = m_util.gdb_exec_to_string('p func.operand_stack[' + str(index) + '].ptyp')
         except:
             return None,None
         maple_type = maple_type.split(' = ')[1].split('maple::PTY_')[1].rstrip()
@@ -607,33 +638,33 @@ def get_one_frame_stack_dynamic(sp, idx):
     # get the caller.operand_stack length
     length = None
     try:
-        buffer = gdb.execute('p caller.operand_stack.size()', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p caller.operand_stack.size()')
     except:
-        return None
+        return None, None
 
     if buffer[0] != '$':
-        return None
+        return None, None
     if ' = ' in buffer:
         try:
             length = int(buffer.split(' = ')[1])
         except:
-            return None
+            return None, None
     else:
-        return None
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_caller_argument_value, "length=", length)
+        return None, None
+    if m_debug.Debug: m_debug.dbg_print("length=", length)
 
 
     if length <= sp or length < idx:
         return None, None
 
     try:
-        maple_type = gdb.execute('p func.operand_stack[' + str(idx) + '].ptyp', to_string = True)
+        maple_type = m_util.gdb_exec_to_string('p func.operand_stack[' + str(idx) + '].ptyp')
     except:
         return None, None
     maple_type = maple_type.split(' = ')[1].split('maple::PTY_')[1].rstrip()
 
     try:
-        buffer = gdb.execute('p func.operand_stack[' + str(idx) + ']', to_string = True)
+        buffer = m_util.gdb_exec_to_string('p func.operand_stack[' + str(idx) + ']')
     except:
         return None, None
 
@@ -643,6 +674,5 @@ def get_one_frame_stack_dynamic(sp, idx):
     else:
         return None, None
 
-    m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_one_frame_stack_dynamic,\
-                    "return maple_type=", maple_type, "v=", v)
+    if m_debug.Debug: m_debug.dbg_print("return maple_type=", maple_type, "v=", v)
     return maple_type, v

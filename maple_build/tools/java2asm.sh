@@ -108,6 +108,7 @@ for f in $* ; do
   # .s
   "${AUX}"/patch-mpl.sh "${FILE_ROOT_NAME}".mpl
   "${MAPLE_COMPILER}" -exe=me,mpl2mpl,mplcg -option="${ME_FLAG}:${MPL2MPL_FLAG}:${MPLCG_FLAG}" "$FILE_ROOT_NAME".mpl > maple.log 2>&1 || exit 3
+  "${AUX}"/patch-asm.sh "$FILE_ROOT_NAME".VtableImpl.s
   
   mv "$FILE_ROOT_NAME".VtableImpl.s "$FILE_ROOT_NAME".s
 

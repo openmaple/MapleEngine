@@ -1,6 +1,7 @@
 python
 import os.path
 gdb.execute(os.path.expandvars('source $MAPLE_DEBUGGER_ROOT/m_gdb.py'))
+from m_util import gdb_echo_and_exec
 end
 
 # add one maple_lib_asm_path into the search list
@@ -15,3 +16,13 @@ msrcpath -add $JAVA_CORE_SRC/jdk/src/
 
 # add local path where your application source code is in your development environment
 msrcpath -add ./
+
+python
+from m_util import gdb_echo_and_exec
+if os.path.isfile(os.path.expanduser('~/.mgdbinit')):
+    cmd = "source " + os.path.expanduser('~/.mgdbinit')
+    gdb_echo_and_exec(cmd)
+
+if os.path.isfile('./.mgdbinit'):
+    gdb_echo_and_exec('source ./.mgdbinit')
+end

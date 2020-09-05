@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #
 # Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
 #
@@ -12,19 +11,20 @@
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more details.
+#
+
 import gdb
 import m_symbol
-import m_frame
 import m_datastore
-from inspect import currentframe, getframeinfo
 import m_util
+from m_util import gdb_print
+import m_debug
 
 def is_mbp_existed():
     """ determine where a Maple breakpoint exists """
     blist = gdb.breakpoints()
     for b in blist:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, is_mbp_existed,\
-                        "b.type=", b.type, "b.location=", b.location, "b.thread=", b.thread, "b.enabled=", b.enabled,\
+        if m_debug.Debug: m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", b.thread, "b.enabled=", b.enabled,\
                         "b.is_valid()=", b.is_valid())
         if 'maple::maple_invoke_method' in b.location and b.is_valid():
             return True, b
@@ -34,16 +34,19 @@ def get_mbp_id():
     """ get a Maple breakpoint gdb.Breakpoint object id """
     blist = gdb.breakpoints()
     for b in blist:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_mbp_id,\
-                        "b.type=", b.type, "b.location=", b.location, "b.thread=", b.thread, "b.enabled=", b.enabled,\
+        if m_debug.Debug: m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", b.thread, "b.enabled=", b.enabled,\
                         "b.is_valid()=", b.is_valid())
         if 'maple::maple_invoke_method' in b.location and b.is_valid():
             return b
     return None
 
-def is_maple_invoke_bp_plt_disabled():
-    """ determine where Maple breakpoint plt disable or not """
-    buf = gdb.execute("info b", to_string=True)
+def is_maple_invoke_bp_plt_disabled(buf):
+    """
+        determine where Maple breakpoint plt disable or not
+
+        params:
+          buf: a string output of m_util.gdb_exec_to_string("info b")
+    """
     match_pattern = "<maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*)@plt>"
     buf = buf.split('\n')
     for line in buf:
@@ -55,22 +58,46 @@ def is_maple_invoke_bp_plt_disabled():
                 return True
     return True #plt does not exist, so, it is disabled
 
-def disable_maple_invoke_bp_plt():
-    """ disable a Maple breakpoint plt """
-    buf = gdb.execute("info b", to_string=True)
+def disable_maple_invoke_bp_plt(buf):
+    """
+        disable a Maple breakpoint plt
+
+        params:
+          buf: a string output of m_util.gdb_exec_to_string("info b")
+    """
     match_pattern = "<maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*)@plt>"
     buf = buf.split('\n')
     for line in buf:
         if match_pattern in line:
             cmd = 'disable ' + line.split()[0]
-            gdb.execute(cmd)
-                
-def get_maple_invoke_bp_stop_addr():
+            m_util.gdb_exec(cmd)
+
+def update_maple_invoke_bp(buf, op_enable = True):
+    """
+        update maple::maple_invoke_method breakpoint
+        when number of enabled maple breakpoints is 0, disable maple::maple_invoke_method
+        when number of enabled maple breakpoints changes from 0 to non-0, enable maple::maple_invoke_method
+        but if maple::maple_invoke_method is pending, then do nothing.
+
+        params:
+          buf: a string output of m_util.gdb_exec_to_string("info b")
+          op_enable = True, to enable the maple::maple_invoke_method
+          op_enable = False, to disable the maple::maple_invoke_method
+    """
+    match_pattern = "in maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*)"
+    buf = buf.split('\n')
+    for line in buf:
+        if match_pattern in line:
+            cmd = 'disable ' if op_enable is False else 'enable '
+            cmd += line.split()[0]
+            m_util.gdb_exec(cmd)
+
+def get_maple_invoke_bp_stop_addr(buf):
     """
     get Maple breakpoint address and its coresponding information
 
     params:
-      None
+      buf: a string output of m_util.gdb_exec_to_string("info b")
 
     Return:
       None on address and None on breakpoint information if no information found, or
@@ -82,11 +109,10 @@ def get_maple_invoke_bp_stop_addr():
       info = at /home/che/gitee/maple_engine/maple_engine/src/invoke_method.cpp:151
     """
 
-    buf = gdb.execute("info b", to_string=True)
     match_pattern = "in maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*)"
     buf = buf.split('\n')
     for line in buf:
-        m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_invoke_bp_stop_addr, "line=", line)
+        if m_debug.Debug: m_debug.dbg_print("line=", line)
         if match_pattern in line:
             x = line.split(match_pattern)
             addr = x[0].split()[-1]
@@ -96,8 +122,7 @@ def get_maple_invoke_bp_stop_addr():
                 return None, None
 
             info = match_pattern + " ".join(x[1:])
-            m_util.debug_print(__file__, getframeinfo(currentframe()).lineno, get_maple_invoke_bp_stop_addr,\
-                              "addr = ", addr, "info = ", info)
+            if m_debug.Debug: m_debug.dbg_print("addr = ", addr, "info = ", info)
             return addr,  info
     return None, None
 
@@ -114,9 +139,13 @@ class MapleBreakpoint(gdb.Breakpoint):
         3, disable unnecessary plt breakpoint.
         """
         super().__init__('maple::maple_invoke_method')
-        disable_maple_invoke_bp_plt()
-        self.mbp_table = {}
-        self.bp_addr, self.bp_info = get_maple_invoke_bp_stop_addr()
+        buf = m_util.gdb_exec_to_string("info b")
+        disable_maple_invoke_bp_plt(buf)
+        self.mbp_table = {} # the symbols here are NOT mirbin_info symbols
+        self.bp_addr, self.bp_info = get_maple_invoke_bp_stop_addr(buf)
+
+        self.mbp_addr_sym_table = {} # a symbol address keyed table for fast stop logic
+        self.load_objfiles = len(gdb.objfiles()) # initial value
 
     def stop(self):
         """
@@ -130,51 +159,55 @@ class MapleBreakpoint(gdb.Breakpoint):
 
         # if the Maple breakpoint was created before .so is loaded, when the breakpoint is hit,
         # plt will be not disable. So we disable it
-        if not is_maple_invoke_bp_plt_disabled():
-            disable_maple_invoke_bp_plt()
+        buf = m_util.gdb_exec_to_string("info b")
+        if not is_maple_invoke_bp_plt_disabled(buf):
+            disable_maple_invoke_bp_plt(buf)
             return False
 
         # if the Maple breakpoint was created before .so is loaded, bp_addr, bp_info (location)
         # if not available. But once hit, address and loc start to be available.
         if not self.bp_info or not self.bp_addr:
-            self.bp_addr, self.bp_info = get_maple_invoke_bp_stop_addr()
+            self.bp_addr, self.bp_info = get_maple_invoke_bp_stop_addr(buf)
 
-        # once the Maple breakpoint is hit, check a Maple symbol is passed in
-        args_addr, args_symbol = m_symbol.get_symbol_name_by_current_frame_args()
-        if args_symbol is None:
+        # determine whether need to look up pending symbol's address. If the number of loaded libraries
+        # is not eaual to the one saved, then libs might have been loaded or unloaded, so we try to update
+        if len(gdb.objfiles()) != self.load_objfiles:
+            self.load_objfiles = len(gdb.objfiles())
+            pending_addr_symbol_list = self.get_pending_addr_symbol_list()
+            if len(pending_addr_symbol_list) > 0:
+                for sym in pending_addr_symbol_list:
+                    self.update_pending_addr_symbol(sym)
+
+        # NOTE!!! here we are getting the current stack's mir_header's address
+        args_addr = m_symbol.get_symbol_addr_by_current_frame_args()
+        if not args_addr or not args_addr in self.mbp_addr_sym_table:
             return False
 
-        # match pattern is matched but symbol does not end with '_mirbin_info'
-        match_pattern = args_symbol[:-12]
+        # mir_header address matches one breakpoint address list
+        table_args_addr = self.mbp_addr_sym_table[args_addr]
+        args_symbol = table_args_addr['mir_symbol']
+        match_pattern = table_args_addr['symbol']
+
+        # it is possible that match pattern is in mbp_addr_sym_table for address check,
+        # but the self.mbp_addr_sym_table[args_addr]['symbol'] could have been cleared
+        # in self.mbp_table by user's mb -clear command
         if not match_pattern in self.mbp_table:
             return False
 
         # Maple symbol for the breakpoint is disabled
-        if self.mbp_table[match_pattern]['disabled'] is True:
-            return False
-                
-        match_pattern_addr = m_symbol.get_symbol_address(match_pattern + '_mirbin_info')
-        if match_pattern_addr == args_addr:
-            if self.mbp_table[match_pattern]['ignore_count'] == 0:
-                self.mbp_table[match_pattern]['hit_count'] += 1
-
-                # update the Maple gdb runtime metadata store.
-                m_datastore.mgdb_rdata.update_gdb_runtime_data()
-                return True
-            else :
-                self.mbp_table[match_pattern]['ignore_count'] -= 1
-                return False
-        else: 
+        table_match_pattern = self.mbp_table[match_pattern]
+        if table_match_pattern['disabled'] is True:
             return False
 
-    def get_mbp_table(self):
-        return self.mbp_table
+        if table_match_pattern['ignore_count'] == 0:
+            table_match_pattern['hit_count'] += 1
 
-    def set_bp_attr(self, symbol, key, value):
-        self.mbp_table[symbol][key] = value
-
-    def add_one_symbol(self, symbol,value):
-        self.mbp_table[symbol] = value
+            # update the Maple gdb runtime metadata store.
+            m_datastore.mgdb_rdata.update_gdb_runtime_data()
+            return True
+        else :
+            table_match_pattern['ignore_count'] -= 1
+            return False
 
     def clear_one_symbol(self, symbol):
         self.mbp_table.pop(symbol)
@@ -182,6 +215,87 @@ class MapleBreakpoint(gdb.Breakpoint):
     def clear_all_symbol(self):
         self.mbp_table.clear()
 
-    def disaply_mbp_table(self):
+    def display_mbp_table(self):
         for mspec in self.mbp_table:
-            print ('mapleBreakpoint object[', mspec, ']: ', self.mbp_table[mspec])
+            buf = 'mapleBreakpoint object mbp_table[' + str(mspec) + ']: ' + str(self.mbp_table[mspec])
+            gdb_print(buf)
+
+    def display_mbp_addr_sym_table(self):
+        for mspec in self.mbp_addr_sym_table:
+            buf = 'mapleBreakpoint object mbp_addr_sym_table[' + str(mspec) + ']: ' + str(self.mbp_addr_sym_table[mspec])
+            gdb_print(buf)
+
+    def get_pending_addr_symbol_list(self):
+        return [ k for k, v in self.mbp_table.items() if not v['hex_addr'] ]
+
+    def add_known_addr_symbol_into_addr_sym_table(self, symbol):
+        """
+        params:
+          symbol: string. this is a regualr symbol with NO _mirbin_info
+        """
+        if not symbol in self.mbp_table:
+            return
+
+        if self.mbp_table[symbol]['hex_addr'] and self.mbp_table[symbol]['address'] != 0:
+            mirbin_addr = self.mbp_table[symbol]['address'] + 4
+            mirbin_symbol = symbol + '_mirbin_info'
+            self.mbp_addr_sym_table[hex(mirbin_addr)] = {}
+            self.mbp_addr_sym_table[hex(mirbin_addr)]['mir_symbol']  = mirbin_symbol
+            self.mbp_addr_sym_table[hex(mirbin_addr)]['symbol']   = symbol
+        return
+
+    def update_pending_addr_symbol(self, symbol):
+        """
+        try to get the address of a symbol. If available, update mbp_table[symbol], AND add a new item
+        into mbp_addr_sym_table[addr+4] = symbol + '_mirbin_info'
+
+        params:
+          symbol: a string. this is a NOT a mirbin symbol, it is a regular symbol user set in mb cmd.
+        """
+        addr = m_symbol.get_symbol_address(symbol)
+        if not addr:
+            return
+        self.mbp_table[symbol]['hex_addr'] = addr
+        self.mbp_table[symbol]['address'] = int(addr,16)
+
+        mirbin_addr = self.mbp_table[symbol]['address'] + 4
+        mirbin_symbol = symbol + '_mirbin_info'
+        self.mbp_addr_sym_table[hex(mirbin_addr)] = {}
+        self.mbp_addr_sym_table[hex(mirbin_addr)]['mir_symbol']  = mirbin_symbol
+        self.mbp_addr_sym_table[hex(mirbin_addr)]['symbol']   = symbol
+
+    def get_enabled_mbp_number(self):
+        return len([ k for k, v in self.mbp_table.items() if not v['disabled'] ])
+
+    def update_mbp(self):
+        """
+        when enabled maple breakpoints reach to 0, we disable the breakpint of maple::maple_invoke_method
+        for better performance. when enabled maple breakpoints changes from 0 to 1 or more, we enable the
+        breakpoint maple::maple_invoke_method.
+        However, if the maple::maple_invoke_method is pending, we do not anything since it is activated
+        yet
+
+        However, the beter way to do this is to use mbp_id.enabled = True or False to enable or disable
+        the maple::maple_invoke_method. we chose not to do this way, is because our regression test suite
+        needs some output pattern that can be checked easily. change the enabled=True or False does not make
+        this easier.
+        """
+
+        mbp_id = get_mbp_id()
+        if not mbp_id:
+            return
+        # if maple:maple_invoke_method breakpoint is pending, we do not have to do anything.
+        if mbp_id.pending:
+            return
+
+        # get the maple breakpoint number for those are enabled
+        mbp_num = self.get_enabled_mbp_number()
+        if m_debug.Debug: m_debug.dbg_print("mbp_num returned =", mbp_num)
+        # disable maple:maple_invoke_method breakpoint
+        buf = m_util.gdb_exec_to_string("info b")
+        if mbp_num == 0:
+            # disable this breakpoint
+            update_maple_invoke_bp(buf, False)
+        else:
+            # enable this breakpoint
+            update_maple_invoke_bp(buf, True)

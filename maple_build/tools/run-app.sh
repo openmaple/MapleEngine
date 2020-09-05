@@ -14,7 +14,7 @@
 # See the MulanPSL - 2.0 for more details.
 #
 
-for v in ROOT COMPILER_ROOT ENGINE_ROOT RUNTIME_ROOT BUILD_ROOT TARGET_ARCH; do
+for v in ROOT COMPILER_ROOT ENGINE_ROOT RUNTIME_ROOT BUILD_ROOT TARGET_ARCH DEBUGGER_ROOT; do
     eval x=\$MAPLE_$v
     [ -n "$x" ] || { echo MAPLE_$v not set. Please source envsetup.sh.; exit 1; }
 done
