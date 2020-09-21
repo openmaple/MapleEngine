@@ -31,7 +31,7 @@
 
 ```
     sudo apt install -y build-essential clang cmake libffi-dev libelf-dev libunwind-dev \
-            libssl-dev openjdk-8-jdk-headless unzip python-minimal python3
+            libssl-dev openjdk-8-jdk-headless unzip python-minimal python3 gdb bc highlight
 ```
 
 ## Maple 构建环境设置
@@ -83,7 +83,7 @@
   Execute the following command to install the packages used by the Maple build.
 
     sudo apt install -y build-essential clang cmake libffi-dev libelf-dev libunwind-dev \
-            libssl-dev openjdk-8-jdk-headless unzip python-minimal python3
+            libssl-dev openjdk-8-jdk-headless unzip python-minimal python3 gdb bc highlight
 
 ## Setup Maple environment
 ```

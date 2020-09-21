@@ -1,4 +1,20 @@
 #!/bin/bash
+if [ $# -ge 1 -a -f "$1" ]; then
+    arg2=${2:-99999999}
+    [[ "$arg2" == +([0-9]) ]] || { grep -n -e "^(gdb)" -e "^(gdb_exec)" -e "$arg2" "$1"; exit 0; }
+    lines=$(sed -n "1,${arg2}p" "$1" | nl -hn -ba -w6 -s' ' | tac)
+    sed '1,/^[0-9 ]*+ + =/d' <<< "$lines" | grep -e "^[0-9 ]*(gdb) " -e "^[0-9 ]*(gdb_exec) " | tac
+    prefix=$(grep -m1 "^[0-9 ]*+ [+ ]*=.[=>] " <<< "$lines" | sed -e 's/=.*/=/' -e 's/^[0-9 ]*//')
+    while [ ${#prefix} -ge 2 ]; do
+        grep -m1 "^[0-9 ]*$prefix" <<< "$lines" || break
+        prefix=$(sed 's/^..//' <<< "$prefix")
+    done | tac
+    exc="^[0-9 ]*Oops, an uncaught exception occured"
+    grep -q "$exc" <<< "$lines" || exit
+    echo -e "\nAn uncaught exception occured. Its backtrace:"
+    sed -n "/$exc/,/^[0-9 ]*+ [+ ]*=/p" <<< "$lines" | tac | grep "^[0-9 ]*- .*, ret: None"
+    exit 1
+fi
 currdir=$(pwd)
 workingdir=$(sed 's|/maple_engine/.*|/maple_engine|' <<< "$currdir")
 [ "$currdir" = "$workingdir" ] && { echo Not a Maple engine working directory; exit 1; }
@@ -11,29 +27,8 @@ if [ ! -f "$app".so ]; then
     "$MAPLE_BUILD_TOOLS"/asm2so.sh "$app".s || exit 2
 fi
 if [ "x$1" = "x-f" ]; then
-    shift
-    cat > .mgdbinit << EOF
-mset trace on
-mb L${app}_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
-run
-python
-for i in range(500):
-    gdb_echo_and_exec('mstepi')
-for i in range(20):
-    gdb_echo_and_exec('mstepi')
-    gdb_echo_and_exec('mstepi')
-    gdb_echo_and_exec('mstepi')
-    gdb_echo_and_exec('mbt')
-    gdb_echo_and_exec('mup')
-    gdb_echo_and_exec('down')
-for i in range(20):
-    gdb_echo_and_exec('mnexti')
-end
-mset trace off
-mbt
-quit
-EOF
-    sed -i -e '/^python/,/^end/s/^/@/' -e 's/^[^@].*/echo (gdb) & \\n\n&/' -e 's/^@//' .mgdbinit
+    sed -n '/^mset trace on/,$p' "$0" | sed -e "s/\${app}/$app/" -e '/^python/,/^end/s/^/@/' \
+        -e 's/^[^@].*/echo (gdb) & \\n\n&/' -e 's/^@//' > .mgdbinit
 fi
 tracelog="$app-$(date +%y%m%d-%H%M).log"
 "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./"$app".so "$app" 32 2> >(tee -a "$tracelog" >&2)
@@ -48,3 +43,34 @@ if [ -f "$tracelog".svg ]; then
 else
     echo Failed to generate the flame graph
 fi
+exit
+
+### .mgdbinit
+mset trace on
+b main
+run
+msi 5000
+python
+from m_util import gdb_echo_exec as exec
+def cmds(cnt):
+    mlst=["","+10","-20","20"]
+    masm=["",":+10",":-20",":+10"]
+    exec('mstepi 200')
+    if cnt % 4 == 0: exec('mbt')
+    exec('mnexti')
+    exec('mlist ' + mlst[cnt % 4])
+    exec('mup')
+    exec('mlist -asm' + masm[cnt % 4])
+    exec('mdown')
+for i in range(20):
+    cmds(i)
+    exec('mfinish')
+exec('mb L${app}_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V')
+exec('mb -listall')
+exec('continue')
+for i in range(20):
+    cmds(i)
+end
+mset trace off
+mbt
+quit

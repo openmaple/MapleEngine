@@ -36,12 +36,13 @@ if [ $? -ne 0 ]; then
     exit 2
 fi
 
-"$MAPLE_DEBUGGER_TOOLS"/trace2stack.py "$filename" > "$filename".stack || exit 2
+"$MAPLE_DEBUGGER_TOOLS"/trace2stack.py "$filename" | sed 's/+/#@%/g' > "$filename".stack || exit 2
 "$MAPLE_ROOT"/../FlameGraph/stackcollapse.pl < "$filename".stack > "$filename".folded || exit 3
 sub=$(basename "$filename" .log)
 "$MAPLE_ROOT"/../FlameGraph/flamegraph.pl --height 20 --width 1600 --countname us --title "Maple Debugger Profiler" \
     --subtitle "$sub" --nametype "LOC,FUNC:" "$filename".folded > "$filename".svg || exit 4
 "$MAPLE_ROOT"/../FlameGraph/flamegraph.pl --height 20 --width 1600 --countname us --title "Maple Debugger Profiler" \
     --subtitle "$sub stack-reversed" --reverse --nametype "LOC,FUNC:" "$filename".folded > "$filename".rev.svg || exit 4
+sed -i -e 's/\(<title>_\.self\._ (.*fill="rgb(\)[0-9,]*/\1238,238,195/' -e 's/#@%/+/g' "$filename".svg "$filename".rev.svg
 echo Generated "$filename".svg
 echo You may view it in your browser.

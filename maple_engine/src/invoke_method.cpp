@@ -53,7 +53,6 @@ static const char* typestr(PrimType t) {
     };
 }
 
-
 thread_local uint32_t __opcode_cnt = 0;
 extern "C" uint32_t __inc_opcode_cnt() {
     return ++__opcode_cnt;
@@ -1146,12 +1145,9 @@ label_OP_throw:
     THROWVAL = MPOP();
     func.throw_exception();
 
-    {
-      // throw_exception() calls MCC_ThrowException(), which increments RC by 1, so we
-      // decrease RC first.
-      MCC_DecRef_NaiveRCFast(THROWVAL.x.a64);
-    }
-
+#if !(defined(MPLRE_C))
+    // throw_exception() does ++RC; do not decrease RC here; see testcase RT0040.
+#endif
     goto label_exception_handler;
   }
 
@@ -1233,20 +1229,26 @@ label_exception_handler:
       }
 
       uint8_t* locals_table = (uint8_t*)&func.header->primtype_table + func.header->formals_num*2; // find start of table for locals; skip formals, which are 2B each
-      for(int i=0; i<func.header->locals_num; i++) {
-        if(locals_table[2*i+1] == 2 || locals_table[2*i+1] == 3) { // 2B for each local var; clean up if the 2nd byte is 2 or 3.
-          if(func.operand_stack[i].ptyp != PTY_a64)
-            continue;
+      for(int i=2; i<func.header->locals_num; i++) { // first two are callee return value and thrown value respectively; skip.
+        if(func.operand_stack[i].ptyp != PTY_a64)
+          continue;
+
+        // 2B for each local var; clean up based on the 2nd byte, which is a flag.
+        if(locals_table[2*i+1] == 2 || locals_table[2*i+1] == 3) { // flag==2: parameters of CLEANUP_LOCALREFVARS; flag==3: CLEANUP_LOCALREFVARS not called
           void* ref = (void*)func.operand_stack[i].x.a64;
-          if(ref && ref != thrownval) {
+          if(ref) {
             MCC_DecRef_NaiveRCFast(ref);
           }
-        } else if(locals_table[2*i+1] == 4 || locals_table[2*i+1] == 5) {
-          if(func.operand_stack[i].ptyp != PTY_a64)
-            continue;
+        } else if(locals_table[2*i+1] == 4 || locals_table[2*i+1] == 5) { // flag==4 or 5: objects requiring ++RC.
           void* ref = (void*)func.operand_stack[i].x.a64;
           if(ref) {
             MCC_IncRef_NaiveRCFast(ref);
+          }
+        }
+        else if(locals_table[2*i+1] == 1) { // flag==1: local refs; --RC if it is thrownval
+          void* ref = (void*)func.operand_stack[i].x.a64;
+          if(ref == thrownval) {
+            MCC_DecRef_NaiveRCFast(ref);
           }
         }
       }

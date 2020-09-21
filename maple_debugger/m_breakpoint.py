@@ -45,7 +45,7 @@ def is_maple_invoke_bp_plt_disabled(buf):
         determine where Maple breakpoint plt disable or not
 
         params:
-          buf: a string output of m_util.gdb_exec_to_string("info b")
+          buf: a string output of m_util.gdb_exec_to_str("info b")
     """
     match_pattern = "<maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*)@plt>"
     buf = buf.split('\n')
@@ -63,7 +63,7 @@ def disable_maple_invoke_bp_plt(buf):
         disable a Maple breakpoint plt
 
         params:
-          buf: a string output of m_util.gdb_exec_to_string("info b")
+          buf: a string output of m_util.gdb_exec_to_str("info b")
     """
     match_pattern = "<maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*)@plt>"
     buf = buf.split('\n')
@@ -80,7 +80,7 @@ def update_maple_invoke_bp(buf, op_enable = True):
         but if maple::maple_invoke_method is pending, then do nothing.
 
         params:
-          buf: a string output of m_util.gdb_exec_to_string("info b")
+          buf: a string output of m_util.gdb_exec_to_str("info b")
           op_enable = True, to enable the maple::maple_invoke_method
           op_enable = False, to disable the maple::maple_invoke_method
     """
@@ -97,7 +97,7 @@ def get_maple_invoke_bp_stop_addr(buf):
     get Maple breakpoint address and its coresponding information
 
     params:
-      buf: a string output of m_util.gdb_exec_to_string("info b")
+      buf: a string output of m_util.gdb_exec_to_str("info b")
 
     Return:
       None on address and None on breakpoint information if no information found, or
@@ -106,7 +106,7 @@ def get_maple_invoke_bp_stop_addr(buf):
 
     Return data example:
       addr = 0x00007ffff5b5f061
-      info = at /home/che/gitee/maple_engine/maple_engine/src/invoke_method.cpp:151
+      info = at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:151
     """
 
     match_pattern = "in maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*)"
@@ -134,12 +134,12 @@ class MapleBreakpoint(gdb.Breakpoint):
 
     def __init__(self, mtype=gdb.BP_BREAKPOINT, mqualified=True):
         """
-        1, create a Maple breakpoint using gdb python api
-        2, initialize a Maple symbol table that this breakpoint will stop on.
-        3, disable unnecessary plt breakpoint.
+        1, Creates a Maple breakpoint using gdb python api
+        2, Initializes a Maple symbol table that this breakpoint will stop on.
+        3, Disables unnecessary plt breakpoint.
         """
         super().__init__('maple::maple_invoke_method')
-        buf = m_util.gdb_exec_to_string("info b")
+        buf = m_util.gdb_exec_to_str("info b")
         disable_maple_invoke_bp_plt(buf)
         self.mbp_table = {} # the symbols here are NOT mirbin_info symbols
         self.bp_addr, self.bp_info = get_maple_invoke_bp_stop_addr(buf)
@@ -159,7 +159,7 @@ class MapleBreakpoint(gdb.Breakpoint):
 
         # if the Maple breakpoint was created before .so is loaded, when the breakpoint is hit,
         # plt will be not disable. So we disable it
-        buf = m_util.gdb_exec_to_string("info b")
+        buf = m_util.gdb_exec_to_str("info b")
         if not is_maple_invoke_bp_plt_disabled(buf):
             disable_maple_invoke_bp_plt(buf)
             return False
@@ -199,15 +199,17 @@ class MapleBreakpoint(gdb.Breakpoint):
         if table_match_pattern['disabled'] is True:
             return False
 
-        if table_match_pattern['ignore_count'] == 0:
-            table_match_pattern['hit_count'] += 1
-
-            # update the Maple gdb runtime metadata store.
-            m_datastore.mgdb_rdata.update_gdb_runtime_data()
-            return True
-        else :
+        if table_match_pattern['ignore_count'] > 0:
             table_match_pattern['ignore_count'] -= 1
             return False
+
+        table_match_pattern['hit_count'] += 1
+
+        # update the Maple gdb runtime metadata store.
+        m_datastore.mgdb_rdata.update_gdb_runtime_data()
+        # update the Maple frame change count
+        m_datastore.mgdb_rdata.update_frame_change_counter()
+        return True
 
     def clear_one_symbol(self, symbol):
         self.mbp_table.pop(symbol)
@@ -231,7 +233,7 @@ class MapleBreakpoint(gdb.Breakpoint):
     def add_known_addr_symbol_into_addr_sym_table(self, symbol):
         """
         params:
-          symbol: string. this is a regualr symbol with NO _mirbin_info
+          symbol: string. This is a regular symbol with NO _mirbin_info
         """
         if not symbol in self.mbp_table:
             return
@@ -250,7 +252,7 @@ class MapleBreakpoint(gdb.Breakpoint):
         into mbp_addr_sym_table[addr+4] = symbol + '_mirbin_info'
 
         params:
-          symbol: a string. this is a NOT a mirbin symbol, it is a regular symbol user set in mb cmd.
+          symbol: string. This is a NOT a mirbin symbol, it is a regular symbol user set in mb cmd.
         """
         addr = m_symbol.get_symbol_address(symbol)
         if not addr:
@@ -270,14 +272,14 @@ class MapleBreakpoint(gdb.Breakpoint):
     def update_mbp(self):
         """
         when enabled maple breakpoints reach to 0, we disable the breakpint of maple::maple_invoke_method
-        for better performance. when enabled maple breakpoints changes from 0 to 1 or more, we enable the
+        for better performance. When enabled maple breakpoints changes from 0 to 1 or more, we enable the
         breakpoint maple::maple_invoke_method.
-        However, if the maple::maple_invoke_method is pending, we do not anything since it is activated
-        yet
+        However, if the maple::maple_invoke_method is pending, we do not do anything since it is not 
+        activated yet
 
         However, the beter way to do this is to use mbp_id.enabled = True or False to enable or disable
-        the maple::maple_invoke_method. we chose not to do this way, is because our regression test suite
-        needs some output pattern that can be checked easily. change the enabled=True or False does not make
+        the maple::maple_invoke_method. We chose not to do it this way, because our regression test suite
+        needs an output pattern that can be checked easily. changing enabled=True or False does not make
         this easier.
         """
 
@@ -292,7 +294,7 @@ class MapleBreakpoint(gdb.Breakpoint):
         mbp_num = self.get_enabled_mbp_number()
         if m_debug.Debug: m_debug.dbg_print("mbp_num returned =", mbp_num)
         # disable maple:maple_invoke_method breakpoint
-        buf = m_util.gdb_exec_to_string("info b")
+        buf = m_util.gdb_exec_to_str("info b")
         if mbp_num == 0:
             # disable this breakpoint
             update_maple_invoke_bp(buf, False)

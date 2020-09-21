@@ -63,17 +63,26 @@ MAPLE_TYPES = [
     'Derived'       #index 0x2a
 ]
 
-def create_asm_mirbin_label_cache(asm_path):
-    """ read index of all records in .s file and return the result in a dict """
+def create_asm_mirbin_label_cache(asm_path, proc_saved = {}):
+    """ Create a dictionary for a given asm file
+        When it is called the first time with a given asm file, it starts
+        a subprocess to handle the asm file and returns None;
+        When called subsequently using the same asm file, it will wait for the
+        first subprocess to finish and return a dictionary created from its output.
+    """
+    if asm_path in proc_saved:
+        d = m_util.proc_communicate(proc_saved.pop(asm_path))
+        return eval(d)
     cmd="bash -c \"paste <(grep -bn _mirbin_info: '" + asm_path \
         + "') <(grep -Fb .cfi_endproc '" + asm_path \
         + "')\" | awk -F: -v a='\"' -v b='\":(' -v c=',' -v d='),' " \
         + "'BEGIN { print \"{\" } { print a$3b$1c$2c$4d } END { print \"}\" }'"
-    return eval(m_util.shell_cmd(cmd))
+    proc_saved[asm_path] = m_util.proc_popen(cmd)
+    return None
 
 def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func_pc_offset):
     """
-      For a given Maple symbol block and a given func_pc_offset, get the co-responding
+      for a given Maple symbol block a given func_pc_offset, get the corresponding
       source code information.
 
       params:
@@ -86,10 +95,10 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
       return:
         None if source code infomration is not found, or
         a dict that contains information including source file name, source code line,
-        co-responding symbol block line number and file offset in asm file.
+        corresponding symbol block line number and file offset in asm file.
         {
             'short_src_file_name': string. source code short file name.
-            'short_src_file_line': int. source code line number.
+            'short_src_file_line': int. source code line number. -1 means MPI_CLINIT_CHECK line
             'asm_line': int. line num where the source code info was found in asm file
             'asm_offset': int. offset of the asm file were source code info was found.
         }
@@ -97,6 +106,11 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
     if m_debug.Debug: m_debug.dbg_print("func_pc_offset=", func_pc_offset, " asm_path=", asm_path, \
                        "label_asm_ln=", label_asm_ln, "start_offset=", start_offset, \
                        "end_offset=", end_offset)
+    try:
+        func_pc_offset_int = int(func_pc_offset, 16)
+        if m_debug.Debug: m_debug.dbg_print("func_pc_offset_int=", func_pc_offset_int)
+    except:
+        return None
 
     f = open(asm_path, "r")
     f.seek(start_offset)
@@ -105,6 +119,9 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
     src_info_line = None
     short_src_file_name = None
     short_src_file_linenum = None
+    last_opcode_line_pc = None
+    this_line_pc = 0
+    stop_on_next_byte_opcode = False
     while offset < end_offset:
         line = f.readline()
         if "// LINE " in line:
@@ -115,7 +132,11 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
             if m_debug.Debug: m_debug.dbg_print("found func_pc_offset = ", func_pc_offset, " line_num = ", line_num)
             if not src_info_line: #there is no co-responding source code file
                 short_src_file_name = None
-                short_src_file_linenum = 0
+                if "MPL_CLINIT_CHECK" in line:
+                    # special signature -1 to indicate MPI_CLINT_CHECK line
+                    short_src_file_linenum = -1
+                else:
+                    short_src_file_linenum = 0
             else:
                 x = src_info_line.split()
                 short_src_file_name = x[2]
@@ -129,6 +150,51 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
             d["asm_offset"] = offset
             if m_debug.Debug: m_debug.dbg_print("result in dict ", d)
             return d
+        elif ".byte OP_" in line:
+            if stop_on_next_byte_opcode == True:
+                if m_debug.Debug: m_debug.dbg_print("found func_pc_offset = ", func_pc_offset, " line_num = ", line_num)
+                if not src_info_line: #there is no co-responding source code file
+                    short_src_file_name = None
+                    if "MPL_CLINIT_CHECK" in line:
+                        # special signature -1 to indicate MPI_CLINT_CHECK line
+                        short_src_file_linenum = -1
+                    else:
+                        short_src_file_linenum = 0
+                else:
+                    x = src_info_line.split()
+                    short_src_file_name = x[2]
+                    short_src_file_linenum = int(x[4][:-1])
+
+                f.close()
+                d = {}
+                d["short_src_file_name"] = short_src_file_name
+                d["short_src_file_line"] = short_src_file_linenum
+                d["asm_line"] = line_num
+                d["asm_offset"] = offset
+                if m_debug.Debug: m_debug.dbg_print("result in dict ", d)
+                return d
+
+            try:
+                this_line_pc = int(line.split("// ")[1][:4],16)
+            except:
+                # in case of no pc offset shown in .byte Op line, the offset is same to previous byte OP line's offset
+                if m_debug.Debug: m_debug.dbg_print("byte opcode line cannot retrieve pc value, line_num=", line_num, "line=", line)
+                offset += len(line)
+                line_num += 1
+                continue
+            last_opcode_line_pc = this_line_pc
+            if m_debug.Debug: m_debug.dbg_print("last_opcode_line_pc=", last_opcode_line_pc)
+        elif line.strip().startswith(".long") or line.strip().startswith(".quad"):
+            if not last_opcode_line_pc:
+                # Opcode not started yet.
+                offset += len(line)
+                line_num += 1
+                continue
+
+            this_line_pc = last_opcode_line_pc + 4
+            if func_pc_offset_int == this_line_pc:
+                stop_on_next_byte_opcode = True
+
         elif ".cfi_endproc" in line:
             break
 
@@ -139,7 +205,7 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
 
 def look_up_next_src_file_info(asm_path, asm_line, asm_offset):
     """
-      For a given asm file and asm line number and offset of the asm line number, return the next
+      for a given asm file and asm line number and offset of the asm line number, return the next
       source file name and line.
 
       params:
@@ -175,9 +241,57 @@ def look_up_next_src_file_info(asm_path, asm_line, asm_offset):
     f.close()
     return None, None
 
+def look_up_next_opcode(asm_path, asm_line, asm_offset):
+    """
+      for a given asm file and asm line number and offset of the asm line number, return whether next opcode
+      is going to jump to different source code line (e.g. Java code). If True, return next opcode's short 
+      source file name and line.
+
+      params:
+        asm_path: string. asm (.s) file full path.
+        asm_line: int
+        asm_offset: int. start offset in asm file line
+
+      return:
+        True if msi cmd should stop at next opcodd, and source code short file name and source line
+        False if msi cmd should not stop. None as source name, None as source line
+    """
+    if m_debug.Debug:
+        m_debug.dbg_print("asm_path = ", asm_path, "asm_line = ", asm_line, "asm_offset=", asm_offset)
+
+    f = open(asm_path, "r")
+    f.seek(asm_offset)
+    line = f.readline()
+
+    short_src_file_name = None
+    short_src_file_linenum = None
+    additional_lines = 0
+    while True:
+        line = f.readline()
+        if "// LINE " in line:
+            x = line.split()
+            short_src_file_name = x[2]
+            short_src_file_linenum = int(x[4][:-1])
+            if m_debug.Debug:
+                m_debug.dbg_print("short_src_file_name = ", short_src_file_name,\
+                                  "short_src_file_linenum", short_src_file_linenum,\
+                                  "found in asm line_num =", asm_line + additional_lines)
+            f.close()
+            return True, short_src_file_name, short_src_file_linenum
+        elif ".byte " in line:
+            f.close()
+            return False, None, None
+        elif ".cfi_endproc" in line:
+            break
+        else:
+            continue
+
+    f.close()
+    return False,None, None
+
 def get_func_arguments(asm_path, mirbin_label, offset):
     """
-    For a given asm (.s) file and a Maple symbol name, return this Maple symbol's
+    for a given asm (.s) file and a Maple symbol name, return this Maple symbol's
     formal (function argument) info and local (function local variable) info.
 
     params:

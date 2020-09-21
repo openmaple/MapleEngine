@@ -27,10 +27,10 @@ from m_util import gdb_print
 
 
 class MapleTypeCmd(gdb.Command):
-    """Print a matching class and its inheritance hierarchy by a given search expression
-    given a regex, search and print all matching class names if multiple are found, or print detail
-    information of class inheritance hierarchy if only one match is found
-    mtype <regular-express>: e.g mtype _2Fjava
+    """print a matching class and its inheritance hierarchy by a given search expression
+    mtype: given a regex, searches and prints all matching class names if multiple are found, 
+    or print detailed information of class inheritance hierarchy if a single match is found
+    mtype <regular-express>: e.g. mtype _2Fjava
     """
 
     def __init__(self):
@@ -62,7 +62,7 @@ class MapleTypeCmd(gdb.Command):
         class_list = m_datastore.mgdb_rdata.get_class_def_list()
         if m_debug.Debug: m_debug.dbg_print("return class_list length:",len(class_list))
         if len(class_list) == 0:
-            gdb_print("class information table not available yet")
+            gdb_print("The class information table is not available yet")
             gdb_print("Retry this after running Maple breakpoint and Maple stack commands")
             return
 
@@ -166,7 +166,7 @@ def search_display_symbol_list(sym_regexp, indent, print_prefix, asm_path_list):
       asm_path_list: search with the asm paths in asm_path_list
       indent: int. number of space characters
 
-    return:
+    returns:
       count: number of matched symbol
       last_matchimg_symbol_name: string, or None if count = 0
       last_matching_symbol_path: string, or None if count = 0
@@ -230,10 +230,10 @@ def display_symbol_detail(symbol_name, symbol_asm_path):
 
 
 class MapleSymbolCmd(gdb.Command):
-    """Print a matching symbol list or its detailed infomatioin
-    given a regex, search and print all matching symbol names if multiple are found, or print detail
-    information of the symbol if only one match is found
-    msymbol <regular-express>: e.g msymbol sun.*executor
+    """print a matching symbol list or it's detailed infomation
+    msymbol: given a regex, searches and prints all matching symbol names if multiple are found, 
+    or print detailed information of the symbol if a single match is found
+    msymbol <regular-express>: e.g. msymbol sun.*executor
     """
 
     def __init__(self):

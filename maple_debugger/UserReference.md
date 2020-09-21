@@ -23,51 +23,51 @@ Before start to use Maple debugger, please make sure to setup two sets of search
    Use msrcpath command to show/add/del source code search paths
 2, The search paths of the generated assembly files of user's program and library.
    This is required by many of Maple debugger commands
-   Use mset command to show/add/del libaray asm file search paths
+   Use mset command to show/add/del library asm file search paths
 ```
 On #1, a search path list should be set, for Maple Debugger to search the source code of libraries and user's application source code. mlist command uses this search list to look up the source code files.
 On #2, a search path list should be set, for Maple Debugger to search assembly files at the time of co-responding .so file is compiled. mbt, mup, mdown and other commands use this search list to look up a lot of information from the assembly files.
 
 ## Maple Command Summary
-* **_mbreakpoint_**: Set and manage Maple breakpoints
-* **_mbacktrace_** : Display Maple backtrace in multiple modes
-* **_mup_**        : Select and print Maple stack frame that called this one
-* **_mdown_**      : Select and print Maple stack frame called by this one
-* **_mlist_**      : List source code in multiple modes
-* **_msrcpath_**   : Add and manage the Maple source code search paths
-* **_mlocal_**     : Display selected Maple frame arguments, local variables and stack dynamic data
-* **_mprint_**     : Print Maple runtime object data
-* **_mtype_**      : Print a matching class and its inheritance hierarchy by a given search expression
-* **_msymbol_**    : Print a matching symbol list or its detailed infomatioin
-* **_mstepi_**     : Step specified number of Maple instructions
-* **_mnexti_**     : Step one Maple instruction, but proceed through subroutine calls
-* **_mfinish_**    : Execute until selected Maple stack frame returns
+* **_mbreakpoint_**: Sets and manages Maple breakpoints
+* **_mbacktrace_** : Displays Maple backtrace in multiple modes
+* **_mup_**        : Selects and prints Maple stack frame that called this one
+* **_mdown_**      : Selects and prints Maple stack frame called by this one
+* **_mlist_**      : Lists source code in multiple modes
+* **_msrcpath_**   : Adds and manages the Maple source code search paths
+* **_mlocal_**     : Displays selected Maple frame arguments, local variables and stack dynamic data
+* **_mprint_**     : Prints Maple runtime object data
+* **_mtype_**      : Prints a matching class and its inheritance hierarchy by a given search expression
+* **_msymbol_**    : Prints a matching symbol list or its detailed infomatioin
+* **_mstepi_**     : Steps specified number of Maple instructions
+* **_mnexti_**     : Steps one Maple instruction, but proceed through subroutine calls
+* **_mfinish_**    : Executes until selected Maple stack frame returns
 * **_mset_**       : Sets and displays Maple debugger settings
-* **_mhelp_**      : Help command, Usage etc
+* **_mhelp_**      : Provides help, usage and etc
 
 ## Maple Breakpoint command
 ### mbreak command
 **_mb_** is the alias of the mbreak command
 #### 1. Syntax
 (gdb) mbreak
-mbreak <symbol>: set a new Maple breakpoint at symbol
-mbreak -set <symbol>: same to 'mbreak <symbol>
-mbreak -enable <symbol|index>: enable an existing Maple breakpoint at symbol
-mbreak -disable <symbol|index>: disable an existing Maple breakpoint at symbol
-mbreak -clear <symbol|index>: delete an existing Maple breakpoint at symbol
-mbreak -clearall : delete all existing Maple breakpoints
-mbreak -listall : list all existing Maple breakpoints
-mbreak -ignore <symbol | index> <count> : set ignore count for specified Maple breakpoints
-mbreak : usage and syntax
+mbreak <symbol>: Sets a new Maple breakpoint at symbol
+mbreak -set <symbol>: An alias for 'mbreak <symbol>'
+mbreak -enable <symbol|index>: Enables an existing Maple breakpoint at symbol
+mbreak -disable <symbol|index>: Disables an existing Maple breakpoint at symbol
+mbreak -clear <symbol|index>: Deletes an existing Maple breakpoint at symbol
+mbreak -clearall : Deletes all existing Maple breakpoints
+mbreak -listall : Lists all existing Maple breakpoints
+mbreak -ignore <symbol | index> <count> : Sets ignore count for specified Maple breakpoints
+mbreak : Displays usage and syntax
 
 #### 2. Set Maple breakpoint
-use command 'mbreak <mangled Maple symbol>' or 'mbreak -set <mangled Maple symbol>'
-example1:
+Execute command 'mbreak <mangled Maple symbol>' or 'mbreak -set <mangled Maple symbol>'
+Example 1:
 ```
 (gdb) mb Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
 set breakpoint  Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
 ```
-example2:
+Example 2:
 ```
 (gdb) mb LTypeTest_3B_7CshowLongList_7C_28AJ_29V
 set breakpoint  LTypeTest_3B_7CshowLongList_7C_28AJ_29V
@@ -77,97 +77,97 @@ Breakpoint 1 (maple::maple_invoke_method) pending.
 ***Note***: this shows a pending Maple breakpoints because the program has not been loaded in yet
 
 #### 3. Display breakpoints and info
-use 'mbreak -list' or 'mbreak -listall'
-example1:
+Execute 'mbreak -list' or 'mbreak -listall'
+Example 1:
 ```
 (gdb) mb -list
-list all breakpoint
+list all Maple breakpoints
 #1 Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V enabled hit_count 0 ignore_count 0 at pending address in maple::maple_invoke_method()
 #2 LTypeTest_3B_7CshowLongList_7C_28AJ_29V enabled hit_count 0 ignore_count 0 at pending address in maple::maple_invoke_method()
 ```
 ***Note***: this output shows Maple breakpoints when those breakpoints are at a pending state.
 
-example2:
+Example 2:
 ```
 (gdb) mb -list
-list all breakpoint
+list all Maple breakpoints
 #1 Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V enabled hit_count 1 ignore_count 0 at 0x7ffff5b51c66 in maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:158
 #2 LTypeTest_3B_7CshowShortList_7C_28AS_29V enabled hit_count 0 ignore_count 0 at 0x7ffff5b51c66 in maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:158
 ```
 ***Note***: this output shows the Maple breakpoints with real address and additional information when the libraries are loaded.
 
 #### 4. Disable a Maple breakpoint
-use 'mb -disable <symbol | index>' command
-example1:
+Execute 'mb -disable <symbol | index>' command
+Example 1:
 ```
 (gdb) mb -disable 1
 disable breakpoint  1
 ```
 ***Note***: use Maple breakpoint index 1 which is Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V from the Maple breakpoint listed above
-example2:
+Example 2:
 ```
 (gdb) mb -disable Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
 disable breakpoint  Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
 ```
 #### 5. Enable a Maple breakpoint
-use 'mb -enable <symbol | index>' command
-example:
+Execute 'mb -enable <symbol | index>' command
+Example:
 ```
 (gdb) mb -enable 1
 enable breakpoint  1
 ```
 ***Note***: use Maple breakpoint index 1 which is Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V from the Maple breakpoint listed above
-example2:
+Example 2:
 ```
 (gdb) mb -enable Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
 enable breakpoint  Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
 ```
 #### 6. Delete a Maple breakpoint
-use 'mb -clear <symbol | index>' command
-example:
+Execute 'mb -clear <symbol | index>' command
+Example:
 ```
 (gdb) mb -clear 1
 clear breakpoint  1
 ```
 ***Note***: use Maple breakpoint index 1 which is Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V from the Maple breakpoint listed above
-example2:
+Example 2:
 ```
 (gdb) mb -clear Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
 clear breakpoint  Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
 ```
 #### 7. Delete all Maple breakpoints
-use 'mb -clearall' command
-example:
+Execute 'mb -clearall' command
+Example:
 ```
 (gdb) mb -clearall
 clear all breakpoint
 ```
 #### 8. Set symbol's ignore couont
-use 'mb -ignore <ysmbol | index> <count>' command
-example:
+Execute 'mb -ignore <ysmbol | index> <count>' command
+Example:
 ```
 (gdb) mb -ignore Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V 2
 ignore breakpoint  1 2
 ```
 ## Maple Stack Commands
 ### mbacktrace command
-**_mbt_** as alias of mbacktrace command. **_Syntax_**: (gdb)mbt [-full | -asm]
+**_mbt_** as alias of mbacktrace command. **_Syntax_**: mbt [-full | -asm]
 #### 1. View Maple frame backtrace
-use command 'mbt'
-example:
+Execute command 'mbt'
+Example:
 ```
-(gdb)mbt
+(gdb) mbt
 Maple Traceback (most recent call first):
-#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
-#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
-#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
+#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
+#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
+#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
 ```
-***Note***: #0 is the stack frame level, **_libcore.so:0x26d1264:0000_** is the function at libcore.so library, function address at 0x26d1264:0000, function name is **_Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V_**; in between () is the function arguments, where **_%2_** is the argument name which is **_a64_** pointer pointing to class **_java.lang.ThreadGroup_**, at the address value of 0x15058. This also shows function is at source code file **_/home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java, line 313_**
+***Note***: #0 is the stack frame level, **_libcore.so:0x26d1264:0000_** is the function at libcore.so library, function address at 0x26d1264:0000, function name is **_Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V_**; in between () is the function arguments, where **_%2_** is the argument name which is **_a64_** pointer pointing to class **_java.lang.ThreadGroup_**, at the address value of 0x15058. This also shows function is at source code file **_/home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java, line 313_**
 #### 2. View Maple backtrace in asm format
-use 'mbt -asm' command
-example:
+Execute 'mbt -asm' command
+Example:
 ```
-(gdb)mbt -asm
+(gdb) mbt -asm
 Maple Traceback (most recent call first):
 #0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at //home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:5882106
 #2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at //home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:5881983
@@ -175,16 +175,16 @@ Maple Traceback (most recent call first):
 ```
 **Note**: This is exact same Maple backtrace, but the source file is assembly file. For example, **_//home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s_** is the assembly file,  line number is **_5882045_** in the assmebly file.
 #### 3. View a full backtrace mixed with Maple frames and gdb native frames
-use 'mbt -full' command
-example:
+Execute 'mbt -full' command
+Example:
 ```
-(gdb)mbt -full
+(gdb) mbt -full
 Maple Traceback (most recent call first):
-#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
+#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
 #1  0x00007ffff5b7135a in maple::MFunction::indirect_call (this=0x7fffffff75d8, ret_ptyp=maple::PTY_void, arg_num=2) at /home/test/gitee/maple_engine/maple_engine/src/mfunction.cpp:150
-#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
+#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
 #3  0x00007ffff5b7135a in maple::MFunction::indirect_call (this=0x7fffffffd128, ret_ptyp=maple::PTY_a64, arg_num=2) at /home/test/gitee/maple_engine/maple_engine/src/mfunction.cpp:150
-#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
+#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
 #5  0x00007ffff5b741ef in __engine_shim (first_arg=140737148666236) at /home/test/gitee/maple_engine/maple_engine/src/shimfunction.cpp:100
 #6  0x00007ffff54fee40 in ffi_call_unix64 () from /usr/lib/x86_64-linux-gnu/libffi.so
 #7  0x00007ffff54fe8ab in ffi_call () from /usr/lib/x86_64-linux-gnu/libffi.so
@@ -204,63 +204,63 @@ Maple Traceback (most recent call first):
 ### mup command
 #### 1. mup
 If mbt shows current Maple frame is at stack level 0, then mup command will make next older Maple frame at its new current frame.
-example:
+Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
-#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
-#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
+#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
+#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
+#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
 ````
 ***Note***: current frame stack level is at level 0
 ```
 (gdb) mup
-#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
+#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
 ```
 ***Note***: now current Maple frame level became 2
 #### 2. mup [n]
 If mbt shows current Maple frame is at stack level 0, then mup command will make next n older Maple frame new current frame
-example:
+Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
-#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
-#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
+#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
+#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
+#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
 ```
 ***Note***: current frame stack level is at level 0
 ```
 (gdb) mup 2
-#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
+#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
 ```
 ***Note***: now current Maple frame became level 4
 ### mdown command
 #### 1. mdown
 If mbt shows current Maple frame is at stack level 4, then mup command will make next newer Maple frame new current frame.
-example:
+Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
+#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
 ```
 ***Note***: the current Maple frame is at stack level 4
 ```
 (gdb) mdown
-#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
+#2 libcore.so:0x26d10d4:0018: Ljava_2Flang_2FThreadGroup_3B_7CcheckParentAccess_7C_28Ljava_2Flang_2FThreadGroup_3B_29Ljava_2Flang_2FVoid_3B(a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:135
 ```
 ***Note***: the current Maple frame is at stack level 2 after mdown command
 #### 2. mdown [n]
 This command moves to next newer n Maple frames and stay at that level in the stack.
-example:
+Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
+#4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:117
 ```
 ***Note***: the current Maple frame is at stack level 4
 ```
 (gdb) mdown 2
-#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/openjdk/openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
+#0 libcore.so:0x26d1264:0000: Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V(a64<java.lang.ThreadGroup> %2=0x15058 "\310\001\020\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/ThreadGroup.java:313
 ```
 ***Note***: after mdown 2, the current Maple frame is back to stack level 0
 
@@ -268,121 +268,141 @@ Maple Traceback (most recent call first):
 ### mstepi command
 **_msi_** as the alias of mstepi command
 #### 1. Step into next Maple instruction
-example:
+Example:
 ```
 (gdb) msi
-Breakpoint 2 at 0x7ffff5b51c14: file /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp, line 59.
-Debug [20051] addr2line -f -e /home/test/gitee/maple_engine/maple_runtime/lib/x86_64/libcore.so 0x26d1264
-Debug [20051] Symbol: 0x00007fffebc0c264, lib_addr: 0x00007fffe953b000, Running Java method: eval_depth=3
-Debug [20051] 1 Args: 1: %2, a64, 0x15058
-
-Thread 1 "mplsh" hit Breakpoint 2, __inc_opcode_cnt () at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:59
-59          return ++__opcode_cnt;
-0x00007ffff5b608f9 in maple::maple_invoke_method (mir_header=0x7fffebc0c264 <Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V_mirbin_info>, caller=0x7fffffff75d8) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:924
-924         DEBUGOPCODE(addroffpc, Expr);
-5882106  :      .byte OP_addroffpc, 0xe, 0x0, 0x0                 // 0000
-5882107  :      .long _PTR__cinf_Ljava_2Flang_2FSystem_3B-.
-5882108  :      .byte OP_intrinsiccall, 0x0, 0x4, 0x1             // 0008: MPL_CLINIT_CHECK
+asm file: /home/test/maple_engine_standalone/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s
+=> 5854919 :    .byte OP_intrinsiccall, 0x1, 0x7f, 0x1            // 0004: MCCSyncEnterFast2
+   5854920 :    // LINE Hashtable.java : 459, INSTIDX : 0||0000:  aload_2
+   5854921 :    // LINE Hashtable.java : 459, INSTIDX : 1||0001:  ifnonnull
 ```
 
 #### 2. Step into next n Maple instructions
-use 'msi [n]' command.
-example:
+Execute 'msi [n]' command.
+Example:
 ```
-(gdb) msi 2
-Debug [20051] 0x26d1264:0000: 0xcafef00ddeadbeef, ---, sp=0 : op=0x9c, ptyp=0x0e, op#= 0,       OP_addroffpc, Expr, 754
-Debug [20051] 0x26d1264:0008: 0x00007ffff4c1a3e0, a64, sp=1 : op=0x29, ptyp=0x00, param=0x0104, OP_intrinsiccall, Stmt, 755
-Debug [20051] IntrinsicId=4, __mpl_clinit_check
-Debug [20051] addr2line -f -e /home/test/gitee/maple_engine/maple_runtime/lib/x86_64/libcore.so 0xb6df3e0
-Debug [20051] Symbol: 0x00007ffff4c1a3e0: CLINIT classinfo
-Debug [20051] addr2line -f -e /home/test/gitee/maple_engine/maple_runtime/lib/x86_64/libcore.so 0x142a2b4
-Debug [20051] Symbol: 0x00007fffea9652b4: [Running CLINIT:
-Debug [20051] addr2line -f -e /home/test/gitee/maple_engine/maple_runtime/lib/x86_64/libcore.so 0x142a2b8
-Debug [20051] Symbol: 0x00007fffea9652b8, lib_addr: 0x00007fffe953b000, Running Java method: eval_depth=3
-Debug [20051] 0 Args:
-
-Thread 1 "mplsh" hit Breakpoint 2, __inc_opcode_cnt () at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:59
-59          return ++__opcode_cnt;
-0x00007ffff5b53d3e in maple::maple_invoke_method (mir_header=0x7fffea9652b8 <Ljava_2Flang_2FSystem_3B_7C_3Cclinit_3E_7C_28_29V_mirbin_info>, caller=0x7fffffff1a88) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:335
-335         DEBUGOPCODE(addroffunc, Expr);
-30600  :        .byte OP_addroffunc, 0xe, 0x0, 0x0                // 0000
-30601  :        .quad Ljava_2Flang_2FSystem_3B_7CregisterNatives_7C_28_29V
-30602  :        .byte OP_icall, 0x1, 0x0, 0x1                     // 000c
+(gdb) msi 20
+asm file: /home/test/maple_engine_standalone/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s
+=> 5854977 :    .byte OP_constval, 0xe, 0x8, 0x0                  // 00b4
+   5854978 :    .byte OP_add, 0xe, 0x0, 0x2                       // 00b8
+   5854979 :    .byte OP_ireadoff, 0x9, 0x0, 0x0                  // 00bc
 ```
 
 #### 3. Step to a specified Maple instruction by Maple instruction count number
-use 'msi -abs n' command
-example:
+Execute 'msi -abs n' command
+Example:
 ```
-(gdb) msi -abs 344658
-...
-Debug [20051] 0x429c:0270: 0x00007fffe0e2b678, a64, sp=1 : op=0x58, ptyp=0x0e, param=0x0000, OP_ireadoff, Expr, 344655
-Debug [20051] 0x429c:0274: 0x00007fffe0c26a38, a64, sp=1 : op=0x1a, ptyp=0x0e, param=0xffec, OP_regassign (%13), Stmt, 344656
-Debug [20051] 0x429c:0278: 0xcafef00ddeadbeef, ---, sp=0 : op=0x5a, ptyp=0x0e, param=0xffec, OP_regread (%13), Expr, ***344657***
+(gdb) msi -abs 10000
+asm file: /home/test/maple_engine_standalone/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s
+=> 1062 :       .byte OP_ge, 0x4, 0x4, 0x2                        // 017c
+   1063 :       .byte OP_brfalse32, 0x0, 0x0, 0x1                 // 0180
+   1064 :       .long mirbin_label_177681_4-.
+```
 
-Thread 1 "main" hit Breakpoint 2, __inc_opcode_cnt () at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:59
-59          return ++__opcode_cnt;
-0x00007ffff5b5389a in maple::maple_invoke_method (mir_header=0x7fffe0c2929c <LTypeTest_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V_mirbin_info>, caller=0x7fffffffda08) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:313
-313         DEBUGSOPCODE(regread, Expr, idx);
-3479  :         .byte OP_regread, 0xe, 0xf3, 0xff                 // 027c: %6
-3480  :         .byte OP_icall, 0x1, 0x0, 0x2                     // 0280
-3481  :         // LINE TypeTest.java : 12, INSTIDX : 124||007c:  iconst_5
-```
 ***Note***: it stops at Maple instruction count number 344658
+
+#### 4. msi -c. Display current opcode count
+Example:
+```
+(gdb) msi -c
+current opcode count is 40001
+```
 
 ### mni command
 #### 1. Move to next Maple instruction
-example:
+Example:
 ```
-(gdb) msi
-Debug [29963] 0x429c:027c: 0x00007fffe0c26a38, a64, sp=1 : op=0x5a, ptyp=0x0e, param=0xfff3, OP_regread (%6), Expr, 344658
-
-Thread 1 "main" hit Breakpoint 3, __inc_opcode_cnt () at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:59
-59          return ++__opcode_cnt;
-0x00007ffff5b62a12 in maple::maple_invoke_method (mir_header=0x7fffe0c2929c <LTypeTest_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V_mirbin_info>, caller=0x7fffffffda08) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:1107
-1107        DEBUGOPCODE(icall, Stmt);
-3480  :         .byte OP_icall, 0x1, 0x0, 0x2                     // 0280
-3481  :         // LINE TypeTest.java : 12, INSTIDX : 124||007c:  iconst_5
-3482  :         // LINE TypeTest.java : 12, INSTIDX : 125||007d:  newarray
-```
-***Note***: currently it stops at Maple count number 344657, and about to execute instruction 344658 which is a OP_icall instruction
-```
-(gdb)mni
-...
-Debug [29963] 0x1a3c:0318: 0x0000000000035cb8, a64, sp=3 : op=0x29, ptyp=0x00, param=0x0329, OP_intrinsiccall, Stmt, 363411
-Debug [29963] IntrinsicId=41, __mpl_cleanup_localrefvars
-Debug [29963] 0x1a3c:031c: 0xcafef00ddeadbeef, ---, sp=0 : op=0x1e, ptyp=0x00, op#= 0,       OP_return, Stmt, 363412
-0x00007ffff5b7135a in maple::MFunction::indirect_call (this=0x7fffffffd5e8, ret_ptyp=maple::PTY_void, arg_num=2) at /home/test/gitee/maple_engine/maple_engine/src/mfunction.cpp:150
-150                 RETURNVAL = maple_invoke_method(header, this);
-Value returned is $42 = {x = {u1 = 0 '\000', i8 = 0 '\000', i16 = 0, u16 = 0, i32 = 0, i64 = 0, f32 = 0, f64 = 0, a64 = 0x0, u8 = 0 '\000', u32 = 0, u64 = 0}, ptyp = maple::PTY_void}
-
-Thread 1 "main" hit Breakpoint 3, __inc_opcode_cnt () at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:59
-59          return ++__opcode_cnt;
-0x00007ffff5b53f82 in maple::maple_invoke_method (mir_header=0x7fffe0c2929c <LTypeTest_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V_mirbin_info>, caller=0x7fffffffda08) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:352
-352         DEBUGCOPCODE(constval, Expr);
-3484  :         .byte OP_constval, 0x9, 0x1, 0x0                  // 0284
-3485  :         .byte OP_constval, 0x4, 0x5, 0x0                  // 0288
-3486  :         .byte OP_addrof32, 0xe, 0x0, 0x0                  // 028c
+(gdb) mni
+asm file: /home/test/maple_engine_standalone/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s
+1002 :  .byte OP_regread, 0x4, 0xfd, 0xff                 // 00c8: %2
+1003 :  .byte OP_regassign, 0x4, 0xfa, 0xff               // 00cc: %5
+1004 :  // LINE String.java : 1471, INSTIDX : 36||0024:  imul
 ```
 ***Note***: Maple instruction 363412 is a OP_return from OP_icall at 344658.
 
+### mstep command
+Steps program until it reaches a different source line of Maple Application
+Example:
+```
+(gdb) mlist
+src file: /home/test/my_openjdk8/jdk/src/share/classes/java/util/Hashtable.java line: 465
+     461         }
+     462
+     463         // Makes sure the key is not already in the hashtable.
+     464         Entry<?,?> tab[] = table;
+=>   465         int hash = key.hashCode();
+     466         int index = (hash & 0x7FFFFFFF) % tab.length;
+     467         @SuppressWarnings("unchecked")
+     468         Entry<K,V> entry = (Entry<K,V>)tab[index];
+     469         for(; entry != null ; entry = entry.next) {
+     470             if ((entry.hash == hash) && entry.key.equals(key)) {
+
+(gdb) ms
+Info: executed 2 opcodes
+src file: /home/test/my_openjdk8/jdk/src/share/classes/java/util/Hashtable.java line: 466
+     462
+     463         // Makes sure the key is not already in the hashtable.
+     464         Entry<?,?> tab[] = table;
+     465         int hash = key.hashCode();
+=>   466         int index = (hash & 0x7FFFFFFF) % tab.length;
+     467         @SuppressWarnings("unchecked")
+     468         Entry<K,V> entry = (Entry<K,V>)tab[index];
+     469         for(; entry != null ; entry = entry.next) {
+     470             if ((entry.hash == hash) && entry.key.equals(key)) {
+     471                 V old = entry.value;
+```
+
+### mnext command
+Steps program, proceeding through subroutine calls of Maple application
+Example:
+```
+(gdb) mlist
+src file: /home/test/my_openjdk8/jdk/src/share/classes/java/util/Hashtable.java line: 468
+     464         Entry<?,?> tab[] = table;
+     465         int hash = key.hashCode();
+     466         int index = (hash & 0x7FFFFFFF) % tab.length;
+     467         @SuppressWarnings("unchecked")
+=>   468         Entry<K,V> entry = (Entry<K,V>)tab[index];
+     469         for(; entry != null ; entry = entry.next) {
+     470             if ((entry.hash == hash) && entry.key.equals(key)) {
+     471                 V old = entry.value;
+     472                 entry.value = value;
+     473                 return old;
+(gdb) mn
+Info: executed 2 opcodes
+src file: /home/test/my_openjdk8/jdk/src/share/classes/java/util/Hashtable.java line: 468
+     464         Entry<?,?> tab[] = table;
+     465         int hash = key.hashCode();
+     466         int index = (hash & 0x7FFFFFFF) % tab.length;
+     467         @SuppressWarnings("unchecked")
+=>   468         Entry<K,V> entry = (Entry<K,V>)tab[index];
+     469         for(; entry != null ; entry = entry.next) {
+     470             if ((entry.hash == hash) && entry.key.equals(key)) {
+     471                 V old = entry.value;
+     472                 entry.value = value;
+     473                 return old;
+```
+
 ### mfinish command
 #### 1. Execute until selected Maple stack frame returns
-example:
+Example:
 ```
-Thread 1 "main" hit Breakpoint 1, maple::maple_invoke_method (mir_header=0x7fffe02d3178 <LFibonacci_3B_7Cfib_7C_28I_29I_mirbin_info>, caller=0x7fffffff78e8) at /home/che/maple_engine_standalone/maple_engine/maple_engine/src/invoke_method.cpp:158
-158             __maple_method_address = (void *)&maple_invoke_method;
-Breakpoint 2 at 0x7ffff5b51c14: file /home/che/maple_engine_standalone/maple_engine/maple_engine/src/invoke_method.cpp, line 59.
-
-Thread 1 "main" hit Breakpoint 2, __inc_opcode_cnt () at /home/che/maple_engine_standalone/maple_engine/maple_engine/src/invoke_method.cpp:59
-59          return ++__opcode_cnt;
-0x00007ffff5b608f9 in maple::maple_invoke_method (mir_header=0x7fffe02d3178 <LFibonacci_3B_7Cfib_7C_28I_29I_mirbin_info>, caller=0x7fffffff78e8)
-    at /home/che/maple_engine_standalone/maple_engine/maple_engine/src/invoke_method.cpp:924
-924     label_OP_dassign:
-Value returned is $3844 = 304296
-214  :          .byte OP_addroffpc, 0xe, 0x0, 0x0                 // 0000
-215  :          .long _PTR__cinf_LFibonacci_3B-.
-216  :          .byte OP_intrinsiccall, 0x0, 0x4, 0x1             // 0008: MPL_CLINIT_CHECK
+(gdb) mfinish
+asm file: /home/test/maple_engine_standalone/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s
+=> 5854918 :    .byte OP_regread, 0xe, 0x1, 0x0                   // 0000: %13
+   5854919 :    .byte OP_intrinsiccall, 0x1, 0x7f, 0x1            // 0004: MCCSyncEnterFast2
+   5854920 :    // LINE Hashtable.java : 459, INSTIDX : 0||0000:  aload_2
+src file: /home/test/my_openjdk8/jdk/src/share/classes/java/util/Hashtable.java line: 459
+     455      * @see     #get(Object)
+     456      */
+     457     public synchronized V put(K key, V value) {
+     458         // Make sure the value is not null
+=>   459         if (value == null) {
+     460             throw new NullPointerException();
+     461         }
+     462
+     463         // Makes sure the key is not already in the hashtable.
+     464         Entry<?,?> tab[] = table;
 ```
 
 
@@ -391,109 +411,293 @@ Value returned is $3844 = 304296
 **_msp_** is the alias of msrcpath command
 Maple Debugger needs a search path list to search the source code files. msrcpath command is used to set and view this search path list
 #### 1. msrcpath
-example:
+Example:
 ```
-(gdb)msrcpath
+(gdb) msrcpath
 Maple source path list: --
-/home/test/openjdk/openjdk8/jdk/src/
+/home/test/my_openjdk8/jdk/src/
 /home/test/gitee/maple_engine/maple_build/examples/TypeTest
 ```
 #### 2. msrcpath -add <path>
 Add a path to the top of the search path list.
-example:
+Example:
 ```
-(gdb)msrcpath -add /home/test/openjdk/openjdk8/jdk/src/
+(gdb) msrcpath -add /home/test/new_openjdk8/jdk/src/
 ```
 #### 3. msrcpath -del <path>
 Delete one path from the search path list
 ```
-(gdb)msrcpath -del /home/test/openjdk/openjdk8/jdk/src/
+(gdb) msrcpath -del /home/test/new_openjdk8/jdk/src/
 ```
 
 ### mlist command
 ***Make sure source code search path is set before use this command***
 This command list the Maple application source code block
 #### 1. mlist
-example:
+Example:
 ```
 (gdb) mlist
-file:  /home/test/gitee/maple_engine/maple_build/examples/TypeTest/TypeTest.java  line:  54
-50             System.out.println();
-51         }
-52
-53         public static void showLongList(long[] list)
-54         {   for(int i = 0; i < list.length; i++)
-55                 System.out.print( list[i] + " " );
-56             System.out.println();
-57         }
-58
+src file: /home/test/my_openjdk8/jdk/src/share/classes/sun/util/PreHashedMap.java line: 115
+     111         this.size = size;
+     112         this.shift = shift;
+     113         this.mask = mask;
+     114         this.ht = new Object[rows];
+=>   115         init(ht);
+     116     }
+     117
+     118     /**
+     119      * Initializes this map.
+     120      *
+
 ```
 #### 2. mlist -asm
 list the current instruction in co-responding assembly file
-example:
+Example:
 ```
 (gdb) mlist -asm
-file:  /home/test/gitee/maple_engine/maple_build/examples/TypeTest/TypeTest.s  line:  985
-981             .ascii "%29\0\0\0\0\0\0\0\0\0\0\0\0\0"
-982             .ascii "%30\0\0\0\0\0\0\0\0\0\0\0\0\0"
-983             .p2align 1
-984     LTypeTest_3B_7CshowLongList_7C_28AJ_29V_mirbin_code:
-985             .byte OP_addroffpc, 0xe, 0x0, 0x0                 // 0000
-986             .long _PTR__cinf_LTypeTest_3B-.
-987             .byte OP_intrinsiccall, 0x0, 0x4, 0x1             // 0008: MPL_CLINIT_CHECK
-988             // LINE TypeTest.java : 54, INSTIDX : 0||0000:  iconst_0
-```
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s line: 355834
+      355825    // icallassigned : unknown
+      355826    .byte OP_regread, 0xe, 0x1, 0x0                   // 0088: %5
+      355827    .byte OP_ireadoff, 0xe, 0x0, 0x0                  // 008c
+      355828    .byte OP_ireadoff, 0xe, 0x18, 0x0                 // 0090
+      355829    .byte OP_constval, 0xe, 0x10, 0x1                 // 0094
+      355830    .byte OP_add, 0xe, 0x0, 0x2                       // 0098
+      355831    .byte OP_ireadoff, 0x9, 0x0, 0x0                  // 009c
+      355832    .byte OP_regread, 0xe, 0x1, 0x0                   // 00a0: %5
+      355833    .byte OP_regread, 0xe, 0xfd, 0xff                 // 00a4: %6
+=>    355834    .byte OP_icall, 0x1, 0x0, 0x3                     // 00a8
+      355835    // LINE PreHashedMap.java : 116, INSTIDX : 41||0029:  return
+      355836    .byte OP_dread, 0xe, 0xfe, 0xff                   // 00ac: Reg1_R20417
+      355837    .byte OP_intrinsiccall, 0x0, 0x29, 0x1            // 00b0: MPL_CLEANUP_LOCALREFVARS
+      355838    .byte OP_return, 0x0, 0x0, 0x0                    // 00b4
 
+```
+#### 3. mlist num:
+Lists current source code file at line of [line-num]
+Example:
+```
+(gdb) mlist 110
+src file: /home/test/my_openjdk8/jdk/src/share/classes/sun/util/PreHashedMap.java line: 110
+     106      * @param mask
+     107      *        The value with which hash codes are masked after being shifted
+     108      */
+     109     protected PreHashedMap(int rows, int size, int shift, int mask) {
+=>   110         this.rows = rows;
+     111         this.size = size;
+     112         this.shift = shift;
+     113         this.mask = mask;
+     114         this.ht = new Object[rows];
+     115         init(ht);
+
+```
+#### 4. mlist filename:line_num
+Lists specified source code file at line of [line-num]
+Example:
+```
+(gdb) mlist System.java:1168
+src file: /home/test/my_openjdk8/jdk/src/share/classes/java/lang/System.java line: 1168
+    1164         // initialization. So make sure the "props" is available at the
+    1165         // very beginning of the initialization and all system properties to
+    1166         // be put into it directly.
+    1167         props = new Properties();
+=>  1168         initProperties(props);  // initialized by the VM
+    1169
+    1170         // There are certain system configurations that may be controlled by
+    1171         // VM options such as the maximum amount of direct memory and
+    1172         // Integer cache size used to support the object identity semantics
+    1173         // of autoboxing.  Typically, the library will obtain these values
+```
+#### 5. mlist +|-[num]
+Lists current source code file offsetting from previous listed line, offset can be + or -
+Example:
+```
+(gdb) mlist PreHashedMap.java:110
+src file: /home/test/my_openjdk8/jdk/src/share/classes/sun/util/PreHashedMap.java line: 110
+     106      * @param mask
+     107      *        The value with which hash codes are masked after being shifted
+     108      */
+     109     protected PreHashedMap(int rows, int size, int shift, int mask) {
+=>   110         this.rows = rows;
+     111         this.size = size;
+     112         this.shift = shift;
+     113         this.mask = mask;
+     114         this.ht = new Object[rows];
+     115         init(ht);
+(gdb) mlist +8
+src file: /home/test/my_openjdk8/jdk/src/share/classes/sun/util/PreHashedMap.java line: 118
+     114         this.ht = new Object[rows];
+     115         init(ht);
+     116     }
+     117
+=>   118     /**
+     119      * Initializes this map.
+     120      *
+     121      * <p> This method must construct the map's hash chains and store them into
+     122      * the appropriate elements of the given hash-table row array.
+     123      *
+```
+#### 6. mlist -asm:+|-[num]
+Lists current assembly instructions offsetting from previous listed line. offset can be + or -
+```
+(gdb) mlist -asm
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s line: 355834
+      355825    // icallassigned : unknown
+      355826    .byte OP_regread, 0xe, 0x1, 0x0                   // 0088: %5
+      355827    .byte OP_ireadoff, 0xe, 0x0, 0x0                  // 008c
+      355828    .byte OP_ireadoff, 0xe, 0x18, 0x0                 // 0090
+      355829    .byte OP_constval, 0xe, 0x10, 0x1                 // 0094
+      355830    .byte OP_add, 0xe, 0x0, 0x2                       // 0098
+      355831    .byte OP_ireadoff, 0x9, 0x0, 0x0                  // 009c
+      355832    .byte OP_regread, 0xe, 0x1, 0x0                   // 00a0: %5
+      355833    .byte OP_regread, 0xe, 0xfd, 0xff                 // 00a4: %6
+=>    355834    .byte OP_icall, 0x1, 0x0, 0x3                     // 00a8
+      355835    // LINE PreHashedMap.java : 116, INSTIDX : 41||0029:  return
+      355836    .byte OP_dread, 0xe, 0xfe, 0xff                   // 00ac: Reg1_R20417
+      355837    .byte OP_intrinsiccall, 0x0, 0x29, 0x1            // 00b0: MPL_CLEANUP_LOCALREFVARS
+      355838    .byte OP_return, 0x0, 0x0, 0x0                    // 00b4
+(gdb) mlist -asm:+10
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s line: 355838
+      355829    .byte OP_constval, 0xe, 0x10, 0x1                 // 0094
+      355830    .byte OP_add, 0xe, 0x0, 0x2                       // 0098
+      355831    .byte OP_ireadoff, 0x9, 0x0, 0x0                  // 009c
+      355832    .byte OP_regread, 0xe, 0x1, 0x0                   // 00a0: %5
+      355833    .byte OP_regread, 0xe, 0xfd, 0xff                 // 00a4: %6
+      355834    .byte OP_icall, 0x1, 0x0, 0x3                     // 00a8
+      355835    // LINE PreHashedMap.java : 116, INSTIDX : 41||0029:  return
+      355836    .byte OP_dread, 0xe, 0xfe, 0xff                   // 00ac: Reg1_R20417
+      355837    .byte OP_intrinsiccall, 0x0, 0x29, 0x1            // 00b0: MPL_CLEANUP_LOCALREFVARS
+=>    355838    .byte OP_return, 0x0, 0x0, 0x0                    // 00b4
+(gdb) mlist -asm:-15
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s line: 355823
+      355814    // LINE PreHashedMap.java : 114, INSTIDX : 30||001e:  putfield
+      355815    .byte OP_regread, 0xe, 0x1, 0x0                   // 0070: %5
+      355816    .byte OP_regread, 0xe, 0x1, 0x0                   // 0074: %5
+      355817    .byte OP_constval, 0xe, 0x30, 0x0                 // 0078
+      355818    .byte OP_add, 0xe, 0x0, 0x2                       // 007c
+      355819    .byte OP_regread, 0xe, 0xfd, 0xff                 // 0080: %6
+      355820    .byte OP_intrinsiccall, 0x1, 0x26, 0x3            // 0084: MCCWrite
+      355821    // LINE PreHashedMap.java : 115, INSTIDX : 33||0021:  aload_0
+      355822    // LINE PreHashedMap.java : 115, INSTIDX : 34||0022:  aload_0
+=>    355823    // LINE PreHashedMap.java : 115, INSTIDX : 35||0023:  getfield
+      355824    // LINE PreHashedMap.java : 115, INSTIDX : 38||0026:  invokevirtual
+      355825    // icallassigned : unknown
+      355826    .byte OP_regread, 0xe, 0x1, 0x0                   // 0088: %5
+      355827    .byte OP_ireadoff, 0xe, 0x0, 0x0                  // 008c
+      355828    .byte OP_ireadoff, 0xe, 0x18, 0x0                 // 0090
+      355829    .byte OP_constval, 0xe, 0x10, 0x1                 // 0094
+      355830    .byte OP_add, 0xe, 0x0, 0x2                       // 0098
+      355831    .byte OP_ireadoff, 0x9, 0x0, 0x0                  // 009c
+      355832    .byte OP_regread, 0xe, 0x1, 0x0                   // 00a0: %5
+      355833    .byte OP_regread, 0xe, 0xfd, 0xff                 // 00a4: %6
+```
+#### 6. mlist .
+Lists code located by the filename and line number of current Maple frame
+Example:
+```
+(gdb) mbt
+Maple Traceback (most recent call first):
+#2 libcore.so:0x1589f2c:00a8: Lsun_2Futil_2FPreHashedMap_3B_7C_3Cinit_3E_7C_28IIII_29V(a64<sun.nio.cs.StandardCharsets$Aliases> %5=0x17598 "@\263\036\365\377\177", i32<> %1=1024, i32<> %2=211, i32<> %3=0, i32<> %4=1023) at /home/test/my_openjdk8/jdk/src/share/classes/sun/util/PreHashedMap.java:115
+#4 libcore.so:0x19cefe0:0020: Lsun_2Fnio_2Fcs_2FStandardCharsets_24Aliases_3B_7C_3Cinit_3E_7C_28_29V(a64<sun.nio.cs.StandardCharsets$Aliases> %1=0x17598 "@\263\036\365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/nio/charset/StandardCharsets.java:377
+#6 libcore.so:0x2691e34:0010: Lsun_2Fnio_2Fcs_2FStandardCharsets_24Aliases_3B_7C_3Cinit_3E_7C_28Lsun_2Fnio_2Fcs_2FStandardCharsets_241_3B_29V(a64<sun.nio.cs.StandardCharsets$Aliases> %2=0x17598 "@\263\036\365\377\177", a64<> %1=0x0) at /home/test/my_openjdk8/jdk/src/share/classes/java/nio/charset/StandardCharsets.java:367
+#8 libcore.so:0x70ca46c:0050: Lsun_2Fnio_2Fcs_2FStandardCharsets_3B_7C_3Cinit_3E_7C_28_29V(a64<sun.nio.cs.StandardCharsets> %5=0x16870 "\340\336 \365\377\177") at /home/test/my_openjdk8/jdk/src/share/classes/java/nio/charset/StandardCharsets.java:711
+#10 libcore.so:0x285fa9c:0048: Ljava_2Fnio_2Fcharset_2FCharset_3B_7C_3Cclinit_3E_7C_28_29V() at /home/test/my_openjdk8/jdk/src/share/classes/java/nio/charset/Charset.java:320
+#28 libcore.so:0x798997c:00ec: Ljava_2Flang_2FSystem_3B_7CinitProperties_7C_28Ljava_2Futil_2FProperties_3B_29Ljava_2Futil_2FProperties_3B(a64<java.util.Properties> %1=0x1f058 "\220\202\022\365\377\177") at unknown:0
+#30 libcore.so:0x888cd98:0098: Ljava_2Flang_2FSystem_3B_7CinitializeSystemClass_7C_28_29V() at /home/test/my_openjdk8/jdk/src/share/classes/java/lang/System.java:1168
+
+(gdb) mlist .
+src file: /home/test/my_openjdk8/jdk/src/share/classes/sun/util/PreHashedMap.java line: 115
+     111         this.size = size;
+     112         this.shift = shift;
+     113         this.mask = mask;
+     114         this.ht = new Object[rows];
+=>   115         init(ht);
+     116     }
+     117
+     118     /**
+     119      * Initializes this map.
+     120      *
+
+```
+#### 7. mlist -asm:.
+Lists code located by the filename and line number of current Maple frame
+```
+(gdb) mbt -asm
+Maple Traceback (most recent call first):
+#2 libcore.so:0x1589f2c:00a8: Lsun_2Futil_2FPreHashedMap_3B_7C_3Cinit_3E_7C_28IIII_29V(a64<sun.nio.cs.StandardCharsets$Aliases> %5=0x17598 "@\263\036\365\377\177", i32<> %1=1024, i32<> %2=211, i32<> %3=0, i32<> %4=1023) at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:355834
+#4 libcore.so:0x19cefe0:0020: Lsun_2Fnio_2Fcs_2FStandardCharsets_24Aliases_3B_7C_3Cinit_3E_7C_28_29V(a64<sun.nio.cs.StandardCharsets$Aliases> %1=0x17598 "@\263\036\365\377\177") at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:1660865
+#6 libcore.so:0x2691e34:0010: Lsun_2Fnio_2Fcs_2FStandardCharsets_24Aliases_3B_7C_3Cinit_3E_7C_28Lsun_2Fnio_2Fcs_2FStandardCharsets_241_3B_29V(a64<sun.nio.cs.StandardCharsets$Aliases> %2=0x17598 "@\263\036\365\377\177", a64<> %1=0x0) at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:5694501
+#8 libcore.so:0x70ca46c:0050: Lsun_2Fnio_2Fcs_2FStandardCharsets_3B_7C_3Cinit_3E_7C_28_29V(a64<sun.nio.cs.StandardCharsets> %5=0x16870 "\340\336 \365\377\177") at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:26283373
+#10 libcore.so:0x285fa9c:0048: Ljava_2Fnio_2Fcharset_2FCharset_3B_7C_3Cclinit_3E_7C_28_29V() at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:6204417
+#28 libcore.so:0x798997c:00ec: Ljava_2Flang_2FSystem_3B_7CinitProperties_7C_28Ljava_2Futil_2FProperties_3B_29Ljava_2Futil_2FProperties_3B(a64<java.util.Properties> %1=0x1f058 "\220\202\022\365\377\177") at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:28704324
+#30 libcore.so:0x888cd98:0098: Ljava_2Flang_2FSystem_3B_7CinitializeSystemClass_7C_28_29V() at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:32916877
+
+(gdb) mlist -asm:.
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s line: 355834
+      355825    // icallassigned : unknown
+      355826    .byte OP_regread, 0xe, 0x1, 0x0                   // 0088: %5
+      355827    .byte OP_ireadoff, 0xe, 0x0, 0x0                  // 008c
+      355828    .byte OP_ireadoff, 0xe, 0x18, 0x0                 // 0090
+      355829    .byte OP_constval, 0xe, 0x10, 0x1                 // 0094
+      355830    .byte OP_add, 0xe, 0x0, 0x2                       // 0098
+      355831    .byte OP_ireadoff, 0x9, 0x0, 0x0                  // 009c
+      355832    .byte OP_regread, 0xe, 0x1, 0x0                   // 00a0: %5
+      355833    .byte OP_regread, 0xe, 0xfd, 0xff                 // 00a4: %6
+=>    355834    .byte OP_icall, 0x1, 0x0, 0x3                     // 00a8
+      355835    // LINE PreHashedMap.java : 116, INSTIDX : 41||0029:  return
+      355836    .byte OP_dread, 0xe, 0xfe, 0xff                   // 00ac: Reg1_R20417
+      355837    .byte OP_intrinsiccall, 0x0, 0x29, 0x1            // 00b0: MPL_CLEANUP_LOCALREFVARS
+      355838    .byte OP_return, 0x0, 0x0, 0x0                    // 00b4
+```
 ## Maple Data Commands
 ### mlocal command
 This command displays the stack frame local varibles' value and dynamic stack data.
 #### 1. mlocal
 This is used to display all local variables' value of a function. Use mlocal command at a Maple breakpoint and after a msi command to step into a function
-example:
+Example:
 ```
 (gdb) mlocal
-local #1 :name=%%thrownval type=v2i64 value=none
-local #2 :name=Reg0_R155549 type=a64 value=0x0
-local #3 :name=Reg1_R20114 type=a64 value=0x0
-local #4 :name=Reg0_R34665 type=a64 value=0x0
-local #5 :name=%1 type=i32 value=0
-local #6 :name=%2 type=i32 value=0
-local #7 :name=%3 type=i32 value=0
-local #8 :name=%4 type=i32 value=0
-local #9 :name=%5 type=i32 value=0
-local #10 :name=%6 type=a64 value=0x0
-local #11 :name=%7 type=a64 value=0x0
-local #12 :name=%8 type=a64 value=0x0
-local #13 :name=%9 type=u16 value=0
-local #14 :name=%10 type=i32 value=0
-local #15 :name=%11 type=i32 value=0
-local #16 :name=%12 type=i32 value=0
-local #17 :name=%13 type=a64 value=0x0
-local #18 :name=%14 type=u1 value=0 '\000'
-local #19 :name=%15 type=i32 value=0
-local #20 :name=%16 type=u1 value=0 '\000'
-local #21 :name=%17 type=u1 value=0 '\000'
-local #22 :name=%18 type=i32 value=0
-local #23 :name=%19 type=u1 value=0 '\000'
-local #24 :name=%20 type=i32 value=0
-local #25 :name=%21 type=i32 value=0
-local #26 :name=%22 type=a64 value=0x0
-local #27 :name=%24 type=a64 value=0x0
-local #28 :name=%25 type=a64 value=0x0
-local #29 :name=%27 type=a64 value=0x0
+local #1: name=%%thrownval type=v2i64 value=none
+local #2: name=Reg0_R155549 type=a64 value=0x0
+local #3: name=Reg1_R20114 type=a64 value=0x0
+local #4: name=Reg0_R34665 type=a64 value=0x0
+local #5: name=%1 type=i32 value=0
+local #6: name=%2 type=i32 value=0
+local #7: name=%3 type=i32 value=0
+local #8: name=%4 type=i32 value=0
+local #9: name=%5 type=i32 value=0
+local #10: name=%6 type=a64 value=0x0
+local #11: name=%7 type=a64 value=0x0
+local #12: name=%8 type=a64 value=0x0
+local #13: name=%9 type=u16 value=0
+local #14: name=%10 type=i32 value=0
+local #15: name=%11 type=i32 value=0
+local #16: name=%12 type=i32 value=0
+local #17: name=%13 type=a64 value=0x0
+local #18: name=%14 type=u1 value=0 '\000'
+local #19: name=%15 type=i32 value=0
+local #20: name=%16 type=u1 value=0 '\000'
+local #21: name=%17 type=u1 value=0 '\000'
+local #22: name=%18 type=i32 value=0
+local #23: name=%19 type=u1 value=0 '\000'
+local #24: name=%20 type=i32 value=0
+local #25: name=%21 type=i32 value=0
+local #26: name=%22 type=a64 value=0x0
+local #27: name=%24 type=a64 value=0x0
+local #28: name=%25 type=a64 value=0x0
+local #29: name=%27 type=a64 value=0x0
 ```
 #### 2. mlocal -stack or mlocal -s
 This is used to display all stack frame's dynamic data.
-example:
+Example:
 ```
 (gdb) mlocal -stack
-sp= 1 :type= a64  value= 0x7ffff49915e8 <_C_STR_aa6c9e888c754e206fadbf41fdc90033> "0u\214\366\377\177"
-sp= 2 :type= a64  value= 0x0
+sp=1: type=a64 value=0x7ffff49915e8 <_C_STR_aa6c9e888c754e206fadbf41fdc90033> "0u\214\366\377\177"
+sp=2: type=a64 value=0x0
 ```
 ### mprint command
 This command is used to display the object data and object type includind the inheritence hierarchy
 #### 1. syntax: mprint <hex address>
-example:
+Example:
 ```
 (gdb) mprint 0x15058
 object type: class Ljava_2Flang_2FThreadGroup_3B
@@ -517,7 +721,7 @@ level 2 class Ljava_2Flang_2FThreadGroup_3B:
 **_syntax_**: mtype <regex-of-mangled-class-name-search-pattern>
 
 #### 1. If only one matches
-example:
+Example:
 ```
 (gdb) mtype Nodes_24ToArrayTask_24OfRef
 #1 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B:
@@ -544,7 +748,7 @@ example:
     #6 Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfRef_3B_7CmakeChild_7C_28II_29Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_3B
 ```
 #### 2. If multiple classes match
-example:
+Example:
 ```
 (gdb) mtype Nodes_24ToArrayTask
 #1 class name: Ljava_2Futil_2Fstream_2FNodes_24ToArrayTask_24OfPrimitive_3B:
@@ -559,16 +763,16 @@ example:
 **_syntax_**: msymbol <regex-of-symbol-name-search-pattern>
 
 #### 1. If only one matches
-example:
+Example:
 ```
 (gdb) msymbol Lsun_2Fsecurity_2Fprovider_2FPolicyParser_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
 #1 symbol name: Lsun_2Fsecurity_2Fprovider_2FPolicyParser_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
+assembly file : /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s
+source        : /home/test/my_openjdk8/jdk/src/share/classes/sun/security/provider/PolicyParser.java
 demangled name: Lsun.security.provider.PolicyParser;main(ALjava.lang.String;)V
-assembly file : //home/che/maple_engine_standalone/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s
-source        : /home/che/my_openjdk8/jdk/src/share/classes/sun/security/provider/PolicyParser.java
 ```
 #### 2. If multiple symbols match
-example:
+Example:
 ```
 (gdb) msymbol executor
 #1 symbol name: Lsun_2Fnio_2Fch_2FAsynchronousChannelGroupImpl_3B_7Cexecutor_7C_28_29Ljava_2Futil_2Fconcurrent_2FExecutorService_3B
@@ -581,13 +785,14 @@ example:
 This command is used to set Maple debugger's environment variables and flags
 #### 1. mset -show
 display the mset settings
-example:
+Example:
 ```
-(gdb)mset -show
+(gdb) mset -show
 {'maple_lib_asm_path': ['~/gitee/maple_engine/maple_build/out/x86_64/', './'], 'verbose': 'off'}
+{'maple_lib_asm_path': ['~/gitee/maple_engine/maple_build/out/x86_64/', './'], 'verbose': 'off', 'event': 'disconnect'}
 ```
 #### 2. mset <key> <value>
-example:
+Example:
 ```
 (gdb)mset verbose on
 ```
@@ -606,7 +811,7 @@ set the number of lines mlist will display for source file and assembly file
 ```
 (gdb) mset linecount 20
 (gdb) mlist
-src file: /home/che/my_openjdk8/jdk/src/share/classes/java/util/AbstractMap.java line: 74
+src file: /home/test/my_openjdk8/jdk/src/share/classes/java/util/AbstractMap.java line: 74
       65  * @since 1.2
       66  */
       67
@@ -631,39 +836,43 @@ src file: /home/che/my_openjdk8/jdk/src/share/classes/java/util/AbstractMap.java
 
 ### mhelp command
 #### 1. List all the commands and Maple Debugger version
-example:
+Example:
 ```
 (gdb) mhelp
-Maple Version 1.0
+Maple Version 1.2
 
-mbreak:     Set and manage Maple breakpoints
-mbacktrace: Display Maple backtrace in multiple modes
-mup:        Select and print Maple stack frame that called this one
-mdown:      Select and print Maple stack frame called by this ones
-mlist:      List source code in multiple modes
-msrcpath:   Add and manage the Maple source code search path
-mlocal:     Display selected Maple frame arguments and local variables
-mprint:     Print Maple runtime object data
-mtype:      Print a matching class and its inheritance hierarchy by a given search expression
-mstepi:     Step specified number of Maple instructions
-mnexti:     Step one Maple instruction, but proceed through subroutine calls
+mbreak:     Sets and manages Maple breakpoints
+mbacktrace: Displays Maple backtrace in multiple modes
+mup:        Selects and prints the Maple stack frame that called this one
+mdown:      Selects and prints the Maple stack frame called by this one
+mlist:      Lists source code in multiple modes
+msrcpath:   Adds and manages the Maple source code search paths
+mlocal:     Displays selected Maple frame arguments, local variables and stack dynamic data
+mprint:     Prints Maple runtime object data
+mtype:      Prints a matching class and its inheritance hierarchy by a given search expression
+msymbol:    Prints a matching symbol list or its detailed infomatioin
+mstepi:     Steps a specified number of Maple instructions
+mnexti:     Steps one Maple instruction, but proceeds through subroutine calls
+mstep:      Steps program until it reaches a different source line of Maple Application
+mnext:      Steps program, proceeding through subroutine calls of Maple application
 mset:       Sets and displays Maple debugger settings
-mfinish:    Execute until selected Maple stack frame returns
-mhelp:      list Maple help information
+mfinish:    Execute until the selected Maple stack frame returns
+mhelp:      Lists Maple help information
 ```
+
 #### 2. Help of individual Maple command
 mhelp <command name>
 ***Note***: command name must be a Maple command full name other than its alias name
-example:
+Example:
 ```
 (gdb) mhelp mbreak
-Maple Version 1.0
-mbreak <symbol>: set a new Maple breakpoint at symbol
-mbreak -set <symbol>: same to "mbreak <symbol>"
-mbreak -enable <symbol|index>: enable an existing Maple breakpoint at symbol
-mbreak -disable <symbol|index>: disable an existing Maple breakpoint at symbol
-mbreak -clear <symbol|index>: delete an existing Maple breakpoint at symbol
-mbreak -clearall : delete all existing Maple breakpoint
-mbreak -listall : list all existing Maple breakpoints
-mbreak -ignore <symbol | index> <count> : set ignore count for specified Maple breakpoints
+Maple Version 1.2
+mbreak <symbol>: Sets a new Maple breakpoint at symbol
+mbreak -set <symbol>: Alias for "mbreak <symbol>"
+mbreak -enable <symbol|index>: Enables an existing Maple breakpoint at symbol
+mbreak -disable <symbol|index>: Disables an existing Maple breakpoint at symbol
+mbreak -clear <symbol|index>: Deletes an existing Maple breakpoint at symbol
+mbreak -clearall : Deletes all existing Maple breakpoints
+mbreak -listall : Lists all existing Maple breakpoints
+mbreak -ignore <symbol | index> <count>: Sets ignore count for specified Maple breakpoints
 ```

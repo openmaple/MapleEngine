@@ -25,15 +25,15 @@ import m_debug
 
 class MapleBreakpointCmd(gdb.Command):
     """Set and manage Maple breakpoints
-    mbreak <symbol>: set a new Maple breakpoint at symbol
-    mbreak <symbol>: set a new Maple breakpoint at symbol
-    mbreak -set <symbol>: same to 'mbreak <symbol>'
-    mbreak -enable <symbol|index>: enable an existing Maple breakpoint at symbol
-    mbreak -disable <symbol|index>: disable an existing Maple breakpoint at symbol
-    mbreak -clear <symbol|index>: delete an existing Maple breakpoint at symbol
-    mbreak -clearall : delete all existing Maple breakpoint
-    mbreak -listall : list all existing Maple breakpoints
-    mbreak -ignore <symbol | index> <count> : set ignore count for specified Maple breakpoints
+    mbreak <symbol>: Set a new Maple breakpoint at symbol
+    mbreak <symbol>: Set a new Maple breakpoint at symbol
+    mbreak -set <symbol>: Same to 'mbreak <symbol>'
+    mbreak -enable <symbol|index>: Enable an existing Maple breakpoint at symbol
+    mbreak -disable <symbol|index>: Disable an existing Maple breakpoint at symbol
+    mbreak -clear <symbol|index>: Delete an existing Maple breakpoint at symbol
+    mbreak -clearall : Delete all existing Maple breakpoints
+    mbreak -listall : List all existing Maple breakpoints
+    mbreak -ignore <symbol | index> <count>: Set ignore count for specified Maple breakpoints
     """
 
     def __init__(self):
@@ -50,8 +50,8 @@ class MapleBreakpointCmd(gdb.Command):
         {
             'count'   : int, a count down number of a Maple symbol to be ignored
             'disabled': True|False,
-            'object'  : instance object of class MapleBreakpoint,
-            'address' : breakpoint reported by 'info b' command + 0x4
+            'object'  : Instance object of class MapleBreakpoint,
+            'address' : Breakpoint reported by 'info b' command + 0x4
         }
         """
         self.mbp_object = None
@@ -71,15 +71,15 @@ class MapleBreakpointCmd(gdb.Command):
         self.mbp_func(args, from_tty)
 
     def usage(self):
-        gdb_print ("  mbreak <symbol>: set a new Maple breakpoint at symbol")
-        gdb_print ("  mbreak -set <symbol>: same to 'mbreak <symbol>")
-        gdb_print ("  mbreak -enable <symbol|index>: enable an existing Maple breakpoint at symbol")
-        gdb_print ("  mbreak -disable <symbol|index>: disable an existing Maple breakpoint at symbol")
-        gdb_print ("  mbreak -clear <symbol|index>: delete an existing Maple breakpoint at symbol")
-        gdb_print ("  mbreak -clearall : delete all existing Maple breakpoints")
-        gdb_print ("  mbreak -listall : list all existing Maple breakpoints")
-        gdb_print ("  mbreak -ignore <symbol | index> <count> : set ignore count for specified Maple breakpoints")
-        gdb_print ("  mbreak : usage and syntax")
+        gdb_print("  mbreak <symbol>: Sets a new Maple breakpoint at symbol\n"
+                  "  mbreak -set <symbol>: An alias for 'mbreak <symbol>'\n"
+                  "  mbreak -enable <symbol|index>: Enables an existing Maple breakpoint at symbol\n"
+                  "  mbreak -disable <symbol|index>: Disables an existing Maple breakpoint at symbol\n"
+                  "  mbreak -clear <symbol|index>: Deletes an existing Maple breakpoint at symbol\n"
+                  "  mbreak -clearall : Deletes all existing Maple breakpoints\n"
+                  "  mbreak -listall : Lists all existing Maple breakpoints\n"
+                  "  mbreak -ignore <symbol | index> <count> : Sets ignore count for specified Maple breakpoints\n"
+                  "  mbreak : Displays usage and syntax")
 
     def mbp_func(self, args, from_tty):
         '''
@@ -173,7 +173,7 @@ class MapleBreakpointCmd(gdb.Command):
             return
         buf = "disable breakpoint " + str(s)
         gdb_print(buf)
-        if s.isnumeric():
+        if s.isdigit():
             symbol = self.lookup_symbol_by_index(int(s))
         else:
             symbol = s
@@ -196,7 +196,7 @@ class MapleBreakpointCmd(gdb.Command):
             return
         buf = "enable breakpoint " + str(s)
         gdb_print(buf)
-        if s.isnumeric():
+        if s.isdigit():
             symbol = self.lookup_symbol_by_index(int(s))
         else:
             symbol = s
@@ -219,7 +219,7 @@ class MapleBreakpointCmd(gdb.Command):
             return
         buf = "clear breakpoint " + str(s)
         gdb_print(buf)
-        if s.isnumeric():
+        if s.isdigit():
             symbol = self.lookup_symbol_by_index(int(s))
         else:
             symbol = s
@@ -242,11 +242,11 @@ class MapleBreakpointCmd(gdb.Command):
             return
         buf = "ignore breakpoint " + str(s) + ' ' + str(c)
         gdb_print(buf)
-        if not c.isnumeric():
+        if not c.isdigit():
             gdb_print ("ignore count must be a number")
             return
 
-        if s.isnumeric():
+        if s.isdigit():
             symbol = self.lookup_symbol_by_index(int(s))
         else:
             symbol = s
@@ -272,7 +272,7 @@ class MapleBreakpointCmd(gdb.Command):
         if not self.mbp_object:
             return
 
-        gdb_print ("list all breakpoint")
+        gdb_print ("list all Maple breakpoints")
         # sort the dict with the index, so that we can display in index order
         blist = [{k:v} for k, v in sorted(self.mbp_object.mbp_table.items(), key=(lambda x:x[1]['index']))]
         bp_info = self.mbp_object.bp_info if self.mbp_object.bp_info else "in maple::maple_invoke_method()"

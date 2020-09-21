@@ -117,16 +117,16 @@ class MapleMirbinInfoIndex():
     for quick reference.
 
     The cache is created based on libraries' coresponding .s files or .VtableImplt.s files
-    The cache will only be created once at few trigger points whichever happens first
+    The cache will only be created once, at a few trigger points, whichever happens first
     """
 
     def __init__(self):
         """
         initialize mirbin_info_cache as a empty dict.
         Key: .s file full path name or .VtableImpl.s file full path name coresponding to .so file used.
-        Value: a dict with following format
+        Value: A dict with following format
           key: Maple symbol
-          value: a tuple, (symbol-line-num, symbol-block-offset, symbol-block-end-offset).
+          value: A tuple, (symbol-line-num, symbol-block-offset, symbol-block-end-offset).
 
         example of mirbin_info_cache:
           mirbin_info_cache['libcore.s'] =
@@ -196,11 +196,11 @@ class MapleFileCache():
 
     def del_general_fullpath(self):
         self.general_fullpath.clear()
-    
+
     def show_general_fullpath(self):
         gdb_print("mgdb_rdata.general_fullpath cache ==== ")
         gdb_print(str(self.general_fullpath))
-    
+
     # api for source code file info cache
     def in_src_file_lines(self, name):
         return name in self.src_file_lines
@@ -212,7 +212,7 @@ class MapleFileCache():
         return self.src_file_lines[name]
 
     def del_src_file_lines(self):
-        self.src_file_lines.clear() 
+        self.src_file_lines.clear()
 
     def show_src_file_lines(self):
         gdb_print("mgdb_rdata.src_file_lines cache ==== ")
@@ -252,6 +252,13 @@ class MapleGDBRuntimeData():
         self.mirbin_info = MapleMirbinInfoIndex()
         self.class_def = MapleClassDefInfo()
         self.file_cache = MapleFileCache()
+        self.frame_change_counter = 0
+
+    def update_frame_change_counter(self):
+        self.frame_change_counter += 1
+
+    def read_frame_change_counter(self):
+        return self.frame_change_counter
 
     #####################################
     # api for mirbin_info_cache
@@ -263,6 +270,8 @@ class MapleGDBRuntimeData():
         self.mirbin_info.init_new_asm(asm_file)
 
         d = m_asm.create_asm_mirbin_label_cache(asm_file)
+        if not d:
+            d = m_asm.create_asm_mirbin_label_cache(asm_file)
         self.mirbin_info_cache_assign(asm_file, d)
 
         if m_debug.Debug:
@@ -300,7 +309,7 @@ class MapleGDBRuntimeData():
         return self.class_def.get_maple_class_def_list()
 
     #####################################
-    # api for Maple File Cache 
+    # api for Maple File Cache
     #####################################
     def in_fullpath_cache(self, name, path):
         return self.file_cache.in_general_fullpath(name, path)
@@ -344,7 +353,7 @@ class MapleGDBRuntimeData():
         self.file_cache.show_asm_block_lines()
         self.file_cache.show_src_file_lines()
         self.file_cache.show_general_fullpath()
-        
+
 
     #####################################
     # advanced api for other module to use
@@ -376,9 +385,9 @@ mgdb_rdata =  MapleGDBRuntimeData()
 def get_stack_frame_data(frame):
     """
     For a given Maple stack frame, get all finds of frame data including
-    1, function header info
-    2, function source code information
-    3, function local variable and arugment informatiion.
+    1, function. Header info
+    2, function. Source code information
+    3, function. Local variable and argument information.
 
     params:
       frame: a gdb.frame object. A SELECTED Maple frame from current stack.
@@ -396,14 +405,14 @@ def get_stack_frame_data(frame):
                  'so_path': so_path full path, a string
                  'asm_path': asm_path full path,a string
                  'func_addr_offset': func_addr_offset, string in xxxx:yyyy: format
-                 'func_header_name' : func_header_name, a string. e.g xxxxxxxxxxx_mirbin_info
+                 'func_header_name' : func_header_name, a string. e.g. xxxxxxxxxxx_mirbin_info
                  'func_header_asm_tuple': func_header_name_block_asm_tuple, (asm line, asm_start_offset, asm_end_offset)
                 }
         'func_argus_locals': same return as m_asm.get_func_arguments() returns
-                {'locals_type': local variable type list, e.g ['void', 'v2i64'],
+                {'locals_type': local variable type list, e.g. ['void', 'v2i64'],
                  'locals_name': local variable name list['%%retval', '%%thrownval'],
-                 'formals_type': func argument type list. e.g ['a64'],
-                 'formals_name': func argument name list. e.g ['%1']
+                 'formals_type': func argument type list. e.g. ['a64'],
+                 'formals_name': func argument name list. e.g. ['%1']
                 }
     """
     if m_debug.Debug: m_debug.dbg_print("==== get_stack_frame_data =====")
@@ -451,9 +460,10 @@ def get_stack_frame_data(frame):
         return None
     if m_debug.Debug: m_debug.dbg_print("first round returns dict d:", d)
 
-    # In some cases, when func_addr_offset's pc partion is 0000, the source code file information can be
-    # missing. In this case, we can check few more lines from its reported asm line ONLT for pc = '0000' situation
-    if not d['short_src_file_name'] and func_addr_offset_pc == '0000' and d['asm_offset'] != 0 and d['asm_line'] != 0:
+    # In some cases, when func_addr_offset's pc partion is 0000, or func_addr_offset is followed by "MPL_CLINIT_CHECK",
+    # the source code file information can be missing.
+    # In this case, we can check few more lines from its reported asm line ONLY for pc = '0000' or "MPI_CLINIT_CHECK" situation
+    if not d['short_src_file_name'] and (func_addr_offset_pc == '0000' or d['short_src_file_line'] == -1) and d['asm_offset'] != 0 and d['asm_line'] != 0:
         if m_debug.Debug: m_debug.dbg_print("func offset pc is 0000, check short_src_file again")
         d['short_src_file_name'], d['short_src_file_line'] = \
             m_asm.look_up_next_src_file_info(asm_path, d['asm_line'], d['asm_offset'])

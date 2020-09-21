@@ -16,36 +16,37 @@
 
 for v in ROOT COMPILER_ROOT ENGINE_ROOT RUNTIME_ROOT BUILD_ROOT TARGET_ARCH DEBUGGER_ROOT; do
     eval x=\$MAPLE_$v
-    [ -n "$x" ] || { echo MAPLE_$v not set. Please source envsetup.sh.; exit 1; }
+    [ -n "$x" ] || { echo MAPLE_$v not set. Please source envsetup.sh.; exit $LINENO; }
 done
-[ -n "${JAVA_CORE_LIB}" ] || { echo JAVA_CORE_LIB not set. Please source envsetup.sh.; exit 1; }
+[ -n "${JAVA_CORE_LIB}" ] || { echo JAVA_CORE_LIB not set. Please source envsetup.sh.; exit $LINENO; }
 
-ps -ef | expand | grep -v grep | grep -v " $$ "| grep "/bash.*debugger-test.sh" && { echo Another test is running.; exit 1; }
+ps -ef | expand | grep -v grep | grep -v " $$ "| grep "/bash.*debugger-test.sh" && { echo Another test is running.; exit $LINENO; }
 
 TESTROOT="$MAPLE_DEBUGGER_ROOT"/testcases
 TESTOUT="$MAPLE_BUILD_ROOT"/out/debugger/test
 SPECIFIED="."
-[ $# -gt 0 ] && { SPECIFIED="/$1[^/]*$"; shift; }
+[ $# -gt 0 ] && { SPECIFIED="/$1"; shift; }
 [ -d "$TESTOUT" ] && rm -rf "$TESTOUT"
 mkdir -p "$TESTOUT"
-find "$TESTROOT" -maxdepth 1 -name "[A-Z]*[0-9][0-9][0-9][0-9]-*" -type d |
-grep "$SPECIFIED" | sort |
+find -L "$TESTROOT" -maxdepth 2 -name "[A-Z]*[0-9][0-9][0-9][0-9]-*" -type d |
+grep -e "$SPECIFIED/*[^/]*\$" | sort |
 while read d; do
     testcase=$(basename "$d")
     echo -n Running test case "$testcase"...
-    cp -a "$d" "$TESTOUT"/"$testcase" || exit 2
-    cd "$TESTOUT"/"$testcase" || exit 2
+    cp -aL "$d" "$TESTOUT"/"$testcase" || exit $LINENO
+    cd "$TESTOUT"/"$testcase" || exit $LINENO
     [ -f test.cfg ] || { echo FAILED; echo "Error: File $testcase/test.cfg not found" > FAILED; continue; }
     [ -f .mgdbinit ] || { echo FAILED; echo "Error: File $testcase/.mgdbinit not found" > FAILED; continue; }
+
     TESTCASE= UNEXPECTED= EXPECTED= TIMEOUT=
     source ./test.cfg > /dev/null || { echo FAILED; echo "Error: Failed to source $testcase/cfg" > FAILED; continue; }
     TIMEOUT=${TIMEOUT:-60}  # Set default timeout limit to 60 seconds if it is not set
     [ -n "$TESTCASE" ] || { echo FAILED; echo "Error: TESTCASE not set in $testcase/cfg" > FAILED; continue; }
     app=$(basename "$TESTCASE")
     mkdir -p "$app"
-    cp -a .mgdbinit "$MAPLE_BUILD_ROOT/$TESTCASE"/*.java "$app"/ || exit 2
+    cp -a .mgdbinit "$MAPLE_BUILD_ROOT/$TESTCASE"/*.java "$app"/ || exit $LINENO
     grep -v "^echo " .mgdbinit | sed -e '/^python/,/^end/s/^/@/' -e 's/^[^@].*/echo (gdb) & \\n\n&/' -e 's/^@//' > "$app"/.mgdbinit
-    cd "$app" || exit 2
+    cd "$app" || exit $LINENO
     "$MAPLE_DEBUGGER_TOOLS"/debugger-trace.sh >& log.txt &
     pid=$!
     maxtry=$TIMEOUT
@@ -59,7 +60,7 @@ while read d; do
         continue
     fi
 
-    grep -e "Error occurred in Python:" -e "SyntaxError: invalid syntax" log.txt > err.txt
+    grep -e "Error while executing Python" -e "Error occurred in Python:" -e "SyntaxError: invalid syntax" log.txt > err.txt
     if [ $? -eq 0 ]; then
         echo FAILED; echo "Error: Failed due to error in Python code" > FAILED
         continue
@@ -86,7 +87,7 @@ while read d; do
     echo PASSED; echo PASSED > PASSED
 done
 
-cd "$TESTOUT" || exit 2
+cd "$TESTOUT" || exit $LINENO
 passed=$(find . -name PASSED | wc -l)
 failed=$(find . -name FAILED | wc -l)
 timeout=$(find . -name TIMEOUT | wc -l)
@@ -100,5 +101,5 @@ if [ "$passed" -gt 0 -a "$failed" -eq 0 -a "$timeout" -eq 0 ]; then
     exit 0
 else
     echo Failed
-    exit 9
+    exit $LINENO
 fi

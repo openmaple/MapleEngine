@@ -14,6 +14,7 @@
 #
 
 import gdb
+import sys
 import m_symbol
 import m_info
 import m_frame
@@ -21,24 +22,29 @@ import m_datastore
 import m_util
 from m_util import MColors
 from m_util import gdb_print
+import m_set
 import m_debug
+import m_list
+import m_asm
 
 def is_msi_bp_existed():
-    """ determine if the msi breakpoints exist or not """
+    """ determines if the msi breakpoints exist or not """
     blist = gdb.breakpoints()
     for b in blist:
-        if m_debug.Debug: m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", b.thread, "b.enabled=", b.enabled,\
-                        "b.is_valid()=", b.is_valid())
+        if m_debug.Debug:
+             m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", \
+                     b.thread, "b.enabled=", b.enabled, "b.is_valid()=", b.is_valid())
         if '__inc_opcode_cnt' in b.location and b.is_valid():
             return True, b
     return False, None
 
 def get_msi_bp_id():
-    """ get a msi breakpoint gdb.Breakpoint object id """
+    """ gets an msi breakpoint gdb.Breakpoint object id """
     blist = gdb.breakpoints()
     for b in blist:
-        if m_debug.Debug: m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", b.thread, "b.enabled=", b.enabled,\
-                        "b.is_valid()=", b.is_valid())
+        if m_debug.Debug:
+             m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", \
+                     b.thread, "b.enabled=", b.enabled, "b.is_valid()=", b.is_valid())
         if '__inc_opcode_cnt' in b.location and b.is_valid():
             return b
     return None
@@ -61,14 +67,14 @@ def disable_msi_bp():
 
 class MapleStepiBreakpoint(gdb.Breakpoint):
     """
-    This class defines a Maple msi breakpoint. msi breakpoint is a breakpoint
+    this class defines a Maple msi breakpoint. msi breakpoint is a breakpoint
     at symbol of __int_opcode_cnt, and can be set along with a specified running
     thread
     """
 
     def __init__(self, threadno, count = 1, mtype=gdb.BP_BREAKPOINT, mqualified=False):
         """
-        create a msi breakpoint with specified thread
+        creates an msi breakpoint with specified thread
         """
         self.settings = {}
         self.settings['symbol'] = '__inc_opcode_cnt'
@@ -79,32 +85,6 @@ class MapleStepiBreakpoint(gdb.Breakpoint):
         spec = self.settings['symbol'] + ' thread ' + str(threadno)
         super().__init__(spec)
         self.msi_bp_object_id = get_msi_bp_id()
-
-    def stop(self):
-        # check if current frame symbol is "__inc_opcode_cnt"
-        match = m_symbol.check_symbol_in_current_frame(self.settings['symbol'])
-        if not match:
-            return False
-
-        # check current thread matches to what msi breakpoint is looking for
-        thread_object = m_info.get_current_thread()
-        if not thread_object:
-            if m_debug.Debug: m_debug.dbg_print("thread not valid")
-            return False
-        if thread_object.num != self.settings['thread']:
-            if m_debug.Debug: m_debug.dbg_print("thread id not match")
-            return False
-        if m_debug.Debug: m_debug.dbg_print("thread_object=", thread_object)
-
-        if self.settings['count'] is 1:
-            if m_debug.Debug: m_debug.dbg_print("count=1, stop here")
-            # this will update the Maple gdb runtime metadata store.
-            m_datastore.mgdb_rdata.update_gdb_runtime_data()
-            return True
-        else:
-            if m_debug.Debug: m_debug.dbg_print("count=", self.settings['count'])
-            self.settings['count'] -= 1
-            return False
 
     def set_bp_attr(self, key, value):
         self.settings[key] = value
@@ -120,11 +100,11 @@ class MapleStepiBreakpoint(gdb.Breakpoint):
         gdb_print (str(self.settings))
 
 class MapleStepiCmd(gdb.Command):
-    """Step specified number of Maple instructions
-    msi is the alias of mstepi command
-    mstepi: step in next Maple instruction
-    mstepi [n]: step in to next nth Maple instruction
-    mstepi -abs [n]: step in specified index of Maple instruction
+    """steps specified number of Maple instructions
+    msi is an alias of mstepi command
+    mstepi: steps in next Maple instruction
+    mstepi [n]: steps in to next nth Maple instruction
+    mstepi -abs [n]: steps in specified index of Maple instruction
     """
 
     def __init__(self):
@@ -137,22 +117,25 @@ class MapleStepiCmd(gdb.Command):
         self.msi_bp_id = None
         m_util.gdb_exec('alias msi = mstepi')
 
+        self.msi_mode_default = 0
+        self.msi_mode_internal = 1
+
     def init_gdb_breakpoint(self, threadno, count):
         # create a msi breakpoint object on a specified thread
         self.mbp_object = MapleStepiBreakpoint(threadno, count)
         self.mbp_object.thread = threadno
+        self.mbp_object.silent = True
         self.msi_bp_id = self.mbp_object.msi_bp_object_id
-
 
     def invoke(self, args, from_tty):
         self.msi_func(args, from_tty)
 
     def usage(self):
-        gdb_print ("  msi : step in next Maple instruction")
-        gdb_print ("  msi [n]: step in to next n Maple instructions")
-        gdb_print ("  msi -abs [n]: step in to specified index n of Maple instruction")
-        gdb_print ("  msi -c: show current Maple opcode count")
-        gdb_print ("  msi help: usuage")
+        gdb_print("  msi : Steps into next Maple instruction\n"
+                  "  msi [n]: Steps into next n Maple instructions\n"
+                  "  msi -abs [n]: Steps into specified index n of Maple instruction\n"
+                  "  msi -c: Shows current Maple opcode count\n"
+                  "  msi help: Displays usage")
 
     def msi_func(self, args, from_tty):
         tobject= m_info.get_current_thread()
@@ -164,39 +147,65 @@ class MapleStepiCmd(gdb.Command):
         s = args.split()
         if len(s) == 0: # msi into next Maple instruction
             count = 1
-            self.set_mstepi(tidx, count)
+            self.set_mstepi(tidx, count, self.msi_mode_default)
         elif len(s) == 1: # msi [n]
             if s[0] == '-debug':
                 self.debug()
-            elif s[0].isnumeric() is True:
-                self.set_mstepi(tidx, int(s[0]))
+            elif s[0].isdigit() and int(s[0]) > 0:
+                self.set_mstepi(tidx, int(s[0]), self.msi_mode_default)
             elif s[0] == '-count' or s[0] == '-c':
                 self.show_current_opcode_cnt()
             elif s[0] == '-internal':
-                self.set_mstepi_internal(tidx)
+                self.set_mstepi(tidx, 1, self.msi_mode_internal)
             else:
                 self.usage()
-            return
         elif len(s) == 2: # msi -abs n
-            if s[0] == '-abs' and s[1].isnumeric() :
-                self.set_mstepi(tidx, int(s[1]), absOption=True)
+            if s[0] == '-abs' and s[1].isdigit() :
+                delta_count = self.delta_from_current_opcode_cnt(int(s[1]))
+                if not delta_count:
+                    self.usage()
+                elif delta_count < 0:
+                    gdb_print("current opcode count is already ahead of what you specified " + s[1])
+                else:
+                    self.set_mstepi(tidx, delta_count, self.msi_mode_default)
             else:
                 self.usage()
-            return
         else:
             self.usage()
-            return
+
+    def get_current_opcode_cnt(self):
+        """returns: string as the current opcode cnt"""
+        current_opcode_cnt = m_symbol.get_variable_value('__opcode_cnt')
+        if not current_opcode_cnt:
+            return None
+        return current_opcode_cnt
 
     def show_current_opcode_cnt(self):
-        current_opcode_cnt = m_symbol.get_variable_value('__opcode_cnt')
+        current_opcode_cnt = self.get_current_opcode_cnt()
         if not current_opcode_cnt:
             gdb_print ("current opcode count not found")
         else:
-            gdb_print ("current opcode count is " + str(current_opcode_cnt))
+            gdb_print ("current opcode count is " + current_opcode_cnt)
         return
 
-    def set_mstepi(self, threadno, count, absOption=False):
+    def delta_from_current_opcode_cnt(self, target_opcode_cnt):
+        """ for given int target_opcode_cnt, calculate the delta count from current opcode cnt
+            returns: None if current_opcode_cnt is not valid
+                    target_opcode_cnt - current_opcode_cnt
+        """
+        current_opcode_cnt_str = self.get_current_opcode_cnt()
+        if not current_opcode_cnt_str:
+            return None
+        try:
+            current_opcode_cnt = int(current_opcode_cnt_str)
+        except:
+            return None
+        return target_opcode_cnt - current_opcode_cnt
 
+    def mstepi_common(self, threadno, count):
+        """returns: selected frame object in stack right after msi breakpoint is hit
+                    None: if something is wrong or no frame available in stack
+        """
         # check if there is existing msi point, it could be created by msi command
         # previously, or it could be created by gdb b command.
         msi_bp_exist, msi_bp_id = is_msi_bp_existed()
@@ -206,10 +215,9 @@ class MapleStepiCmd(gdb.Command):
         else:
             if msi_bp_id != self.msi_bp_id:
                 # if existing msi bp id does not match to self.msi_bp_id
-                gdb_print("There are one or more breakpints already created at __inc_opcode_cnt")
-                gdb_print("In order to use mstepi command, please delete those breakpoints first")
-                gdb_print("")
-                return
+                gdb_print("There are one or more breakpints already created at __inc_opcode_cnt\n"
+                          "In order to use mstepi command, please delete those breakpoints first\n")
+                return None
             else:
                 # the existing msi bp id matches to self.msi_bp_id, it was created
                 # by mstepi command previously.
@@ -217,25 +225,14 @@ class MapleStepiCmd(gdb.Command):
                     enable_msi_bp()
 
         self.mbp_object.set_bp_attr('thread', threadno)
-        # if msi -abs option specifed, setup the correct count value for stop control
-        if absOption is True:
-            current_opcode_cnt = m_symbol.get_variable_value('__opcode_cnt')
-            if current_opcode_cnt is None:
-                gdb_print ("__opcode_cnt value not found")
-                return
-            else:
-                current_opcode_cnt = int(current_opcode_cnt)
-                if count > current_opcode_cnt:
-                    count = count - current_opcode_cnt
-                else:
-                    gdb_print("current opcode count " + str(urrent_opcode_cnt) + " is already ahead of what you specified " + str(count))
-                    return
         self.mbp_object.set_bp_attr('count', count)
+        assert count > 0
+        self.mbp_object.ignore_count = count - 1
 
+        hitcnt = self.mbp_object.hit_count
         # It is important to perform a continue command here for the msi breakpoint
         # to be reached.
         m_util.gdb_exec("continue")
-
 
         """
         if the msi breakpoint's count reaches to 1, it will return True to cause gdb
@@ -244,26 +241,38 @@ class MapleStepiCmd(gdb.Command):
         'finish' command must NOT be called inside of msi breakpoint stop() logic
         """
         frame = None
-        if self.mbp_object.get_bp_attr('count') is 1:
+        if self.mbp_object.hit_count - hitcnt == count:
             """
-            If gdb stops here, it must have hit one breakpoint. However. the breakpoint
-            it hits might not be the msi breakpoint, it could be the other breakpoint user set up.
-            In this case, we better check if it is a Maple frame. If it is, then the breakpoint is
-            what we want, otherwise, just stop here and we just return because it hit what user
-            means to stop.
+            if gdb stops here, it must have hit one breakpoint. However. the breakpoint
+            it hits may not be the msi breakpoint, it could be another breakpoint the user set up.
+            In this case, we check if it is a Maple frame. If it is, then the breakpoint is
+            ours. Otherwise just stop here and return because it hit a user's other stop.
             """
             frame = m_frame.get_selected_frame()
             if not frame:
-                return
+                return None
             if not m_frame.is_maple_frame(frame):
-                m_util.gdb_exec("finish")
+                if m_set.msettings['opcode'] == 'on':
+                    m_util.gdb_exec("finish")
+                else:
+                    silent_finish()
                 # now get the new selected frame
                 frame = m_frame.get_selected_frame()
                 if not frame:
-                    return
+                    return None
+
+        # this will update the Maple gdb runtime metadata store.
+        m_datastore.mgdb_rdata.update_gdb_runtime_data()
+        m_datastore.mgdb_rdata.update_frame_change_counter()
 
         # always disable msi breakpoint after msi is excuted
         disable_msi_bp()
+        return frame
+
+    def mstepi_update_and_display(self, frame):
+        # this will update the Maple gdb runtime metadata store.
+        m_datastore.mgdb_rdata.update_gdb_runtime_data()
+        m_datastore.mgdb_rdata.update_frame_change_counter()
 
         ds = m_datastore.get_stack_frame_data(frame)
         if not ds:
@@ -276,70 +285,23 @@ class MapleStepiCmd(gdb.Command):
         gdb_print("asm file: %s%s%s" % (MColors.BT_SRC, asm_path, MColors.ENDC))
         f = open(asm_path, 'r')
         f.seek(asm_offset)
-        line = f.readline()
-        gdb_print("=> %s : %s" % (str(asm_line), line.rstrip()))
-        line = f.readline()
-        gdb_print("   %s : %s" % (str(asm_line + 1), line.rstrip()))
-        line = f.readline()
-        gdb_print("   %s : %s" % (str(asm_line + 2), line.rstrip()))
+        gdb_print("=> %d : %s" % (asm_line, f.readline().rstrip()))
+        gdb_print("   %d : %s" % (asm_line + 1, f.readline().rstrip()))
+        gdb_print("   %d : %s" % (asm_line + 2, f.readline().rstrip()))
         f.close()
+        m_util.gdb_exec('display')
 
-    def set_mstepi_internal(self, threadno):
+    def set_mstepi(self, threadno, count, msi_mode):
+        frame = self.mstepi_common(threadno, count)
+        if not frame:
+            return
 
-        # check if there is existing msi point, it could be created by msi command
-        # previously, or it could be created by gdb b command.
-        msi_bp_exist, msi_bp_id = is_msi_bp_existed()
-        if not msi_bp_exist:
-            # there is no msi bp exist, so just create a new msi breakpoint
-            self.init_gdb_breakpoint(threadno, 1)
+        if msi_mode == self.msi_mode_default:
+            self.mstepi_update_and_display(frame)
+        elif msi_mode == self.msi_mode_internal:
+            return
         else:
-            if msi_bp_id != self.msi_bp_id:
-                # if existing msi bp id does not match to self.msi_bp_id
-                gdb_print("There are one or more breakpints already created at __inc_opcode_cnt")
-                gdb_print("In order to use mstepi command, please delete those breakpoints first")
-                gdb_print("")
-                return
-            else:
-                # the existing msi bp id matches to self.msi_bp_id, it was created
-                # by mstepi command previously.
-                if self.msi_bp_id.enabled is False:
-                    enable_msi_bp()
-
-        self.mbp_object.set_bp_attr('thread', threadno)
-        self.mbp_object.set_bp_attr('count', 1)
-
-        # It is important to perform a continue command here for the msi breakpoint
-        # to be reached.
-        m_util.gdb_exec("continue")
-
-
-        """
-        if the msi breakpoint's count reaches to 1, it will return True to cause gdb
-        stop at msi breakpoint by previous 'continue' command.
-        Once gdb stops here, a gdb 'finish' command shall be called. However,
-        'finish' command must NOT be called inside of msi breakpoint stop() logic
-        """
-        frame = None
-        if self.mbp_object.get_bp_attr('count') is 1:
-            """
-            If gdb stops here, it must have hit one breakpoint. However. the breakpoint
-            it hits might not be the msi breakpoint, it could be the other breakpoint user set up.
-            In this case, we better check if it is a Maple frame. If it is, then the breakpoint is
-            what we want, otherwise, just stop here and we just return because it hit what user
-            means to stop.
-            """
-            frame = m_frame.get_selected_frame()
-            if not frame:
-                return
-            if not m_frame.is_maple_frame(frame):
-                m_util.gdb_exec("finish")
-                # now get the new selected frame
-                frame = m_frame.get_selected_frame()
-                if not frame:
-                    return
-
-        # always disable msi breakpoint after msi is excuted
-        disable_msi_bp()
+            return
 
     def debug(self):
         if self.mbp_object:
@@ -347,8 +309,24 @@ class MapleStepiCmd(gdb.Command):
         else:
             gdb_print("nothing\n")
 
+class MapleFinishBreakpoint (gdb.FinishBreakpoint):
+    def __init__(self):
+        """ creates a finish breakpoint which is invisible to user
+        """
+        super().__init__(internal = True)
+        self.silent = True
+
+    def stop(self):
+        """ stop when hits finish breakpoint
+        """
+        return True
+
+def silent_finish():
+    fbp = MapleFinishBreakpoint()
+    m_util.gdb_exec("continue")
+
 class MapleFinishCmd(gdb.Command):
-    """Execute until selected Maple stack frame returns
+    """execute until selected Maple stack frame returns
     Execute until selected Maple stack frame returns
     """
 
@@ -365,5 +343,76 @@ class MapleFinishCmd(gdb.Command):
         frame = m_frame.get_newest_frame()
         if not frame:
             return
-        m_util.gdb_exec_to_string("finish")
+        silent_finish()
         m_util.gdb_exec("msi")
+        m_util.gdb_exec("mlist")
+        m_datastore.mgdb_rdata.update_frame_change_counter()
+
+class MapleStepCmd(gdb.Command):
+    """step program until it reaches a different source line of Maple Application
+    Step program until it reaches a different source line of Maple Application
+    """
+
+    def __init__(self):
+        gdb.Command.__init__ (self,
+                              "mstep",
+                              gdb.COMMAND_RUNNING,
+                              gdb.COMPLETE_NONE)
+        m_util.gdb_exec('alias ms = mstep')
+
+    def invoke(self, args, from_tty):
+        self.mstep_func(args)
+
+    def mstep_func(self, args):
+        frame = m_frame.get_selected_frame()
+        ds = m_datastore.get_stack_frame_data(frame)
+        if not ds:
+            return
+        if m_debug.Debug: m_debug.dbg_print("retrieved ds=", ds)
+        asm_path = ds['frame_func_header_info']['asm_path']
+        asm_line = ds['frame_func_src_info']['asm_line']
+        asm_offset = ds['frame_func_src_info']['asm_offset']
+
+        stop = False
+        short_src_file_name = None
+        short_src_file_line = None
+        count = 0
+        while not stop:
+            # before we execute msi command, we must know should we stop keep executing msi after the current msi
+            # is executed. If current msi command is executed and found it should stop, then we need the source file
+            # information after stop.
+            stop, short_src_file_name, short_src_file_line = m_asm.look_up_next_opcode(asm_path, asm_line, asm_offset)
+            if m_debug.Debug:
+                m_debug.dbg_print("stop =", stop, "short_src_file_name=", short_src_file_name, "short_src_file_line=",short_src_file_line)
+            m_util.gdb_exec("msi -internal")
+            count += 1
+            if m_debug.Debug:
+                m_debug.dbg_print("executed %d opcodes", count)
+            # retrieve the new frame data since one opcode can change to a different frame
+            frame = m_frame.get_selected_frame()
+            ds = m_datastore.get_stack_frame_data(frame)
+            if not ds:
+                gdb_print("Warning: Failed to get new stack frame to continue")
+                return
+            if m_debug.Debug: m_debug.dbg_print("retrieved ds=", ds)
+            asm_path = ds['frame_func_header_info']['asm_path']
+            asm_line = ds['frame_func_src_info']['asm_line']
+            asm_offset = ds['frame_func_src_info']['asm_offset']
+
+        gdb_print("Info: executed %d %s" % (count, 'opcode' if count == 1 else 'opcodes'))
+        if m_debug.Debug:
+            m_debug.dbg_print ("short_src_file_name = ", short_src_file_name, "short_src_file_line=", short_src_file_line)
+
+        file_full_path = None
+        for source_path in m_list.maple_source_path_list:
+            file_full_path = m_list.find_one_file(short_src_file_name, source_path)
+            if not file_full_path:
+                continue
+            else:
+                break
+
+        if not file_full_path:
+            gdb_print("Warning: source file %s not found" % (short_src_file_name))
+        else:
+            m_list.display_src_file_lines(file_full_path, short_src_file_line)
+        return

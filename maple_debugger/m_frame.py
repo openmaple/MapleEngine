@@ -138,14 +138,14 @@ def get_closest_maple_frame_func_lib_info():
     """
     starting from currently selected frame, find out the closest Maple frame, and then
     call get_maple_frame_func_lib_info() to return func header offset, library .so path,
-    library's coresponding assembly file path, func_header address,and the Maple frame itself
+    library's coresponding assembly file path, func_header address, and the Maple frame itself
 
     returns:
-      1. func_header_offset: in string.
-      2. so_path: string. so library file full path.
-      3. asm_path: string. asm file fuul path.
-      4. func_header: int. address of function header.
-      5. frame: gdb.Frame. echo this frame.
+      1, func_header_offset: in string.
+      2, so_path: string. so library file full path.
+      3, asm_path: string. asm file fuul path.
+      4, func_header: int. address of function header.
+      5, frame: gdb.Frame. echo this frame.
 
       or all None if no valid Maple frame found
     """
@@ -182,15 +182,15 @@ def get_maple_frame_func_lib_info(frame):
       frame: a gdb.Frame object.
 
     returns:
-      1. func_header_offset: in string.
-      2. so_path: string. so library file full path.
-      3. asm_path: string. asm file fuul path.
-      4. func_header: int. address of function header.
-      5. frame: gdb.Frame. echo this frame.
+      1, func_header_offset: in string.
+      2, so_path: string. so library file full path.
+      3, asm_path: string. asm file fuul path.
+      4, func_header: int. address of function header.
+      5, frame: gdb.Frame. echo this frame.
     """
 
     frame_rip = get_current_frame_rip(frame)
-    buf = m_util.gdb_exec_to_string("info b")
+    buf = m_util.gdb_exec_to_str("info b")
     bp_addr, bp_info = m_breakpoint.get_maple_invoke_bp_stop_addr(buf)
     if m_debug.Debug: m_debug.dbg_print("frame_rip =", frame_rip, "bp_addr=", bp_addr)
 

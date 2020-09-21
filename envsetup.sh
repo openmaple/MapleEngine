@@ -31,6 +31,7 @@ export MAPLE_BUILD_TOOLS="$MAPLE_BUILD_ROOT/tools"
 export MAPLE_DEBUGGER_ROOT="$MAPLE_ROOT/maple_debugger"
 export MAPLE_DEBUGGER_TOOLS="$MAPLE_DEBUGGER_ROOT/tools"
 export MAPLE_TARGET_ARCH="x86_64"
+export MAPLE_DEBUGGER_LIBCORE="$MAPLE_BUILD_ROOT/out/$MAPLE_TARGET_ARCH"
 export JAVA_CORE_LIB="libcore"
 export JAVA_CORE_SRC="$HOME/my_openjdk8"
 export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64

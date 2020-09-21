@@ -17,94 +17,106 @@ import gdb
 from m_util import gdb_print
 
 maple_debugger_version_major = 1
-maple_debugger_version_minor = 1
+maple_debugger_version_minor = 2
 
 maple_commands_info = '\n'\
-    'mbreak:     Set and manage Maple breakpoints\n'\
-    'mbacktrace: Display Maple backtrace in multiple modes\n'\
-    'mup:        Select and print Maple stack frame that called this one\n'\
-    'mdown:      Select and print Maple stack frame called by this one\n'\
-    'mlist:      List source code in multiple modes\n'\
-    'msrcpath:   Add and manage the Maple source code search paths\n'\
-    'mlocal:     Display selected Maple frame arguments, local variables and stack dynamic data\n'\
-    'mprint:     Print Maple runtime object data\n'\
-    'mtype:      Print a matching class and its inheritance hierarchy by a given search expression\n'\
-    'msymbol:    Print a matching symbol list or its detailed infomatioin\n'\
-    'mstepi:     Step specified number of Maple instructions\n'\
-    'mnexti:     Step one Maple instruction, but proceed through subroutine calls\n'\
+    'mbreak:     Sets and manages Maple breakpoints\n'\
+    'mbacktrace: Displays Maple backtrace in multiple modes\n'\
+    'mup:        Selects and prints the Maple stack frame that called this one\n'\
+    'mdown:      Selects and prints the Maple stack frame called by this one\n'\
+    'mlist:      Lists source code in multiple modes\n'\
+    'msrcpath:   Adds and manages the Maple source code search paths\n'\
+    'mlocal:     Displays selected Maple frame arguments, local variables and stack dynamic data\n'\
+    'mprint:     Prints Maple runtime object data\n'\
+    'mtype:      Prints a matching class and its inheritance hierarchy by a given search expression\n'\
+    'msymbol:    Prints a matching symbol list or its detailed infomatioin\n'\
+    'mstepi:     Steps a specified number of Maple instructions\n'\
+    'mnexti:     Steps one Maple instruction, but proceeds through subroutine calls\n'\
+    'mstep:      Steps program until it reaches a different source line of Maple Application\n'\
+    'mnext:      Steps program, proceeding through subroutine calls of Maple application\n'\
     'mset:       Sets and displays Maple debugger settings\n'\
-    'mfinish:    Execute until selected Maple stack frame returns\n'\
-    'mhelp:      list Maple help information\n'
+    'mfinish:    Execute until the selected Maple stack frame returns\n'\
+    'mhelp:      Lists Maple help information\n'
 
 maple_commands_detail_info = {
-    'mbreak':   'mbreak <symbol>: set a new Maple breakpoint at symbol\n'\
-                'mbreak -set <symbol>: same to "mbreak <symbol>"\n'\
-                'mbreak -enable <symbol|index>: enable an existing Maple breakpoint at symbol\n'\
-                'mbreak -disable <symbol|index>: disable an existing Maple breakpoint at symbol\n'\
-                'mbreak -clear <symbol|index>: delete an existing Maple breakpoint at symbol\n'\
-                'mbreak -clearall : delete all existing Maple breakpoint\n'\
-                'mbreak -listall : list all existing Maple breakpoints\n'\
-                'mbreak -ignore <symbol | index> <count> : set ignore count for specified Maple breakpoints\n',
+    'mbreak':   'mbreak <symbol>: Sets a new Maple breakpoint at symbol\n'\
+                'mbreak -set <symbol>: Alias for "mbreak <symbol>"\n'\
+                'mbreak -enable <symbol|index>: Enables an existing Maple breakpoint at symbol\n'\
+                'mbreak -disable <symbol|index>: Disables an existing Maple breakpoint at symbol\n'\
+                'mbreak -clear <symbol|index>: Deletes an existing Maple breakpoint at symbol\n'\
+                'mbreak -clearall : Deletes all existing Maple breakpoints\n'\
+                'mbreak -listall : Lists all existing Maple breakpoints\n'\
+                'mbreak -ignore <symbol | index> <count>: Sets ignore count for specified Maple breakpoints\n',
 
-    'mbacktrace':   'mbt is the alias of mbacktrace command\n'\
-                    'mbacktrace: print backtrace of Maple frames\n'\
-                    'mbacktrace -asm: print backtrace of Maple frames in assembly format\n'\
-                    'mbreaktrace -full: print backtrace of mixed gdb native frames and Maple frames\n',
+    'mbacktrace':   'mbt: An alias for the "mbacktrace" command\n'\
+                    'mbacktrace: Prints backtrace of Maple frames\n'\
+                    'mbacktrace -asm: Prints the backtrace of Maple frames in assembly format\n'\
+                    'mbacktrace -full: Prints the backtrace of mixed gdb native frames and Maple frames\n',
 
-    'mup':      'mup: move up one Maple frame that called selected Maple frame\n'\
-                'mup -n: move up n Maple frames from currently selected Maple frame\n',
+    'mup':      'mup: Moves up one Maple frame that called the selected Maple frame\n'\
+                'mup -n: Moves up n Maple frames from currently selected Maple frame\n',
 
-    'mdown':    'mdown: move down one Maple frame called by selected Maple frame\n'\
-                'mdown -n: move down n Maple frames called from currently selected Maple frame\n',
+    'mdown':    'mdown: Moves down one Maple frame called by selected Maple frame\n'\
+                'mdown -n: Moves down n Maple frames called from currently selected Maple frame\n',
 
-    'mlist':    'mlist: list source code associated with current Maple frame\n'\
-                'mlist -asm: list assemble instructions associated with current Maple frame\n',
+    'mlist':    'mlist: Lists the source code associated with current Maple frame\n'\
+                'mlist -asm: Lists the assembly instructions associated with current Maple frame\n'\
+                'mlist . | mlist -asm:. : Lists code located by the filename and line number of current Maple frame\n'\
+                'mlist line-num : Lists current source code file at line of [line-num]\n'\
+                'mlist filename:line-num : Lists specified source code file at line of [line-num]\n'\
+                'mlist +|-[num]: Lists current source code file offsetting from previous listed line, offset can be + or -\n'\
+                'mlist -asm:+|-[num]: Lists current assembly instructions offsetting from previous listed line. offset can be + or -\n',
 
-    'msrcpath': 'msp is the alias of msrcpath command\n'\
-                'msrcpath: display all the search paths of Maple application and library source code\n'\
-                'msrcpath -show: same to msrcpath command without arugment\n'\
-                'msrcpath -add <path>:  add one path to the top of the list\n'\
-                'msrcpath -del <path>:  delete specified path from the list\n',
+    'msrcpath': 'msp: An alias of the "msrcpath" command\n'\
+                'msrcpath: Displays all the search paths of Maple application and library source code\n'\
+                'msrcpath -show: An Alias of the "msrcpath" command without arugments\n'\
+                'msrcpath -add <path>: Adds one path to the top of the list\n'\
+                'msrcpath -del <path>: Deletes specified path from the list\n',
 
-    'mlocal':   'mlocal: display function local variabls of currently selected Maple frame\n'\
-                'mlocal [-s|-stack]: display runtime operand stack changes of current selected Maple frame\n',
+    'mlocal':   'mlocal: Displays function local variables of the selected Maple frame\n'\
+                'mlocal [-s|-stack]: Displays runtime operand stack changes of current selected Maple frame\n',
 
-    'mprint':   'print a Maple object data\n'\
-                'mprint <addr-in-hex>: e.g mprint 0x13085\n',
+    'mprint':   'mprint: Displays Maple object data\n'\
+                'mprint <addr-in-hex>: e.g. mprint 0x13085\n',
 
-    'mtype' :   'given a regex, search and print all matching class names if multiple are found, or print detail\n'\
-                'information of class inheritance hierarchy if only one match is found\n'\
-                'mtype <regular-express>: e.g mtype _2Fjava \n',
+    'mtype' :   'mtype: Given a regex, searches and prints all matching class names if multiple are found, or\n'\
+                'prints detailed information of class inheritance hierarchy if a single match is found\n'\
+                'mtype <regular-express>: e.g. mtype _2Fjava \n',
 
-    'msymbol' : 'given a regex, search and print all matching symbol names if multiple are found, or print detail\n'\
-                'information of the symbol if only one match is found\n'\
-                'msymbol <regular-express>: e.g msymbol sun.*executor\n',
+    'msymbol' : 'msymbol: Given a regex, searches and prints all matching symbol names if multiple are found, or\n'\
+                'prints detailed information of the symbol if a single match is found\n'\
+                'msymbol <regular-express>: e.g. msymbol sun.*executor\n',
 
-    'mstepi':   'msi is the alias of mstepi command\n'\
-                'mstepi: step in next Maple instruction\n'\
-                'mstepi [n]: step in to next nth Maple instruction\n'\
-                'mstepi -abs [n]: step in specified index of Maple instruction\n',
+    'mstepi':   'msi: An alias of "mstepi" command\n'\
+                'mstepi: Steps into the next Maple instruction\n'\
+                'mstepi [n]: Steps into the next nth Maple instruction\n'\
+                'mstepi -c:  Displays the current opcode count\n'\
+                'mstepi -abs [n]: Steps into the specified index of Maple instruction\n',
 
-    'mnexti':   'mnexti: Step one Maple instruction, but proceed through subroutine calls\n',
+    'mnexti':   'mnexti: Steps one Maple instruction, but proceeds through subroutine calls\n',
 
-    'mfinish':  'mfinish: Execute until selected Maple stack frame returns\n',
+    'mstep' :   'mstep: Steps program until it reaches a different source line of Maple Application\n',
 
-    'mset':     'mset <name> <value>: set Maple debugger environment settings\n'\
-                'mset verbose on|off: turn on or off of Maple debugger verbose mode\n'\
-                'mset -add  <key name of list> <list item value>: add new key/value into a list\n'\
+    'mnext' :   'mnext: Steps program, proceeding through subroutine calls of Maple application\n',
+
+    'mfinish':  'mfinish: Executes until selected Maple stack frame returns\n',
+
+    'mset':     'mset <name> <value>: Sets Maple debugger environment settings\n'\
+                'mset verbose on|off: Enables/disables the Maple debugger verbose mode\n'\
+                'mset -add  <key name of list> <list item value>: Adds a new key/value into a list\n'\
                 '  example: mset -add maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864\n'\
-                'mset -del  <key name of list> <list item value>: delete one key/value from a list\n'\
+                'mset -del  <key name of list> <list item value>: Deletes one key/value from a list\n'\
                 '  example: maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864\n'\
-                'mset -show: view current settings\n',
+                'mset -show: Displays current settings\n',
 
-    'mhelp':    'mhelp: to list all Maple commands and command summary\n'\
-                'mhelp <maple-command-full-name>: detail usage of specified Maple command\n',
+    'mhelp':    'mhelp: Lists all Maple commands and their summaries\n'\
+                'mhelp <maple-command-full-name>: Details the usage of the specified Maple command\n',
 }
 
 class MapleHelpCmd(gdb.Command):
     """list Maple help information
-    mhelp: to list all Maple commands and command summary
-    mhelp <maple-command-full-name>: detail usage of specified Maple command
+    mhelp: Displays all Maple commands and command summary
+    mhelp <maple-command-full-name>: Detailed usage of specified Maple command
     """
 
     def __init__(self):

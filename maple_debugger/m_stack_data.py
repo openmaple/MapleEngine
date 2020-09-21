@@ -19,11 +19,12 @@ import m_frame
 import m_datastore
 import m_debug
 from m_util import gdb_print
+from m_util import MColors
 
 class MapleLocalCmd(gdb.Command):
-    """Display selected Maple frame arguments, local variables and stack dynamic data
-    mlocal: display function local variabls of currently selected Maple frame
-    mlocal [-s|-stack]: display runtime operand stack changes of current selected Maple frame
+    """displays selected Maple frame arguments, local variables and stack dynamic data
+    mlocal: displays function local variabls of currently selected Maple frame
+    mlocal [-s|-stack]: displays runtime operand stack changes of current selected Maple frame
     """
 
     def __init__(self):
@@ -37,9 +38,8 @@ class MapleLocalCmd(gdb.Command):
         self.mlocal_func(args, from_tty)
 
     def usage(self):
-        gdb_print ("mlocal: display function local variabls of currently selected Maple frame")
-        gdb_print ("mlocal [-s|-stack]: display runtime operand stack changes of current selected Maple frame")
-        gdb_print ("\n")
+        gdb_print("mlocal: Displays function local variabls of currently selected Maple frame"
+                  "mlocal [-s|-stack]: Displays runtime operand stack changes of currently selected Maple frame")
 
     def mlocal_func(self, args, from_tty):
         mode = 'local'
@@ -76,15 +76,15 @@ class MapleLocalCmd(gdb.Command):
 
     def display_locals(self, func_argus_locals_dict, func_header_name):
         """
-        display function local variables and arguments.
+        displays function local variables and arguments.
 
         params:
           func_header_name: string. function name
           func_argus_locals_dict: function local/argument data in dict
             {
-                'locals_type': a list of local variable type in string, e.g ['void', 'v2i64'],
-                'locals_name': a list of local variable name in string. e.g ['%%retval', '%%thrownval'],
-                'formals_type': a list of argument type in string, e.g ['a64'],
+                'locals_type': a list of local variable type in string, e.g. ['void', 'v2i64'],
+                'locals_name': a list of local variable name in string. e.g. ['%%retval', '%%thrownval'],
+                'formals_type': a list of argument type in string, e.g. ['a64'],
                 'formals_name': a list of argument name in string, e.g. ['%1']
             }
         """
@@ -106,22 +106,23 @@ class MapleLocalCmd(gdb.Command):
             if not local_value:
                 local_value = "none"
 
-            line = "local #" +  str(i) + " :name=" + name + " type=" + rtype + " value=" + str(local_value)
+            line = "local #" +  str(i) + ": name=" + MColors.BT_ARGNAME + name + MColors.ENDC + \
+                    " type=" + rtype + " value=" + str(local_value)
             gdb_print(line)
 
         return
 
     def display_stack(self, func_argus_locals_dict, func_header_name):
         """
-        display function dynamic stack data.
+        displays function dynamic stack data.
 
         params:
           func_header_name: string. function name
           func_argus_locals_dict: function local/argument data in dict
             {
-                'locals_type': a list of local variable type in string, e.g ['void', 'v2i64'],
-                'locals_name': a list of local variable name in string. e.g ['%%retval', '%%thrownval'],
-                'formals_type': a list of argument type in string, e.g ['a64'],
+                'locals_type': a list of local variable type in string, e.g. ['void', 'v2i64'],
+                'locals_name': a list of local variable name in string. e.g. ['%%retval', '%%thrownval'],
+                'formals_type': a list of argument type in string, e.g. ['a64'],
                 'formals_name': a list of argument name in string, e.g. ['%1']
             }
         """
@@ -142,7 +143,7 @@ class MapleLocalCmd(gdb.Command):
                 idx += 1
                 continue
 
-            line = "sp=" + str(count) + " :type=" + str(mtype) + " value=" + str(v)
+            line = "sp=" + str(count) + ": type=" + str(mtype) + " value=" + str(v)
             gdb_print(line)
             count += 1
             idx += 1

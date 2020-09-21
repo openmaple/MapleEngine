@@ -12,6 +12,12 @@
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more deta
 ```
+## Version 1.2
+*__Date: 2020/09/21__*
+
+* Added _mstep_ command to step program to a different source line
+* Added _mnext_ command to step program through subroutine calls
+* Added enhancement to _mlist_ command to support more list modes
 
 ## Version 1.1
 *__Date: 2020/09/07__*
@@ -41,6 +47,6 @@
    * _mnexti_, alias as _mni_
    * _mset_,
    * _mhelp
-* README.md for preparation and launch up of using Maple Debugger
-* UserReference.md for Maple Debugger command detail information
+* README.md for preparation and launch using Maple Debugger
+* UserReference.md for Maple Debugger command detailed information
 * .mgdbinit for Maple Debugger default configuration

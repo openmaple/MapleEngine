@@ -2,11 +2,12 @@ mb LFibonacci_3B_7Cfib_7C_28I_29I
 run
 mb -disable LFibonacci_3B_7Cfib_7C_28I_29I
 python
+from m_util import gdb_echo_exec as exec
 for i in range(1000):
-    gdb_echo_and_exec('msi')
-gdb_echo_and_exec('mbt')
+    exec('msi')
+exec('mbt')
 for i in range(20):
-    gdb_echo_and_exec('mfinish')
-    gdb_echo_and_exec('mbt')
+    exec('mfinish')
+    exec('mbt')
 end
-q
+quit

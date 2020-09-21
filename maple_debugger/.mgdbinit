@@ -1,28 +1,28 @@
+# python3 and gdb initial commands for Maple debugger
 python
 import os.path
 gdb.execute(os.path.expandvars('source $MAPLE_DEBUGGER_ROOT/m_gdb.py'))
-from m_util import gdb_echo_and_exec
 end
 
-# add one maple_lib_asm_path into the search list
-mset -add maple_lib_asm_path $MAPLE_DEBUGGER_ROOT/out/x86_64/
+# handle SIGUSR2
+handle SIGUSR2 pass noprint nostop
 
-# add another one maple_lib_asm_path into the search list
+# add one maple_lib_asm_path into the directory search list
+mset -add maple_lib_asm_path $MAPLE_DEBUGGER_LIBCORE/
+
+# add another maple_lib_asm_path into the directory search list
 mset -add maple_lib_asm_path ./
 
 # add openjdk8 source code file search path in your development environment
 msrcpath -add $JAVA_CORE_SRC/build/linux-x86_64-normal-server-release/
 msrcpath -add $JAVA_CORE_SRC/jdk/src/
 
-# add local path where your application source code is in your development environment
+# add the local path to your application source code in your development environment
 msrcpath -add ./
 
 python
-from m_util import gdb_echo_and_exec
-if os.path.isfile(os.path.expanduser('~/.mgdbinit')):
-    cmd = "source " + os.path.expanduser('~/.mgdbinit')
-    gdb_echo_and_exec(cmd)
-
-if os.path.isfile('./.mgdbinit'):
-    gdb_echo_and_exec('source ./.mgdbinit')
+from m_util import gdb_echo_exec as exec
+for v in [os.path.expanduser('~/.mgdbinit'), './.mgdbinit']:
+    if os.path.isfile(v):
+        exec('source %s' % v)
 end

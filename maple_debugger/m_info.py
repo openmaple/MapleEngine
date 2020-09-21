@@ -34,7 +34,7 @@ def get_info_proc_mapping():
     num = len(gdb.objfiles())
     if num_objfiles != num:
         num_objfiles = num
-        cached_proc_mapping = m_util.gdb_exec_to_string('info proc mapping')
+        cached_proc_mapping = m_util.gdb_exec_to_str('info proc mapping')
     return cached_proc_mapping
 
 def get_maple_frame_addr():
@@ -42,10 +42,10 @@ def get_maple_frame_addr():
     get current Maple frame addr via 'info args' gdb command.
 
     returns:
-        address in string. e.g 0x7fff6021c308
+        address in string. e.g. 0x7fff6021c308
         or None if not found.
     """
-    buf = m_util.gdb_exec_to_string('info args')
+    buf = m_util.gdb_exec_to_str('info args')
     if buf.find('_mirbin_info') != -1 and buf.find('mir_header') != -1:
         x = buf.split()
         return x[2]
@@ -54,7 +54,7 @@ def get_maple_frame_addr():
 
 def get_so_base_addr(name):
     """
-    For a given name of library, return its base address via 'info proc mapping' cmd
+    for a given name of library, return its base address via 'info proc mapping' cmd
 
     returns:
       base address of specified so file in string format, or
@@ -81,7 +81,7 @@ def get_so_base_addr(name):
 
 def get_initialized_maple_func_attr(name):
     """
-    For a given attribute name, return its value via 'print' command in string format.
+    for a given attribute name, return its value via 'print' command in string format.
     """
 
     if name and name in ['func.header', 'func.lib_addr', 'func.pc']:
@@ -90,7 +90,7 @@ def get_initialized_maple_func_attr(name):
         return None
 
     try:
-        buf = m_util.gdb_exec_to_string(cmd)
+        buf = m_util.gdb_exec_to_str(cmd)
     except:
         return None
 
@@ -129,7 +129,7 @@ def get_initialized_maple_func_addrs():
     if not lib_addr:
         return None
     try:
-        buf = m_util.gdb_exec_to_string('x/1xw ' + str(header))
+        buf = m_util.gdb_exec_to_str('x/1xw ' + str(header))
     except:
         return None
 
@@ -138,10 +138,10 @@ def get_initialized_maple_func_addrs():
     header_size = int(buf.split(':')[1],16)
 
     if (header < lib_addr):
-        gdb_print ("header address is found less than lib_addr, something is wrong")
+        gdb_print ("Warning: The header address is lower than lib_addr.")
         return None
     if (pc < header):
-        gdb_print ("pc address is found less than header, something is wrong")
+        gdb_print ("Warning: The pc address is lower than the header address.")
         return None
 
     xxxxxx = header - lib_addr
@@ -155,7 +155,7 @@ def get_initialized_maple_func_addrs():
 proc_mapping_re = re.compile(r'(0x[0-9a-f]+)[ \t]+(0x[0-9a-f]+)[ \t]+0x[0-9a-f]+[ \t]+0x[0-9a-f]+[ \t]+(/\S+)', re.M)
 def get_lib_addr_from_proc_mapping(addr):
     """
-    For a given Maple method address, find out the base address of the .so lib
+    for a given Maple method address, find out the base address of the .so lib
     this address belongs to
 
     params:
@@ -205,16 +205,16 @@ def get_lib_addr_from_proc_mapping(addr):
 
 def get_lib_so_info(addr):
     """
-    For a given Maple method address, look up the lib so file, and get informations
+    for a given Maple method address, look up the lib so file, and get informations
     about the so library and its co-responding asm file info.
 
     params:
       addr: address of a method in hex string with prefix '0x', i.e 0x7fff6021c308
 
     returns:
-      1. so lib start address: int
-      2. lib so file full path in string
-      3. lib asm file full path in string
+      1, so lib start address: int
+      2, lib so file full path in string
+      3, lib asm file full path in string
     """
     a = int(addr, 0)
 
@@ -382,8 +382,8 @@ def get_uninitialized_maple_func_addrs():
 
     header = int(func_header, 16)
     if (header < func_lib_addr):
-        #gdb_print ("header address is found less than lib_addr, something is wrong")
-        if m_debug.Debug: m_debug.dbg_print("header address is found less than lib_addr, something is wrong")
+        #gdb_print ("Warning: The header address is lower than lib_addr.")
+        if m_debug.Debug: m_debug.dbg_print("Warning: The header address is lower than lib_addr.")
         return None,None,None, None
 
     offset = header - func_lib_addr
@@ -397,14 +397,14 @@ def get_uninitialized_maple_func_addrs():
 ####  API section for retrieving Maple frame caller information
 ######################################################################
 """
-use these api to get the current frame's caller's information. Because
-at the time we call it, the frame is in stack, so its caller's information
-must be available.
+use these api calls to get the current frame's caller's information. Due to 
+the fact that at the time we call it the frame is in the stack, it's 
+caller's information must also be available.
 """
 
 def get_maple_caller_sp():
     try:
-        buffer = m_util.gdb_exec_to_string('p caller.sp')
+        buffer = m_util.gdb_exec_to_str('p caller.sp')
     except:
         return None
 
@@ -417,7 +417,7 @@ def get_maple_caller_sp():
 
 def get_maple_caller_full():
     try:
-        buffer = m_util.gdb_exec_to_string('p *caller')
+        buffer = m_util.gdb_exec_to_str('p *caller')
     except:
         return None
 
@@ -428,12 +428,12 @@ def get_maple_caller_full():
 
 def get_maple_caller_argument_value(arg_idx, arg_num, mtype):
     """
-    For given Maple caller's arg_idx, arg_num and type,
+    for a given Maple caller's arg_idx, arg_num and type,
     get its value from caller's operand_stack
 
     params:
       arg_idx: the argument index in a Maple method.
-               e.g method1(int a, long b, string c), for
+               e.g. method1(int a, long b, string c), for
                argument "a", its arg index is 0, c is 2.
       arg_num: number of argument a method has
       mtype  : a string. definition in m_asm.py
@@ -446,7 +446,7 @@ def get_maple_caller_argument_value(arg_idx, arg_num, mtype):
 
     # get the caller.sp first
     try:
-        buffer = m_util.gdb_exec_to_string('p caller.sp')
+        buffer = m_util.gdb_exec_to_str('p caller.sp')
     except:
         return None
 
@@ -463,7 +463,7 @@ def get_maple_caller_argument_value(arg_idx, arg_num, mtype):
 
     # get the caller.operand_stack length
     try:
-        buffer = m_util.gdb_exec_to_string('p caller.operand_stack.size()')
+        buffer = m_util.gdb_exec_to_str('p caller.operand_stack.size()')
     except:
         return None
 
@@ -484,7 +484,7 @@ def get_maple_caller_argument_value(arg_idx, arg_num, mtype):
     # get the caller.operand_stack[arg_idx]
     idx = sp - arg_num + arg_idx + 1
     try:
-        buffer = m_util.gdb_exec_to_string('p caller.operand_stack[' + str(idx) + ']')
+        buffer = m_util.gdb_exec_to_str('p caller.operand_stack[' + str(idx) + ']')
     except:
         return None
 
@@ -505,7 +505,7 @@ def get_maple_a64_pointer_type(arg_value):
 
     addr = arg_value.split()[0]
     try:
-        buf = m_util.gdb_exec_to_string('x/2xw ' + addr)
+        buf = m_util.gdb_exec_to_str('x/2xw ' + addr)
     except:
         return None
     addr = buf.split(':')[1].split()
@@ -514,7 +514,7 @@ def get_maple_a64_pointer_type(arg_value):
     addr = addr1 + addr0[2:]
 
     try:
-        buf = m_util.gdb_exec_to_string('x ' + addr)
+        buf = m_util.gdb_exec_to_str('x ' + addr)
     except:
         return None
     if not addr0[2:] in buf:
@@ -538,12 +538,12 @@ def get_maple_a64_pointer_type(arg_value):
 ######################################################################
 def get_maple_frame_stack_sp_index(func_header_name):
     """
-    For a given func header name, find out its sp value reported in operand_stack
+    for a given func header name, find out its sp value reported in operand_stack
     """
 
     # get the func.operand_stack length
     try:
-        buffer = m_util.gdb_exec_to_string('p func')
+        buffer = m_util.gdb_exec_to_str('p func')
     except:
         return None
 
@@ -568,12 +568,12 @@ def get_maple_frame_stack_sp_index(func_header_name):
 
 def get_one_frame_stack_local(index, sp, name, ltype):
     """
-    For given indexi, sp vale and local or format name in operand_stack,
+    for given indexi, sp vale and local or format name in operand_stack,
     return its value.
 
     params:
-      index: int. index of locals or formals in caller.operand_stack
-      sp : int.  sp value in caller.operand_stack
+      index: int. index of locals or formals in func.operand_stack
+      sp : int.  sp value in func.operand_stack
       name: string. local variable name
       ltype: string. Original type found for the local variable name.
 
@@ -585,7 +585,7 @@ def get_one_frame_stack_local(index, sp, name, ltype):
 
     # get the func.operand_stack length
     try:
-        buffer = m_util.gdb_exec_to_string('p func')
+        buffer = m_util.gdb_exec_to_str('p func')
     except:
         return None,None
 
@@ -597,7 +597,7 @@ def get_one_frame_stack_local(index, sp, name, ltype):
 
     # get the caller.operand_stack[index]
     try:
-        buffer = m_util.gdb_exec_to_string('p func.operand_stack[' + str(index) + ']')
+        buffer = m_util.gdb_exec_to_str('p func.operand_stack[' + str(index) + ']')
     except:
         return None,None
 
@@ -610,7 +610,7 @@ def get_one_frame_stack_local(index, sp, name, ltype):
 
     if name == "%%thrownval":
         try:
-            maple_type = m_util.gdb_exec_to_string('p func.operand_stack[' + str(index) + '].ptyp')
+            maple_type = m_util.gdb_exec_to_str('p func.operand_stack[' + str(index) + '].ptyp')
         except:
             return None,None
         maple_type = maple_type.split(' = ')[1].split('maple::PTY_')[1].rstrip()
@@ -625,20 +625,19 @@ def get_one_frame_stack_local(index, sp, name, ltype):
 
 def get_one_frame_stack_dynamic(sp, idx):
     """
-    For a given sp and index number in a dynamic caller operand_stack data, return its
+    for a given sp and index number in a dynamic caller operand_stack data, return its
     data type and value.
 
     Note, at runtime, caller.operand_stack is dynamic, sp, idx, types and values are all
     changing during the run time.
     """
-
     if idx > sp:
         return None, None
 
     # get the caller.operand_stack length
     length = None
     try:
-        buffer = m_util.gdb_exec_to_string('p caller.operand_stack.size()')
+        buffer = m_util.gdb_exec_to_str('p func.operand_stack.size()')
     except:
         return None, None
 
@@ -658,13 +657,13 @@ def get_one_frame_stack_dynamic(sp, idx):
         return None, None
 
     try:
-        maple_type = m_util.gdb_exec_to_string('p func.operand_stack[' + str(idx) + '].ptyp')
+        maple_type = m_util.gdb_exec_to_str('p func.operand_stack[' + str(idx) + '].ptyp')
     except:
         return None, None
     maple_type = maple_type.split(' = ')[1].split('maple::PTY_')[1].rstrip()
 
     try:
-        buffer = m_util.gdb_exec_to_string('p func.operand_stack[' + str(idx) + ']')
+        buffer = m_util.gdb_exec_to_str('p func.operand_stack[' + str(idx) + ']')
     except:
         return None, None
 

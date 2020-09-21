@@ -18,13 +18,13 @@ import m_debug
 
 def get_symbol_address(symbol):
     """
-    For a given Maple symbol, returns its address in hex string via gdb p command,
+    for a given Maple symbol, returns its address in hex string via gdb p command,
     or None if not found
     """
 
     cmd = 'p ' + symbol
     try:
-        result  = m_util.gdb_exec_to_string(cmd)
+        result  = m_util.gdb_exec_to_str(cmd)
     except:
         return None
 
@@ -44,7 +44,7 @@ def get_symbol_name_by_current_func_args():
 
     cmd = 'p func'
     try:
-        result = m_util.gdb_exec_to_string(cmd)
+        result = m_util.gdb_exec_to_str(cmd)
     except:
         return None, None
     if m_debug.Debug: m_debug.dbg_print("result=", result)
@@ -66,7 +66,7 @@ def get_symbol_addr_by_current_frame_args():
     """
     cmd = 'p/x *(long long*)&mir_header'
     try:
-        result = m_util.gdb_exec_to_string(cmd)
+        result = m_util.gdb_exec_to_str(cmd)
     except:
         return None
 
@@ -78,7 +78,7 @@ def get_symbol_addr_by_current_frame_args():
 def get_mirheader_name_by_mirheader_addr(addr):
     cmd = 'x ' + addr
     try:
-        result = m_util.gdb_exec_to_string(cmd)
+        result = m_util.gdb_exec_to_str(cmd)
     except:
         return None
     result = result.rstrip()
@@ -96,7 +96,7 @@ def get_symbol_name_by_current_frame_args():
 
     cmd = 'info args'
     try:
-        result  = m_util.gdb_exec_to_string(cmd)
+        result  = m_util.gdb_exec_to_str(cmd)
     except:
         return None, None
     if m_debug.Debug: m_debug.dbg_print("result=", result)
@@ -118,7 +118,7 @@ def check_symbol_in_current_frame(symbol):
 
     cmd = 'info frame '
     try:
-        result  = m_util.gdb_exec_to_string(cmd)
+        result  = m_util.gdb_exec_to_str(cmd)
     except:
         return False
 
@@ -137,7 +137,7 @@ def get_variable_value(variable):
 
     cmd = 'p ' + variable
     try:
-        result  = m_util.gdb_exec_to_string(cmd)
+        result  = m_util.gdb_exec_to_str(cmd)
     except:
         return None
 
@@ -241,7 +241,7 @@ def get_maple_symbol_name(symbol):
     """
     for a symbol that presents a Maple object type,
     return the symbol name.
-    e.g __cinf_Ljava_2Flang_2FString_3B, return Ljava_2Flang_2FString_3B
+    e.g. __cinf_Ljava_2Flang_2FString_3B, return Ljava_2Flang_2FString_3B
     """
 
     offset = symbol.find('L')
@@ -255,12 +255,12 @@ def get_maple_symbol_name(symbol):
 
 def get_maple_symbol_full_syntax(symbol):
     """
-    For a given Maple symbol, return its full syntax, also known as its
+    for a given Maple symbol, return its full syntax, also known as its
     symbol description.
 
     params
       symbol: string.  symbol we can see in gdb stack data.
-            e.g __cinf_Ljava_2Flang_2FString_3B,
+           e.g. __cinf_Ljava_2Flang_2FString_3B,
                 __cinf_ALjava_2Flang_2FString_3B
                 __cinf_ZLsun_xxxxxxxxxxxxxxxxxxxx
                 __cinf_JLjavax_yyyyyyyyyyyyyyy

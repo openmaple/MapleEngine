@@ -91,8 +91,15 @@ class MColors:
         MColors.MP_CNAME = MColors.BBLUE if colored else ''
         MColors.MP_FSYNTAX = MColors.BYELLOW if colored else ''
 
+def is_interactive():
+    """ check if gdb runs in interactive mode
+    returns: True if gdb runs in interactive mode
+    """
+    stdout = os.readlink('/proc/%d/fd/1' % os.getpid())
+    return True if stdout.startswith("/dev/pts/") else False
+
 def color_symbol(c, sym):
-    """ Color symbol
+    """ color symbol
     """
     if not Colored:
         return sym;
@@ -102,43 +109,40 @@ def color_symbol(c, sym):
     return ''.join([c, s[0],'_7C', MColors.NM_METHOD, s[1], c, '_7C', s[2], MColors.ENDC])
 
 def enable_color_output(c = True):
-    """ Enable colored output if possible
+    """ enable colored output if possible
 
-    Args:
-        c (boolean): True to enable colored output if possible
+    args:
+        c (boolean): True to enable colored output
                      False to disable colored output
 
-    Returns:
+    returns:
     """
     global Colored, Highlighted
-    if c:
-        stdout = os.readlink('/proc/%s/fd/1' % str(os.getpid()))
-        c = True if stdout.startswith("/dev/pts/") else False
     Colored = c
+    MColors.init_maple_colors(colored = c)
     exe = '/usr/bin/highlight'
     Highlighted = True if c and os.path.isfile(exe) and os.access(exe, os.X_OK) else False
-    MColors.init_maple_colors(colored = Colored)
 
 def gdb_exec(cmd):
-    """Execute a gdb command with gdb.execute()
+    """execute a gdb command with gdb.execute()
 
-    Args:
+    args:
        cmd (string): gdb command to be executed
 
-    Returns:
+    returns:
     """
     gdb.execute(cmd)
 
 mretrace = re.compile(r'^- [- ]*<-- .*|^\+ [+ ]*==> .*', re.M)
 def gdb_exec_to_null(cmd):
-    """Execute a gdb command with gdb.execute()
+    """execute a gdb command with gdb.execute()
     The output of gdb will be thrown away.
     If it is in the trace mode of Maple debugger, all trace output will be printed to stderr.
 
-    Args:
+    args:
        cmd (string): gdb command to be executed
 
-    Returns:
+    returns:
     """
     if sys.getprofile():
         buf = gdb.execute(cmd, to_string=True)
@@ -147,44 +151,55 @@ def gdb_exec_to_null(cmd):
     else:
         gdb.execute(cmd, to_string=True)
 
-def gdb_exec_to_string(cmd):
-    """Execute a gdb command with gdb.execute()
+def gdb_exec_to_str(cmd):
+    """execute a gdb command with gdb.execute()
     The output of gdb will be put into a string and return it.
     It should not be used to execute a Maple debugger command.
 
-    Args:
+    args:
        cmd (string): gdb command to be executed
 
-    Returns:
+    returns:
        A string which includes the output of the gdb command
     """
     return gdb.execute(cmd, to_string=True)
 
-def gdb_echo_and_exec(cmd):
-    """Echo a gdb command and execute it with gdb.execute()
+def gdb_echo_exec(cmd):
+    """echo a gdb command and execute it with gdb.execute()
 
-    Args:
+    args:
        cmd (string): gdb command to be echoed and executed
 
-    Returns:
+    returns:
     """
     gdb.execute('echo (gdb_exec) ' + cmd + '\\n')
     gdb.execute(cmd)
 
 def gdb_print(string, stream = gdb.STDOUT):
-    """A wrapper function of gdb.write with '\n' to the end of string
+    """a wrapper function of gdb.write with '\n' to the end of string
     """
     gdb.write(string + '\n', stream)
 
 def gdb_write(string, stream = gdb.STDOUT):
-    """A wrapper function of gdb.write
+    """a wrapper function of gdb.write
     """
     gdb.write(string, stream)
 
-
 def shell_cmd(cmd):
-    """Execute a command through shell without stderr output
+    """execute a command through shell and return results decoded from its stdout
     """
-    command = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-    (output, err) = command.communicate()
+    subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    (output, err) = subproc.communicate()
+    return output.decode("utf-8")
+
+def proc_popen(cmd):
+    """execute a command with Popen of subprocess in background
+    """
+    subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    return subproc
+
+def proc_communicate(subproc):
+    """get the stdout output of subprocess, decode it and return results
+    """
+    output = subproc.communicate()[0]
     return output.decode("utf-8")

@@ -1,0 +1,5 @@
+b main
+run
+msi 2500
+mtype Ljava_2Futil_2FHashtable_3B
+quit

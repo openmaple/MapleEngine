@@ -26,7 +26,7 @@ if [ ! -d "mapleall" ]; then
     git clone https://gitee.com/openarkcompiler-incubator/mapleall.git || exit 1
 else
     cd mapleall || exit 1
-    git pull --rebase || exit 1
+    git pull || exit 1
 fi
 [ -d "$MAPLE_ROOT"/../mapleall ] || ln -sf "$MAPLE_COMPILER_ROOT" "$MAPLE_ROOT"/../mapleall
 

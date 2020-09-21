@@ -22,9 +22,9 @@ from m_util import gdb_print
 import m_debug
 
 class MaplePrintCmd(gdb.Command):
-    """Print Maple runtime object data
-    print a Maple object data:
-    mprint <addr-in-hex>: e.g mprint 0x13085
+    """prints Maple runtime object data
+    mprint: prints a Maple object's data:
+    mprint <addr-in-hex>: e.g. mprint 0x13085
     """
 
     def __init__(self):
@@ -37,8 +37,8 @@ class MaplePrintCmd(gdb.Command):
         self.mprint_func(args, from_tty)
 
     def usage(self):
-        gdb_print ("  mprint      : print Maple object data")
-        gdb_print ("  mprint <addr-in-hex>: e.g mprint 0x13085")
+        gdb_print ("  mprint      : prints Maple object data")
+        gdb_print ("  mprint <addr-in-hex>: e.g. mprint 0x13085")
 
     def mprint_func(self, args, from_tty):
         s = str(args)
@@ -78,7 +78,7 @@ class MaplePrintCmd(gdb.Command):
 
     def get_class_name_syntax(self, addr):
         """
-        For a given stack address, get its class name, class full syntax (description), and
+        for a given stack address, get its class name, class full syntax (description), and
         the object size.
 
         params:
@@ -91,13 +91,13 @@ class MaplePrintCmd(gdb.Command):
         """
 
         try:
-            buffer = m_util.gdb_exec_to_string('x/gx ' + hex(addr))
+            buffer = m_util.gdb_exec_to_str('x/gx ' + hex(addr))
         except:
             return None,None,None
         obj_addr = buffer.split(':')[1].strip(' ')
 
         try:
-            buffer = m_util.gdb_exec_to_string('x ' + obj_addr)
+            buffer = m_util.gdb_exec_to_str('x ' + obj_addr)
         except:
             return None,None,None
         if not '<' in buffer or not '>' in buffer:
@@ -117,7 +117,7 @@ class MaplePrintCmd(gdb.Command):
 
     def get_class_list(self, class_name, full_syntax, type_size):
         """
-        For a given class name and its full syntax, find out all the derived classes.
+        for a given class name and its full syntax, find out all the derived classes.
         return a list of class inheritance hierarchy starting from the most base class.
 
         params:
@@ -130,7 +130,7 @@ class MaplePrintCmd(gdb.Command):
           The item in the list is a dict with the format of
             {
                 'class_name': class name, string
-                'full_syntax': class desciption. in string. e.g 'array int Ivar[]'
+                'full_syntax': class desciption. in string. e.g. 'array int Ivar[]'
                 'type_size': int.
                 'obj_class': obj_class dict retrieved from m_datastore .macros.def cache.
                              This cache has a dict format:
@@ -224,7 +224,7 @@ class MaplePrintCmd(gdb.Command):
     def get_array_length(self, addr):
         cmd = 'x/1xw ' + hex(addr)
         try:
-            buffer = m_util.gdb_exec_to_string(cmd)
+            buffer = m_util.gdb_exec_to_str(cmd)
         except:
             return 0
         item_num = int(buffer.split(':')[1].strip(),16)
@@ -259,7 +259,7 @@ class MaplePrintCmd(gdb.Command):
                 return
             if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
             try:
-                buffer = m_util.gdb_exec_to_string(cmd)
+                buffer = m_util.gdb_exec_to_str(cmd)
             except:
                 buf = '  [{}] {}'.format(i,'no-data')
                 gdb_print (buf)
@@ -268,7 +268,7 @@ class MaplePrintCmd(gdb.Command):
 
             steps += 1
             v = buffer.split(':')[1].strip()
-            v = hex(int(v, 16)) #remove leading 0s. e.g 0x000123 to 0x123
+            v = hex(int(v, 16)) #remove leading 0s. e.g. 0x000123 to 0x123
             buf = '  [{}] {}'.format(i, v)
             gdb_print (buf)
 
@@ -295,7 +295,7 @@ class MaplePrintCmd(gdb.Command):
             cmd = 'x/1gx ' + hex(obj_addr)
             if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
             try:
-                buffer = m_util.gdb_exec_to_string(cmd)
+                buffer = m_util.gdb_exec_to_str(cmd)
             except:
                 buf = '  [{}] {}'.format(i,'no-data')
                 gdb_print (buf)
@@ -304,7 +304,7 @@ class MaplePrintCmd(gdb.Command):
 
             steps += 1
             v = buffer.split(':')[1].strip()
-            v = hex(int(v, 16)) #remove leading 0s. e.g 0x000123 to 0x123
+            v = hex(int(v, 16)) #remove leading 0s. e.g. 0x000123 to 0x123
             buf = '  [{}] {}'.format(i, v)
             gdb_print (buf)
 
@@ -339,7 +339,7 @@ class MaplePrintCmd(gdb.Command):
         if length == 8: # 8 byte, could be a long, a 8 byte address ptr, or a double
             cmd = 'x/1gx ' + hex(addr + offset) # cmd to get 8 byte address
             try:
-                hex_string = m_util.gdb_exec_to_string(cmd)
+                hex_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -348,7 +348,7 @@ class MaplePrintCmd(gdb.Command):
 
             cmd = 'x/1gf ' + hex(addr + offset) # cmd to get 8 byte double value
             try:
-                double_string = m_util.gdb_exec_to_string(cmd)
+                double_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -356,7 +356,7 @@ class MaplePrintCmd(gdb.Command):
 
             cmd = 'x/1dg ' + hex(addr + offset) # cmd to get 8 byte long value
             try:
-                long_string = m_util.gdb_exec_to_string(cmd)
+                long_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -368,7 +368,7 @@ class MaplePrintCmd(gdb.Command):
         elif length == 4: # 4 byte,could be int, float, hex
             cmd = 'x/1xw ' + hex(addr + offset) # cmd to get 4 byte hex address
             try:
-                hex_string = m_util.gdb_exec_to_string(cmd)
+                hex_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -376,7 +376,7 @@ class MaplePrintCmd(gdb.Command):
 
             cmd = 'x/1dw ' + hex(addr + offset) # cmd to get 4 byte int
             try:
-                int_string = m_util.gdb_exec_to_string(cmd)
+                int_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -384,7 +384,7 @@ class MaplePrintCmd(gdb.Command):
 
             cmd = 'x/1fw ' + hex(addr + offset) # cmd to get 4 byte float
             try:
-                float_string = m_util.gdb_exec_to_string(cmd)
+                float_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -396,7 +396,7 @@ class MaplePrintCmd(gdb.Command):
         elif length == 2: # 2 byte, could be short, hex, 2 character
             cmd = 'x/1xh ' + hex(addr + offset) # cmd to get 2 byte hex address
             try:
-                hex_string = m_util.gdb_exec_to_string(cmd)
+                hex_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -404,7 +404,7 @@ class MaplePrintCmd(gdb.Command):
 
             cmd = 'x/1dh ' + hex(addr + offset) # cmd to get 2 byte short int
             try:
-                short_string = m_util.gdb_exec_to_string(cmd)
+                short_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -412,7 +412,7 @@ class MaplePrintCmd(gdb.Command):
 
             cmd = 'x/2b ' + hex(addr + offset) # cmd to get 2 byte characters
             try:
-                byte_string = m_util.gdb_exec_to_string(cmd)
+                byte_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -424,7 +424,7 @@ class MaplePrintCmd(gdb.Command):
         elif length == 1: # 1 byte. could be hex, c
             cmd = 'x/1xb ' + hex(addr + offset) # cmd to get 1 byte hex
             try:
-                hex_string = m_util.gdb_exec_to_string(cmd)
+                hex_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
@@ -432,7 +432,7 @@ class MaplePrintCmd(gdb.Command):
 
             cmd = 'x/1cb ' + hex(addr + offset) # cmd to get 1 byte characters
             try:
-                byte_string = m_util.gdb_exec_to_string(cmd)
+                byte_string = m_util.gdb_exec_to_str(cmd)
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None

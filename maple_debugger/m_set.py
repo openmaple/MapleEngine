@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import m_debug
+import m_util
 from m_util import gdb_print
 import m_datastore
 
@@ -25,18 +26,18 @@ msettings = {}
 
 mexcluded = {"m_debug.py", "m_set.py", "m_gdb.py", "m_help.py"}
 mtrclmts  = os.getenv('MAPLE_TRACE_LIMIT','')
-mtrclimit = int(mtrclmts) if mtrclmts.isnumeric() else 80
+mtrclimit = int(mtrclmts) if mtrclmts.isdigit() else 80
 
 def trace_maple_debugger(frame, event, arg, mtrace_data = [0]):
-    """Implement the trace function of Maple debugger
+    """implements the trace function of Maple debugger
     The trace output includes the elapsed time of each target function for performance profiling
 
-    Args:
+    params:
        frame: the frame to be traced
        event: event which occurs, both "call" and "return" are needed
        arg:   Return value for "return" and None for "call"
 
-    Returns:
+    returns:
        trace_maple_debugger itself
     """
     if event == "call":
@@ -50,7 +51,8 @@ def trace_maple_debugger(frame, event, arg, mtrace_data = [0]):
             else:
                 argstr = 'arg#%d, %s' % (co.co_argcount,
                         ', '.join(str(frame.f_locals[v]) for v in co.co_varnames[:co.co_argcount]))
-                argstr = (argstr[:mtrclimit] + '...' if len(argstr) > mtrclimit else argstr).replace('\n', '\\n')
+                argstr = (argstr[:mtrclimit] + '...' if len(argstr) > mtrclimit \
+                        else argstr).replace('\n', '\\n').replace('\033', '\\033')
             mtrace_data[0] += 1
             gdb_print("+ " * mtrace_data[0] + "==> %s:%d, %s, @(%s), {%s}" % \
                     (filename, lineno, funcname, callsite, argstr), gdb.STDERR)
@@ -61,21 +63,39 @@ def trace_maple_debugger(frame, event, arg, mtrace_data = [0]):
         if filename.startswith("m_") and filename not in mexcluded:
             etime = int((time.time() - mtrace_data.pop()) * 1000000)
             funcname, lineno, retstr = co.co_name, frame.f_lineno, str(arg)
-            retstr = (retstr[:mtrclimit] + '...' if len(retstr) > mtrclimit else retstr).replace('\n', '\\n')
+            retstr = (retstr[:mtrclimit] + '...' if len(retstr) > mtrclimit \
+                    else retstr).replace('\n', '\\n').replace('\033', '\\033')
             gdb_print("- " * mtrace_data[0] + "<-- %s:%d, %s, %sus, ret: %s" % \
                     (filename, lineno, funcname, etime, retstr), gdb.STDERR)
             mtrace_data[0] -= 1
     return trace_maple_debugger
 
+def register_event_handlers(action, event_saved = {}):
+    """register event handlers with action(either 'connect' or 'disconnect')
+    Ignore all event handlers defined in m_util.py with names like event_%s_handler
+    """
+    template = "def event_{0}_handler(e=None): gdb_print('@@@Event name: {0}, type: ' + type(e).__name__)"
+    for e in gdb.events.__dict__.keys():
+        if e.startswith("__"): continue
+        if e not in event_saved and "event_%s_handler" % e not in dir(m_util):
+            exec(template.format(e))
+            exec("event_saved[e] = event_%s_handler" % e)
+        if e in event_saved:
+            handler = event_saved[e]
+            exec("gdb.events.{0}.{1}(handler)".format(e, action))
+            gdb_print("  gdb.events.{0}.{1}({2})".format(e, action, handler.__name__))
+        else:
+            gdb_print("  Ignored event {0}".format(e))
+
 class MapleSetCmd(gdb.Command):
-    """Sets and displays Maple debugger settings
-    mset <name> <value>: set Maple debugger environment settings
-    mset verbose on|off: turn on or off of Maple debugger verbose mode
-    mset -add  <key name of list> <list item value>: add new key/value into a list
+    """sets and displays Maple debugger settings
+    mset <name> <value>: sets Maple debugger environment settings
+    mset verbose on|off: enables/disables Maple debugger verbose mode
+    mset -add  <key name of list> <list item value>: adds new key/value into a list
       example: mset -add maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864
-    mset -del  <key name of list> <list item value>: delete one key/value from a list
+    mset -del  <key name of list> <list item value>: deletes one key/value from a list
       example: maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864
-    mset -show: view current settings
+    mset -show: displays current settings
     """
 
     def __init__(self):
@@ -85,6 +105,8 @@ class MapleSetCmd(gdb.Command):
                               gdb.COMPLETE_NONE)
         global msettings
         msettings['verbose'] = 'off'
+        msettings['event'] = 'disconnect'
+        msettings['opcode'] = 'off' # for msi, ms, mfinish, mni, mn command to show instruction info
         m_debug.Debug = False
         msettings['maple_lib_asm_path'] = []
 
@@ -92,18 +114,18 @@ class MapleSetCmd(gdb.Command):
         self.mset_func(args, from_tty)
 
     def usage(self):
-        gdb_print("mset:")
-        gdb_print("  -to set Maple debugger environment:")
-        gdb_print("    syntax: mset <name> <value>")
-        gdb_print("    example: mset verbose on")
-        gdb_print("  -to add/del items in list:")
-        gdb_print("    syntax:  mset -add <key name of list> <list item value>")
-        gdb_print("    example: mset -add maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864")
-        gdb_print("             mset -del maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864")
-        gdb_print("  -to view current settings:")
-        gdb_print("    syntax:  mset -show")
-        gdb_print("  -to load user defined configuration file in json format:")
-        gdb_print("    syntax:  mset -lconfig <configuration json file>")
+        gdb_print("mset:\n"
+                  "  -To set Maple debugger environment:\n"
+                  "    syntax: mset <name> <value>\n"
+                  "    example: mset verbose on\n"
+                  "  -To add/del items in list:\n"
+                  "    syntax:  mset -add <key name of list> <list item value>\n"
+                  "    example: mset -add maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864\n"
+                  "             mset -del maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x864\n"
+                  "  -To display current settings:\n"
+                  "    syntax:  mset -show\n"
+                  "  -To load user defined configuration file in json format:\n"
+                  "    syntax:  mset -lconfig <configuration json file>")
 
     def mset_func(self, args, from_tty):
         s = str(args).split()
@@ -117,10 +139,20 @@ class MapleSetCmd(gdb.Command):
             return
         elif len(s) == 2:
             if s[0] == 'trace':
-                sys.setprofile(trace_maple_debugger if s[1] == 'on' else None)
+                if s[1].isdigit():
+                    global mtrclimit
+                    mtrclimit = int(s[1])
+                else:
+                    sys.setprofile(trace_maple_debugger if s[1] == 'on' else None)
             elif s[0] == 'verbose':
                 m_debug.Debug = False if s[1] == 'off' else True
                 msettings[s[0]] = 'on' if m_debug.Debug else 'off'
+            elif s[0] == 'event':
+                action = 'connect' if s[1] == 'on' else 'disconnect'
+                register_event_handlers(action)
+                msettings[s[0]] = action
+            elif s[0] == 'opcode':
+                msettings[s[0]] = 'on' if s[1] == 'on' else 'off'
             else:
                 msettings[s[0]] = s[1]
                 return

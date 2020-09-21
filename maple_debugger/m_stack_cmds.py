@@ -25,7 +25,7 @@ import m_debug
 
 def print_maple_frame(frame, index, asm_format):
     """
-    print one Maple backtrace frame.
+    prints one Maple backtrace frame.
 
     params:
       frame: a gdb.Frame object
@@ -57,6 +57,7 @@ def print_maple_frame(frame, index, asm_format):
                 continue
             else:
                 break
+        if not file_full_path: file_full_path = "unknown"
     else:
         file_full_path = 'unknown'
 
@@ -101,18 +102,18 @@ def print_maple_frame(frame, index, asm_format):
 def print_gdb_frame(frame, index):
     """ print one gdb native backtrace frame """
 
-    s   = m_util.gdb_exec_to_string('bt')
+    s   = m_util.gdb_exec_to_str('bt')
     bt  = s.split('#' + str(index))
     bt  = bt[1].split('#')[0][:-1]
     bt  = '#' + str(index) + bt
     gdb_print(bt)
 
 class MapleBacktrace(gdb.Command):
-    """Display Maple backtrace in multiple modes
+    """displays Maple backtrace in multiple modes
     mbt is the alias of mbacktrace command
-    mbacktrace: print backtrace of Maple frames
-    mbacktrace -asm: print backtrace of Maple frames in assembly format
-    mbreaktrace -full: print backtrace of mixed gdb native frames and Maple frames
+    mbacktrace: prints backtrace of Maple frames
+    mbacktrace -asm: prints backtrace of Maple frames in assembly format
+    mbacktrace -full: prints backtrace of mixed gdb native frames and Maple frames
     """
 
     def __init__(self):
@@ -169,9 +170,9 @@ class MapleBacktrace(gdb.Command):
 
 
 class MapleUpCmd(gdb.Command):
-    """Select and print Maple stack frame that called this one
-    mup: move up one Maple frame that called selected Maple frame
-    mup -n: move up n Maple frames from currently selected Maple frame
+    """selects and prints Maple stack frame that called this one
+    mup: moves up one Maple frame to caller of selected Maple frame
+    mup -n: moves up n Maple frames from currently selected Maple frame
     """
     def __init__(self):
         gdb.Command.__init__ (self,
@@ -183,8 +184,8 @@ class MapleUpCmd(gdb.Command):
         self.mup_func(args, from_tty)
 
     def usage(self):
-        gdb_print("mup : move Maple frame up one level")
-        gdb_print("mup -n: move Maple frame up n levels")
+        gdb_print("mup : Moves Maple frame up one level")
+        gdb_print("mup -n: Moves Maple frame up n levels")
 
     def mup_func(self, args, from_tty):
         steps = 1
@@ -235,11 +236,12 @@ class MapleUpCmd(gdb.Command):
 
         asm_format = False
         print_maple_frame(frame, index, asm_format)
+        m_datastore.mgdb_rdata.update_frame_change_counter()
 
 class MapleDownCmd(gdb.Command):
-    """Select and print Maple stack frame called by this one
-    mdown: move down one Maple frame called by selected Maple frame
-    mdown -n: move down n Maple frames called from currently selected Maple frame
+    """selects and prints Maple stack frame called by this one
+    mdown: moves down one Maple frame called by selected Maple frame
+    mdown -n: moves down n Maple frames called from currently selected Maple frame
     """
     def __init__(self):
         gdb.Command.__init__ (self,
@@ -251,8 +253,8 @@ class MapleDownCmd(gdb.Command):
         self.mdown_func(args, from_tty)
 
     def usage(self):
-        gdb_print("mdown : move Maple frame down one level")
-        gdb_print("mdown -n: move Maple frame down n levels")
+        gdb_print("mdown : Moves Maple frame down one level")
+        gdb_print("mdown -n: Moves Maple frame down n levels")
 
     def mdown_func(self, args, from_tty):
         steps = 1
@@ -304,3 +306,4 @@ class MapleDownCmd(gdb.Command):
 
         asm_format = False
         print_maple_frame(frame, index, asm_format)
+        m_datastore.mgdb_rdata.update_frame_change_counter()

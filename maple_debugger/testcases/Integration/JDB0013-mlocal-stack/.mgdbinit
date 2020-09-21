@@ -1,0 +1,8 @@
+mb LHelloWorld_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
+run
+msi
+p func.sp
+msi
+p func.sp
+mlocal -stack
+quit
