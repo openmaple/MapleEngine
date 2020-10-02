@@ -134,18 +134,18 @@ def get_current_frame_rip(frame):
     return disa['addr']
 
 
-def get_closest_maple_frame_func_lib_info():
+def get_newest_maple_frame_func_lib_info():
     """
-    starting from currently selected frame, find out the closest Maple frame, and then
+    starting from currently selected frame, find out the newest Maple frame, and then
     call get_maple_frame_func_lib_info() to return func header offset, library .so path,
     library's coresponding assembly file path, func_header address, and the Maple frame itself
 
     returns:
       1, func_header_offset: in string.
       2, so_path: string. so library file full path.
-      3, asm_path: string. asm file fuul path.
+      3, asm_path: string. asm file full path.
       4, func_header: int. address of function header.
-      5, frame: gdb.Frame. echo this frame.
+      5, mirmpl_path: string. .mpl.mir.mpl file full path
 
       or all None if no valid Maple frame found
     """
@@ -184,9 +184,9 @@ def get_maple_frame_func_lib_info(frame):
     returns:
       1, func_header_offset: in string.
       2, so_path: string. so library file full path.
-      3, asm_path: string. asm file fuul path.
+      3, asm_path: string. asm file full path.
       4, func_header: int. address of function header.
-      5, frame: gdb.Frame. echo this frame.
+      5, mirmpl_path: in string. .mpl.mir.mpl file full path
     """
 
     frame_rip = get_current_frame_rip(frame)
@@ -203,18 +203,19 @@ def get_maple_frame_func_lib_info(frame):
             if m_debug.Debug: m_debug.dbg_print("func_addr_offset=None")
             return None, None, None, None, None
         func_header = m_info.get_initialized_maple_func_attr('func.header')
-        start_addr, so_path, asm_path = m_info.get_lib_so_info(func_header)
-        if m_debug.Debug: m_debug.dbg_print("func_addr_offset=", func_addr_offset, "so_path=", so_path, "asm_path=", asm_path, \
-                        "func_header=", func_header, "frame=", frame)
-        return func_addr_offset, so_path, asm_path, func_header, frame
+        start_addr, so_path, asm_path, mirmpl_path = m_info.get_lib_so_info(func_header)
+        if m_debug.Debug: m_debug.dbg_print("func_addr_offset=", func_addr_offset, "so_path=", so_path, \
+                                            "asm_path=", asm_path, "func_header=", func_header, "mirmpl_path=", mirmpl_path)
+        return func_addr_offset, so_path, asm_path, func_header, mirmpl_path
 
     # the breakpoint address is same to frame.rip (first instruction address in the memory),
     # this means program just stops at the first instruction of the function, so the func is NOT
     # initialized yet
-    func_addr_offset, so_path, asm_path, func_header  = m_info.get_uninitialized_maple_func_addrs()
+    func_addr_offset, so_path, asm_path, func_header, mirmpl_path  = m_info.get_uninitialized_maple_func_addrs()
 
     # func_addr_offset in string , format of func_addr:offset:
-    if not func_addr_offset or not so_path or not asm_path or not func_addr_offset:
-        if m_debug.Debug: m_debug.dbg_print("returns None")
-        return None, None, None,None,None
-    return func_addr_offset, so_path, asm_path,func_header, frame
+    if not func_addr_offset or not so_path or not asm_path or not func_header or not mirmpl_path:
+        if m_debug.Debug: m_debug.dbg_print("func_addr_offset=", func_addr_offset, "so_path=", so_path, "asm_path=", asm_path)
+        if m_debug.Debug: m_debug.dbg_print("func_header=", func_header, "mirmpl_path=",mirmpl_path)
+        return None, None, None, None, None
+    return func_addr_offset, so_path, asm_path,func_header, mirmpl_path

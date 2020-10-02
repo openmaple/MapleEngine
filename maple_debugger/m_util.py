@@ -37,28 +37,7 @@ class MColors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-    ENDC = ''
-
-    NM_SYMBOL = ''
-    NM_METHOD = ''
-
-    BT_ADDR = ''
-    BT_FNNAME = ''
-    BT_SRC = ''
-    BT_ARGNAME = ''
-
-    BP_ADDR = ''
-    BP_ATTR = ''
-    BP_SYMBOL = ''
-    BP_STATE_GR = ''
-    BP_STATE_RD = ''
-
-    TP_CNAME = ''
-    TP_MNAME = ''
-    SP_SNAME = ''
-    MP_FSYNTAX = ''
-    MP_CNAME = ''
-
+    @staticmethod
     def init_maple_colors(colored = True):
         # restore it in case disable color was called
         MColors.ENDC = '\033[0m' if colored else ''
@@ -90,6 +69,7 @@ class MColors:
         # Maple Colors used for mprint
         MColors.MP_CNAME = MColors.BBLUE if colored else ''
         MColors.MP_FSYNTAX = MColors.BYELLOW if colored else ''
+        MColors.MP_STR_V = MColors.BGREEN if colored else ''
 
 def is_interactive():
     """ check if gdb runs in interactive mode
@@ -172,7 +152,7 @@ def gdb_echo_exec(cmd):
 
     returns:
     """
-    gdb.execute('echo (gdb_exec) ' + cmd + '\\n')
+    gdb.write('echo (gdb_exec) %s\n' % cmd)
     gdb.execute(cmd)
 
 def gdb_print(string, stream = gdb.STDOUT):
@@ -195,11 +175,11 @@ def shell_cmd(cmd):
 def proc_popen(cmd):
     """execute a command with Popen of subprocess in background
     """
-    subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env={'PYTHONIOENCODING':'latin1'})
     return subproc
 
 def proc_communicate(subproc):
     """get the stdout output of subprocess, decode it and return results
     """
     output = subproc.communicate()[0]
-    return output.decode("utf-8")
+    return output

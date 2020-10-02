@@ -42,6 +42,11 @@ class MaplePrintCmd(gdb.Command):
 
     def mprint_func(self, args, from_tty):
         s = str(args)
+        try:
+            val = gdb.parse_and_eval(s)
+            s = hex(int(val))
+        except:
+            pass
 
         x = s.split()
         if len(x) == 1: # address
@@ -189,6 +194,7 @@ class MaplePrintCmd(gdb.Command):
                                                  MColors.MP_FSYNTAX + class_list[level-1]['class_name'] + MColors.ENDC)
         gdb_print(buffer)
 
+        value_string = None
         field_count = 1
         for i in range(level):
             if 'array' in class_list[i]['full_syntax']:
@@ -219,6 +225,17 @@ class MaplePrintCmd(gdb.Command):
                     gdb_print(buffer)
                     field_count += 1
 
+        # Check, if the last level of the object is a Ljava_2Flang_2FString_3B (String Object), we display its string value
+        if class_list[level - 1]['full_syntax'] == 'class' and class_list[level - 1]['class_name'] == 'Ljava_2Flang_2FString_3B':
+            if value_string:
+                string_object_addr = value_string.split(',')[0].split('hex:')[1]
+                if m_debug.Debug: m_debug.dbg_print("string_object_addr in string=", string_object_addr)
+                try:
+                    string_object_addr = int(string_object_addr, 16)
+                except:
+                    return
+                self.display_single_string_object_values(string_object_addr)
+
         return
 
     def get_array_length(self, addr):
@@ -230,6 +247,58 @@ class MaplePrintCmd(gdb.Command):
         item_num = int(buffer.split(':')[1].strip(),16)
         if m_debug.Debug: m_debug.dbg_print("item_num=", item_num)
         return item_num
+
+    def display_array_char_values(self, addr, type_size, item_num):
+
+        if item_num > 32:
+            item_list = [i for i in range(24)]
+            item_list = item_list + [ i for i in range(item_num - 8, item_num)]
+        else:
+            item_list = [i for i in range(item_num)]
+
+        steps = 0
+        show_snip = True
+        buf = 'String Value: "' + MColors.MP_STR_V
+        for i in item_list:
+            obj_addr = addr + 4 + type_size * i  # class reference is a pointer, 8 bytes
+            cmd = 'x/1hx ' + hex(obj_addr)
+            if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
+            try:
+                buffer = m_util.gdb_exec_to_str(cmd)
+            except:
+                buf = '  {}'.format('no-data')
+                gdb_print (buf)
+                steps += 1
+                return
+
+            steps += 1
+            v = buffer.split(':')[1].strip()
+            buf = buf + int(v, 16).to_bytes(2, byteorder='big').decode("utf-16-be")
+
+            if item_num > 32 and steps >= 24 and show_snip == True:
+                buf = buf + '...'
+                show_snip = False
+
+        gdb_print (buf + MColors.ENDC + '"')
+        return
+
+    def display_single_string_object_values(self, addr):
+        """NOTE!!! NOTE!!! NOTE!!!
+        call this when we know addr IS a String Object
+        string object is Ljava_2Flang_2FString_3B which has a 12 bytes header.
+        """
+        class_name, full_syntax, type_size  = self.get_class_name_syntax(addr)
+        if m_debug.Debug:
+            m_debug.dbg_print("class_name=", class_name, "full_syntax=", full_syntax, "type_size=", type_size, "addr=", addr)
+        if not full_syntax:
+            return
+        if full_syntax != "array C[]":
+            return
+
+        # get to the data part of String object in Java by addr + 12
+        item_num = self.get_array_length(addr + 12)
+        self.display_array_char_values(addr+12, type_size, item_num)
+
 
     def display_array_primitive_values(self, addr, full_syntax, type_size):
         buffer = 'Object Type: {}'.format(MColors.MP_FSYNTAX + full_syntax + MColors.ENDC)
@@ -269,6 +338,8 @@ class MaplePrintCmd(gdb.Command):
             steps += 1
             v = buffer.split(':')[1].strip()
             v = hex(int(v, 16)) #remove leading 0s. e.g. 0x000123 to 0x123
+            if full_syntax == 'array C[]': # display unicode character
+                v = v + ", '" + int(v, 16).to_bytes(2, byteorder='big').decode("utf-16-be") + "'"
             buf = '  [{}] {}'.format(i, v)
             gdb_print (buf)
 
@@ -343,7 +414,7 @@ class MaplePrintCmd(gdb.Command):
             except:
                 if m_debug.Debug: m_debug.dbg_print()
                 return None
-            hex_string = hex_string.split()[1]
+            hex_string = hex_string.split(':')[1]
             hex_string = hex(int(hex_string,16))
 
             cmd = 'x/1gf ' + hex(addr + offset) # cmd to get 8 byte double value

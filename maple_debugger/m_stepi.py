@@ -182,10 +182,11 @@ class MapleStepiCmd(gdb.Command):
 
     def show_current_opcode_cnt(self):
         current_opcode_cnt = self.get_current_opcode_cnt()
+        tobject= m_info.get_current_thread()
         if not current_opcode_cnt:
-            gdb_print ("current opcode count not found")
+            gdb_print ("Thread %d: current opcode count not found" % (tobject.num))
         else:
-            gdb_print ("current opcode count is " + current_opcode_cnt)
+            gdb_print ("Thread %d: current opcode count is %s" % (tobject.num, current_opcode_cnt))
         return
 
     def delta_from_current_opcode_cnt(self, target_opcode_cnt):
@@ -278,6 +279,10 @@ class MapleStepiCmd(gdb.Command):
         if not ds:
             return
         if m_debug.Debug: m_debug.dbg_print("retrieved ds=", ds)
+
+        if m_set.msettings['stack'] == 'on':
+            m_util.gdb_exec('mlocal -stack')
+
         asm_path = ds['frame_func_header_info']['asm_path']
         asm_line = ds['frame_func_src_info']['asm_line']
         asm_offset = ds['frame_func_src_info']['asm_offset']

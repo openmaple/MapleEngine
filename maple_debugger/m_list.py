@@ -27,6 +27,14 @@ maple_source_path_list = []
 
 default_src_display_line_count = 10
 default_asm_display_line_count = 20
+default_mir_display_line_count = 20
+
+asm_lang = os.path.expandvars('$MAPLE_DEBUGGER_ROOT/highlight/asm.lang')
+mpl_lang = os.path.expandvars('$MAPLE_DEBUGGER_ROOT/highlight/mpl.lang')
+
+MLIST_MODE_SRC = 0
+MLIST_MODE_ASM = 1
+MLIST_MODE_MIR = 2
 
 def find_one_file(name, path):
     """ find the file with specified name and given base path """
@@ -179,7 +187,8 @@ class MapleSourcePathCmd(gdb.Command):
 class MapleListCmd(gdb.Command):
     """list source code in multiple modes
     mlist: list source code associated with current Maple frame
-    mlist -asm: list assemble instructions associated with current Maple frame
+    mlist -asm: list assembly instructions associated with current Maple frame
+    mlist -mir: list Maple IR associated with current Maple frame
     """
 
     def __init__(self):
@@ -191,13 +200,9 @@ class MapleListCmd(gdb.Command):
         self.frame_change_count = 0
         self.frame_data = {}
 
-        """
-        self.default_src_display_line_count = 10
-        self.default_asm_display_line_count = 20
-        """
-
         self.prev_src_file_line = 0
         self.prev_asm_file_line = 0
+        self.prev_mir_file_line = 0
 
     def invoke(self, args, from_tty):
         self.mlist_func(args, from_tty)
@@ -205,11 +210,13 @@ class MapleListCmd(gdb.Command):
     def usage(self):
         gdb_print("  mlist      : Lists source code associated with current Maple frame\n"
                   "  mlist -asm : Lists assembly instructions associated with current Maple frame\n"
-                  "  mlist . | mlist -asm:. : Lists code located by the filename and line number of current Maple frame\n"
+                  "  mlist . | mlist -asm:. | mlist -mir:. : Lists code located by the filename and line number of current Maple frame\n"
                   "  mlist line-num : Lists current source code file at line of [line-num]\n"
                   "  mlist filename:line-num : Lists specified source code file at line of [line-num]\n"
                   "  mlist +|-[num]: Lists current source code file offsetting from previous listed line, offset can be + or -\n"
-                  "  mlist -asm:+|-[num]: Lists current assembly instructions offsetting from previous listed line. offset can be + or -")
+                  "  mlist -asm:+|-[num]: Lists current assembly instructions offsetting from previous listed line. offset can be + or -)\n"
+                  "  mlist -mir : Lists Maple IR associated with current Maple frame\n"
+                  "  mlist -mir:+|-[num]: Lists current Maple IR offsetting from previous listed line. offset can be + or -")
 
     def mlist_func(self, args, from_tty):
         s = str(args)
@@ -217,7 +224,7 @@ class MapleListCmd(gdb.Command):
             self.mlist_source_file_func()
             return
 
-        asm_mode = False
+        mlist_mode = MLIST_MODE_SRC
         line_offset = 0
         src_line_num = 0
         src_file_name = None
@@ -227,26 +234,26 @@ class MapleListCmd(gdb.Command):
             return
 
         if s == "-asm":
-            asm_mode = True
+            mlist_mode = MLIST_MODE_ASM
         elif "-asm:-" == s:
-            asm_mode = True
+            mlist_mode = MLIST_MODE_ASM
             line_offset = default_asm_display_line_count * -1
         elif "-asm:-" == s[0:6]:
-            asm_mode = True
+            mlist_mode = MLIST_MODE_ASM
             if s[6:].isdigit():
                 line_offset = int(s[6:]) * -1
         elif "-asm:+" == s:
-            asm_mode = True
+            mlist_mode = MLIST_MODE_ASM
             line_offset = default_asm_display_line_count
         elif "-asm:+" == s[0:6]:
-            asm_mode = True
+            mlist_mode = MLIST_MODE_ASM
             if s[6:].isdigit():
                 line_offset = int(s[6:])
             else:
                 self.usage()
                 return
         elif "-asm:" == s[0:5]:
-            asm_mode = True
+            mlist_mode = MLIST_MODE_ASM
             if s[5:].isdigit():
                 line_offset = int(s[5:])
             elif "." == s[5:]:
@@ -254,6 +261,36 @@ class MapleListCmd(gdb.Command):
             else:
                 self.usage()
                 return
+
+        elif s == "-mir":
+            mlist_mode = MLIST_MODE_MIR
+        elif "-mir:-" == s:
+            mlist_mode = MLIST_MODE_MIR
+            line_offset = default_mir_display_line_count * -1
+        elif "-mir:-" == s[0:6]:
+            mlist_mode = MLIST_MODE_MIR
+            if s[6:].isdigit():
+                line_offset = int(s[6:]) * -1
+        elif "-mir:+" == s:
+            mlist_mode = MLIST_MODE_MIR
+            line_offset = default_mir_display_line_count
+        elif "-mir:+" == s[0:6]:
+            mlist_mode = MLIST_MODE_MIR
+            if s[6:].isdigit():
+                line_offset = int(s[6:])
+            else:
+                self.usage()
+                return
+        elif "-mir:" == s[0:5]:
+            mlist_mode = MLIST_MODE_MIR
+            if s[5:].isdigit():
+                line_offset = int(s[5:])
+            elif "." == s[5:]:
+                m_datastore.mgdb_rdata.update_frame_change_counter()
+            else:
+                self.usage()
+                return
+
         elif "." == s:
             m_datastore.mgdb_rdata.update_frame_change_counter()
         elif s.isdigit():
@@ -278,10 +315,12 @@ class MapleListCmd(gdb.Command):
             self.usage()
             return
 
-        if asm_mode:
+        if mlist_mode == MLIST_MODE_ASM:
             self.mlist_asm_file_func(line_offset)
-        else:
+        elif mlist_mode == MLIST_MODE_SRC:
             self.mlist_source_file_func(filename = src_file_name, line = src_line_num, offset = line_offset)
+        else:
+            self.mlist_mir_file_func(line_offset)
 
     def mlist_asm_file_func(self, offset):
         frame_change_count = m_datastore.mgdb_rdata.read_frame_change_counter()
@@ -306,6 +345,30 @@ class MapleListCmd(gdb.Command):
         self.display_asm_file_lines(self.frame_data['frame_func_header_info']['asm_path'], \
                                     self.frame_data['frame_func_src_info']['asm_line'],\
                                     self.frame_data['frame_func_header_info']['func_header_asm_tuple'])
+
+    def mlist_mir_file_func(self, offset):
+        frame_change_count = m_datastore.mgdb_rdata.read_frame_change_counter()
+
+        # stack selected frame changed by other cmds or breakpoints
+        if self.frame_change_count < frame_change_count:
+            frame = m_frame.get_selected_frame()
+            if not frame:
+                return
+
+            ds = m_datastore.get_stack_frame_data(frame)
+            if not ds:
+                return
+
+            self.frame_data = ds
+            self.frame_change_count = frame_change_count
+
+        if offset != 0:
+            new_line = self.prev_mir_file_line + offset
+            self.frame_data['frame_func_src_info']['mirmpl_line'] = new_line if new_line > 1 else 1
+
+        self.display_mir_file_lines(self.frame_data['frame_func_header_info']['mirmpl_path'], \
+                                    self.frame_data['frame_func_src_info']['mirmpl_line'],\
+                                    self.frame_data['frame_func_header_info']['func_header_mirmpl_tuple'])
 
     def mlist_source_file_func(self, filename = None, line = 0, offset = 0):
         """
@@ -434,9 +497,9 @@ class MapleListCmd(gdb.Command):
         ss_line = asm_tuple[0] + s_line - 1
         if m_util.Highlighted:
             buf =m_util.shell_cmd('dd skip=%d bs=1 count=%d if=%s 2> /dev/null |'
-                ' highlight -O xterm256 -S asm -s %s | sed -n %d,%dp |'
+                ' highlight -O xterm256 --config-file=%s -s %s | sed -n %d,%dp |'
                 ' nl -ba -s" " -w12 -v%d | sed "s/^  \\( *%d \\)/=>\\1/"' \
-                % (asm_tuple[1], asm_tuple[2] - asm_tuple[1], filename, \
+                % (asm_tuple[1], asm_tuple[2] - asm_tuple[1], filename, asm_lang, \
                    m_util.HighlightStyle, s_line, e_line, ss_line, line_num))
         else:
             buf =m_util.shell_cmd('dd skip=%d bs=1 count=%d if=%s 2> /dev/null |'
@@ -447,3 +510,58 @@ class MapleListCmd(gdb.Command):
 
         self.prev_asm_file_line = line_num
         self.frame_data['frame_func_src_info']['asm_line'] = line_num + count if line_num + count < asm_tuple[0] + total else asm_tuple[0] + total - 1
+
+    def display_mir_file_lines(self, filename, line_num, mir_tuple):
+        """
+        params:
+          filename: string. asm file full path
+          line_num: int. line number of this asm file
+          mir_tuple: (maple_symbol_block_start_line, block_start_offset, block_end_offset) in mir.mpl file
+        """
+        exist = m_datastore.mgdb_rdata.in_mirblock_lines(filename, mir_tuple[0])
+        if exist:
+            total = m_datastore.mgdb_rdata.get_mirblock_lines(filename, mir_tuple[0])
+        else:
+            with open(filename) as fp:
+                offset = mir_tuple[1]
+                fp.seek(offset)
+                total = 0
+                while offset < mir_tuple[2]:
+                    line = fp.readline()
+                    offset += len(line)
+                    total += 1
+            m_datastore.mgdb_rdata.add_mirblock_lines(filename, mir_tuple[0], total)
+        try:
+            count = int(m_set.msettings["linecount"])
+            if count < 9:
+                count = default_mir_display_line_count if count != 0 else total << 1
+        except:
+            count = default_mir_display_line_count
+
+        if line_num < mir_tuple[0]:
+            line_num = mir_tuple[0]
+        if line_num > mir_tuple[0] + total:
+            line_num = mir_tuple[0] + total - 1
+
+        curr_num = line_num - mir_tuple[0] + 1
+        half = (count - 1) >> 1
+        s_line = curr_num - half if curr_num > half + 1 else 1
+        half = count - half - 1
+        e_line = curr_num + half if curr_num + half <= total else total
+        gdb_print("asm file: %s%s%s line: %d" % (MColors.BT_SRC, filename, MColors.ENDC, line_num))
+        ss_line = mir_tuple[0] + s_line - 1
+        if m_util.Highlighted:
+            buf =m_util.shell_cmd('dd skip=%d bs=1 count=%d if=%s 2> /dev/null |'
+                ' highlight -O xterm256 --config-file=%s -s %s | sed -n %d,%dp |'
+                ' nl -ba -s" " -w12 -v%d | sed "s/^  \\( *%d \\)/=>\\1/"' \
+                % (mir_tuple[1], mir_tuple[2] - mir_tuple[1], filename, mpl_lang, \
+                   m_util.HighlightStyle, s_line, e_line, ss_line, line_num))
+        else:
+            buf =m_util.shell_cmd('dd skip=%d bs=1 count=%d if=%s 2> /dev/null |'
+                ' sed -n %d,%dp | nl -ba -s" " -w12 -v%d | sed "s/^  \\( *%d \\)/=>\\1/"' \
+                % (mir_tuple[1], mir_tuple[2] - mir_tuple[1], filename, \
+                   s_line, e_line, ss_line, line_num))
+        m_util.gdb_write(buf)
+
+        self.prev_mir_file_line = line_num
+        self.frame_data['frame_func_src_info']['mirmpl_line'] = line_num + count if line_num + count < mir_tuple[0] + total else mir_tuple[0] + total - 1

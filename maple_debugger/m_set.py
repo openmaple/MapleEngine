@@ -70,22 +70,19 @@ def trace_maple_debugger(frame, event, arg, mtrace_data = [0]):
             mtrace_data[0] -= 1
     return trace_maple_debugger
 
-def register_event_handlers(action, event_saved = {}):
+def register_event_handlers(action, event_handlers = {}):
     """register event handlers with action(either 'connect' or 'disconnect')
     Ignore all event handlers defined in m_util.py with names like event_%s_handler
     """
-    template = "def event_{0}_handler(e=None): gdb_print('@@@Event name: {0}, type: ' + type(e).__name__)"
-    for e in gdb.events.__dict__.keys():
+    template = "def trc_event_{0}(e=None): gdb.write('@@@Event name: {0}, type: %s\\n' % type(e).__name__)"
+    msg = 'En' if action == 'connect' else 'Dis'
+    for e in sorted(gdb.events.__dict__.keys()):
         if e.startswith("__"): continue
-        if e not in event_saved and "event_%s_handler" % e not in dir(m_util):
+        if e not in event_handlers:
             exec(template.format(e))
-            exec("event_saved[e] = event_%s_handler" % e)
-        if e in event_saved:
-            handler = event_saved[e]
-            exec("gdb.events.{0}.{1}(handler)".format(e, action))
-            gdb_print("  gdb.events.{0}.{1}({2})".format(e, action, handler.__name__))
-        else:
-            gdb_print("  Ignored event {0}".format(e))
+            exec('event_handlers[e] = trc_event_' + e)
+        exec('gdb.events.{0}.{1}(event_handlers[e])'.format(e, action))
+        gdb.write('  %sabled tracing for event "%s"\n' % (msg, e))
 
 class MapleSetCmd(gdb.Command):
     """sets and displays Maple debugger settings
@@ -107,6 +104,7 @@ class MapleSetCmd(gdb.Command):
         msettings['verbose'] = 'off'
         msettings['event'] = 'disconnect'
         msettings['opcode'] = 'off' # for msi, ms, mfinish, mni, mn command to show instruction info
+        msettings['stack'] = 'off' # for msi and mni to show evaluation stack info
         m_debug.Debug = False
         msettings['maple_lib_asm_path'] = []
 
@@ -149,9 +147,12 @@ class MapleSetCmd(gdb.Command):
                 msettings[s[0]] = 'on' if m_debug.Debug else 'off'
             elif s[0] == 'event':
                 action = 'connect' if s[1] == 'on' else 'disconnect'
-                register_event_handlers(action)
-                msettings[s[0]] = action
+                if action != msettings[s[0]]:
+                    register_event_handlers(action)
+                    msettings[s[0]] = action
             elif s[0] == 'opcode':
+                msettings[s[0]] = 'on' if s[1] == 'on' else 'off'
+            elif s[0] == 'stack':
                 msettings[s[0]] = 'on' if s[1] == 'on' else 'off'
             else:
                 msettings[s[0]] = s[1]

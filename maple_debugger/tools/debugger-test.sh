@@ -24,12 +24,12 @@ ps -ef | expand | grep -v grep | grep -v " $$ "| grep "/bash.*debugger-test.sh" 
 
 TESTROOT="$MAPLE_DEBUGGER_ROOT"/testcases
 TESTOUT="$MAPLE_BUILD_ROOT"/out/debugger/test
-SPECIFIED="."
-[ $# -gt 0 ] && { SPECIFIED="/$1"; shift; }
+SPECIFIED="." EXCLUSED="/Regression/"
+[ $# -gt 0 ] && { SPECIFIED="/$1"; EXCLUSED="///"; shift; }
 [ -d "$TESTOUT" ] && rm -rf "$TESTOUT"
 mkdir -p "$TESTOUT"
 find -L "$TESTROOT" -maxdepth 2 -name "[A-Z]*[0-9][0-9][0-9][0-9]-*" -type d |
-grep -e "$SPECIFIED/*[^/]*\$" | sort |
+grep -e "$SPECIFIED/*[^/]*\$" | grep -v "$EXCLUSED" | sort |
 while read d; do
     testcase=$(basename "$d")
     echo -n Running test case "$testcase"...
@@ -43,7 +43,13 @@ while read d; do
     TIMEOUT=${TIMEOUT:-60}  # Set default timeout limit to 60 seconds if it is not set
     [ -n "$TESTCASE" ] || { echo FAILED; echo "Error: TESTCASE not set in $testcase/cfg" > FAILED; continue; }
     app=$(basename "$TESTCASE")
-    mkdir -p "$app"
+    if [ -L ../$app ]; then
+        cp -a "../$app/" "$app"
+        rm -f "$app"/{.mgdbinit,log.txt,TIMEOUT,*ED,err.txt,*expected-output.txt,*-*.log}
+    else
+        mkdir -p "$app"
+        ln -s "$PWD/$app" ../"$app"
+    fi
     cp -a .mgdbinit "$MAPLE_BUILD_ROOT/$TESTCASE"/*.java "$app"/ || exit $LINENO
     grep -v "^echo " .mgdbinit | sed -e '/^python/,/^end/s/^/@/' -e 's/^[^@].*/echo (gdb) & \\n\n&/' -e 's/^@//' > "$app"/.mgdbinit
     cd "$app" || exit $LINENO

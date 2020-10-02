@@ -51,6 +51,7 @@ maple_commands_detail_info = {
     'mbacktrace':   'mbt: An alias for the "mbacktrace" command\n'\
                     'mbacktrace: Prints backtrace of Maple frames\n'\
                     'mbacktrace -asm: Prints the backtrace of Maple frames in assembly format\n'\
+                    'mbacktrace -mir: prints backtrace of Maple frames in Maple IR format\n'\
                     'mbacktrace -full: Prints the backtrace of mixed gdb native frames and Maple frames\n',
 
     'mup':      'mup: Moves up one Maple frame that called the selected Maple frame\n'\
@@ -61,11 +62,13 @@ maple_commands_detail_info = {
 
     'mlist':    'mlist: Lists the source code associated with current Maple frame\n'\
                 'mlist -asm: Lists the assembly instructions associated with current Maple frame\n'\
-                'mlist . | mlist -asm:. : Lists code located by the filename and line number of current Maple frame\n'\
+                'mlist . | mlist -asm:. | mlist -mir:. : Lists code located by the filename and line number of current Maple frame\n'\
                 'mlist line-num : Lists current source code file at line of [line-num]\n'\
                 'mlist filename:line-num : Lists specified source code file at line of [line-num]\n'\
                 'mlist +|-[num]: Lists current source code file offsetting from previous listed line, offset can be + or -\n'\
-                'mlist -asm:+|-[num]: Lists current assembly instructions offsetting from previous listed line. offset can be + or -\n',
+                'mlist -asm:+|-[num]: Lists current assembly instructions offsetting from previous listed line. offset can be + or -\n'\
+                'mlist -mir : Lists Maple IR associated with current Maple frame\n'\
+                'mlist -mir:+|-[num]: Lists current Maple IR offsetting from previous listed line. offset can be + or -\n',
 
     'msrcpath': 'msp: An alias of the "msrcpath" command\n'\
                 'msrcpath: Displays all the search paths of Maple application and library source code\n'\

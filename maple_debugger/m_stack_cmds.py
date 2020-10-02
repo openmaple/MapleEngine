@@ -23,14 +23,18 @@ from m_util import MColors
 from m_util import gdb_print
 import m_debug
 
-def print_maple_frame(frame, index, asm_format):
+MBT_FORMAT_SRC = 0
+MBT_FORMAT_ASM = 1
+MBT_FORMAT_MIR = 2
+
+def print_maple_frame(frame, index, mbt_format):
     """
     prints one Maple backtrace frame.
 
     params:
       frame: a gdb.Frame object
       index: a index number of the frame.
-      asm_format: print Maple backtrace in asm format if set
+      mbt_format: print Maple backtrace in specified format, MBT_FORMAT_SRC or MBT_FORMAT_ASM or MBT_FORMAT_MIR
     """
 
     data = m_datastore.get_stack_frame_data(frame)
@@ -40,11 +44,13 @@ def print_maple_frame(frame, index, asm_format):
 
     so_path = data['frame_func_header_info']['so_path']
     asm_path = data['frame_func_header_info']['asm_path']
+    mirmpl_path = data['frame_func_header_info']['mirmpl_path']
     func_addr_offset = data['frame_func_header_info']['func_addr_offset']
     func_name = data['frame_func_header_info']['func_name']
 
     src_file_short_name = data['frame_func_src_info']['short_src_file_name']
     asm_line_num = data['frame_func_src_info']['asm_line']
+    mirmpl_line_num = data['frame_func_src_info']['mirmpl_line']
     src_file_line = data['frame_func_src_info']['short_src_file_line']
 
     func_argus_locals = data['func_argus_locals']
@@ -89,14 +95,18 @@ def print_maple_frame(frame, index, asm_format):
         args_buffer = args_buffer[:-2]
     if m_debug.Debug: m_debug.dbg_print("arg_num=", arg_num, " args_buffer=", args_buffer)
 
-    if asm_format:
+    if mbt_format == MBT_FORMAT_ASM:
         buffer = '#%i %s:%s %s(%s) at %s:%s' % \
            (index, MColors.BT_ADDR + so_path.split('/')[-1] + MColors.ENDC,MColors.BT_ADDR + func_addr_offset + MColors.ENDC,\
              m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + asm_path + MColors.ENDC, asm_line_num)
-    else:
+    elif mbt_format == MBT_FORMAT_SRC:
         buffer = '#%i %s:%s %s(%s) at %s:%s' % \
            (index, MColors.BT_ADDR + so_path.split('/')[-1] + MColors.ENDC, MColors.BT_ADDR + func_addr_offset + MColors.ENDC,\
             m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + file_full_path + MColors.ENDC, src_file_line)
+    else:
+        buffer = '#%i %s:%s %s(%s) at %s:%s' % \
+           (index, MColors.BT_ADDR + so_path.split('/')[-1] + MColors.ENDC,MColors.BT_ADDR + func_addr_offset + MColors.ENDC,\
+             m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + mirmpl_path + MColors.ENDC, mirmpl_line_num)
     gdb_print(buffer)
 
 def print_gdb_frame(frame, index):
@@ -113,6 +123,7 @@ class MapleBacktrace(gdb.Command):
     mbt is the alias of mbacktrace command
     mbacktrace: prints backtrace of Maple frames
     mbacktrace -asm: prints backtrace of Maple frames in assembly format
+    mbacktrace -mir: prints backtrace of Maple frames in Maple IR format
     mbacktrace -full: prints backtrace of mixed gdb native frames and Maple frames
     """
 
@@ -129,12 +140,14 @@ class MapleBacktrace(gdb.Command):
 
     def mbt_func(self, args, from_tty):
         s = str(args)
-        asm = False
+        mbt_format = MBT_FORMAT_SRC
         full = False
         if s == "-full" or s == "full":
             full = True
         elif s == "-asm":
-            asm = True
+            mbt_format = MBT_FORMAT_ASM
+        elif s == "-mir":
+            mbt_format = MBT_FORMAT_MIR
 
         selected_frame = m_frame.get_selected_frame()
         newest_frame = m_frame.get_newest_frame()
@@ -157,7 +170,7 @@ class MapleBacktrace(gdb.Command):
         gdb_print('Maple Traceback (most recent call first):')
         while frame:
             if m_frame.is_maple_frame(frame):
-                print_maple_frame(frame, index, asm)
+                print_maple_frame(frame, index, mbt_format)
             elif full:
                 print_gdb_frame(frame, index)
             index += 1
@@ -234,8 +247,7 @@ class MapleUpCmd(gdb.Command):
                 prev_maple_frame_index = index
                 steps -= 1
 
-        asm_format = False
-        print_maple_frame(frame, index, asm_format)
+        print_maple_frame(frame, index, MBT_FORMAT_SRC)
         m_datastore.mgdb_rdata.update_frame_change_counter()
 
 class MapleDownCmd(gdb.Command):
@@ -304,6 +316,5 @@ class MapleDownCmd(gdb.Command):
                 prev_maple_frame_index = index
                 steps -= 1
 
-        asm_format = False
-        print_maple_frame(frame, index, asm_format)
+        print_maple_frame(frame, index, MBT_FORMAT_SRC)
         m_datastore.mgdb_rdata.update_frame_change_counter()

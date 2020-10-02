@@ -215,6 +215,7 @@ def get_lib_so_info(addr):
       1, so lib start address: int
       2, lib so file full path in string
       3, lib asm file full path in string
+      4, lib mpl.mir.mpl file full path in string
     """
     a = int(addr, 0)
 
@@ -224,6 +225,7 @@ def get_lib_so_info(addr):
     path = None
     so_path = None
     asm_path = None
+    mirmpl_path = None
     for (hexstart, hexend, path) in re.findall(proc_mapping_re, buf):
         try:
             start = int(hexstart, 16)
@@ -239,22 +241,28 @@ def get_lib_so_info(addr):
         if a >= start and a <= end:
             if not path.rstrip().lower().endswith('.so'):
                 if m_debug.Debug: m_debug.dbg_print("path does not end with .so, path = ", path)
-                return None, None, None
+                return None, None, None, None
             so_path = path.rstrip().replace('/./','/')
             if m_debug.Debug: m_debug.dbg_print("gdb.solib_name(addr)=", gdb.solib_name(a))
+            mirmpl_path = so_path[:-3] + '.mpl.mir.mpl'
+            mirmpl_path = os.path.realpath(mirmpl_path)
             asm_path = so_path[:-3] + '.VtableImpl.s'
             asm_path = os.path.realpath(asm_path)
-            if os.path.exists(so_path) and os.path.exists(asm_path):
+            if os.path.exists(so_path) and os.path.exists(asm_path) and os.path.exists(mirmpl_path):
                 # both .so file and co-responding .s file exist in same directory
-                if m_debug.Debug: m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
-                return start, so_path, asm_path
+                if m_debug.Debug: m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path,\
+                                                    "asm_path=", asm_path, "mirmpl_path=", mirmpl_path)
+                return start, so_path, asm_path, mirmpl_path
 
             asm_path = so_path[:-3] + '.s'
             asm_path = os.path.realpath(asm_path)
-            if os.path.exists(so_path) and os.path.exists(asm_path):
+            mirmpl_path = so_path[:-3] + '.mpl.mir.mpl'
+            mirmpl_path = os.path.realpath(mirmpl_path)
+            if os.path.exists(so_path) and os.path.exists(asm_path) and os.path.exists(mirmpl_path):
                 # both .so file and co-responding .s file exist in same directory
-                if m_debug.Debug: m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
-                return start, so_path, asm_path
+                if m_debug.Debug: m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, \
+                                                    "asm_path=", asm_path, "mirmpl_path=", mirmpl_path)
+                return start, so_path, asm_path, mirmpl_path
 
             so_path_short_name = so_path.split('/')[-1][:-3]
 
@@ -262,28 +270,34 @@ def get_lib_so_info(addr):
             asm_path = ''
             for i in range(len(base) - 4):
                 asm_path += '/' + base[i]
+            mirmpl_path = asm_path + '/maple_build/out/x86_64/'+ so_path_short_name + '.mpl.mir.mpl'
+            mirmpl_path = os.path.realpath(mirmpl_path)
             asm_path += '/maple_build/out/x86_64/'+ so_path_short_name + '.VtableImpl.s'
             asm_path = os.path.realpath(asm_path)
-            if os.path.exists(so_path) and os.path.exists(asm_path):
+            if os.path.exists(so_path) and os.path.exists(asm_path) and os.path.exists(mirmpl_path):
                 # special case where .so and .VtableImpl.s are in such a different folders
                 if m_debug.Debug:
-                    m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
-                return start, so_path, asm_path
+                    m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, \
+                                      "asm_path=", asm_path, "mirmpl_path=", mirmpl_path)
+                return start, so_path, asm_path, mirmpl_path
 
             if not 'maple_lib_asm_path' in m_set.msettings:
-                return None,None, None
+                return None, None, None, None
             for v in m_set.msettings['maple_lib_asm_path']:
+                mirmpl_path = v + '/'+ so_path_short_name + '.mpl.mir.mpl'
+                mirmpl_path = os.path.realpath(mirmpl_path)
                 asm_path = v + '/' + so_path_short_name + '.VtableImpl.s'
                 asm_path = os.path.realpath(asm_path)
                 #asm_path = path.split('maple/out')[0] + 'maple/out/common/share/' + so_path_short_name + '.VtableImpl.s'
-                if os.path.exists(so_path) and os.path.exists(asm_path):
+                if os.path.exists(so_path) and os.path.exists(asm_path) and os.path.exists(mirmpl_path):
                     # .s file is in the search path list
                     if m_debug.Debug:
-                        m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, "asm_path=", asm_path)
-                    return start, so_path, asm_path
+                        m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, \
+                                          "asm_path=", asm_path, "mirmpl_path", mirmpl_path)
+                    return start, so_path, asm_path, mirmpl_path
 
-            return None, None, None
-    return None, None, None
+            return None, None, None, None
+    return None, None, None, None
 
 
 exclude_lib_path = ['/lib/', '/lib64/', '/usr/']
@@ -368,6 +382,7 @@ def get_uninitialized_maple_func_addrs():
       2, so_path: in string. so library full path.
       3, asm_path: in string. asm (.s) file full path
       4, func_header: func header address in string.
+      5, mirmpl_path: in string. .mpl.mir.mpl file full path
     """
 
     func_header = get_maple_frame_addr()
@@ -375,23 +390,23 @@ def get_uninitialized_maple_func_addrs():
         return None, None, None, None
     if m_debug.Debug: m_debug.dbg_print("func_header=", func_header)
 
-    func_lib_addr, so_path, asm_path = get_lib_so_info(func_header)
-    if not func_lib_addr or not so_path or not asm_path:
-        return None, None, None, None
+    func_lib_addr, so_path, asm_path, mirmpl_path = get_lib_so_info(func_header)
+    if not func_lib_addr or not so_path or not asm_path or not mirmpl_path:
+        return None, None, None, None, None
     if m_debug.Debug: m_debug.dbg_print("func_lib_addr=", func_lib_addr)
 
     header = int(func_header, 16)
     if (header < func_lib_addr):
         #gdb_print ("Warning: The header address is lower than lib_addr.")
         if m_debug.Debug: m_debug.dbg_print("Warning: The header address is lower than lib_addr.")
-        return None,None,None, None
+        return None, None, None, None, None
 
     offset = header - func_lib_addr
 
     # when a func in a frame is not initialized yet, pc value is 0000
     pc = '0000'
 
-    return hex(offset) + ":" + pc + ":", so_path, asm_path, func_header
+    return hex(offset) + ":" + pc + ":", so_path, asm_path, func_header, mirmpl_path
 
 #######################################################################
 ####  API section for retrieving Maple frame caller information

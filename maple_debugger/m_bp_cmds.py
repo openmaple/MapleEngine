@@ -97,7 +97,7 @@ class MapleBreakpointCmd(gdb.Command):
         if len(s) is 0: #nothing specified
             self.usage()
             return
-        x = s.split()
+        x = s.replace('_mirbin_info','').replace('_mirbin_code', '').split()
         if len(x) == 1: #symbol or clearall or listall
             if x[0] == '-clearall':
                 self.clearall_breakpoint()

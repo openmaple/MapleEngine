@@ -16,6 +16,7 @@
 import gdb
 import m_frame
 import m_asm
+import m_mirmpl
 import m_symbol
 import m_debug
 from m_util import gdb_print
@@ -178,11 +179,78 @@ class MapleMirbinInfoIndex():
         relist.sort()
         return relist
 
+class MapleMirmplInfoIndex():
+    """
+    class MapleMirmplInfoIndex creates a cache of all Maple symbol block information
+    for quick reference.
+
+    The cache is created based on libraries' coresponding .mpl.mir.mpl files
+    The cache will only be created once, at a few trigger points, whichever happens first
+    """
+
+    def __init__(self):
+        """
+        initialize mirmpl_info_cache as a empty dict.
+        Key: .mpl.mir.mpl file full path name coresponding to .so file used.
+        Value: A dict with following format
+          key: Maple symbol
+          value: A tuple, (symbol-line-num, symbol-block-offset, symbol-block-end-offset).
+
+        example of mirmpl_info_cache:
+          mirmpl_info_cache['libcore.mpl.mir.mpl'] =
+          {
+            'Ljava_2Flang_2FClass_3B_7CisArray_7C_28_29Z' : (100, 5397, 5409)
+            'Ljava_2Flang_2FStringBuffer_3B_7CsetLength_7C_28I_29V': (200, 6000,7000)
+          }
+          mirmpl_info_cache['MyApplication.mpl.mir.mpl'] =
+          {
+            'LTypeTest_3B_7CshowLongList_7C_28AJ_29V': (300, 6088,7020)
+          }
+
+        """
+        self.mirmpl_info_cache = {}
+
+    def init_new_mirmpl(self, mirmpl):
+        if not mirmpl in self.mirmpl_info_cache:
+            self.mirmpl_info_cache[mirmpl] = {}
+
+    def add_new_mirmpl_item(self, mirmpl, k, v):
+        self.mirmpl_info_cache[mirmpl][k] = v
+
+    def assign_new_mirmpl(self, mirmpl, d):
+        self.init_new_mirmpl(mirmpl)
+        self.mirmpl_info_cache[mirmpl] = dict(d)
+
+    def has_key(self, mirmpl):
+        return mirmpl in self.mirmpl_info_cache
+
+    def get_mirmpl_item(self, mirmpl, symbol):
+        if not mirmpl in self.mirmpl_info_cache:
+            if m_debug.Debug: m_debug.dbg_print("mirmpl", mirmpl, "not found in mirmpl info cache ")
+            return None
+        if not symbol in self.mirmpl_info_cache[mirmpl]:
+            if m_debug.Debug: m_debug.dbg_print("Maple label", symbol, "not found in mirmpl_info_cache[",mirmpl, "]" )
+            return None
+
+        if m_debug.Debug: m_debug.dbg_print("return ", self.mirmpl_info_cache[mirmpl][symbol])
+        return self.mirmpl_info_cache[mirmpl][symbol]
+
+    def get_mirmpl_list(self):
+        relist = [*self.mirmpl_info_cache]
+        relist.sort()
+        return relist
+
+    def get_symbol_list(self, mirmpl):
+        relist = [*self.mirmpl_info_cache[mirmpl]]
+        relist.sort()
+        return relist
+
 class MapleFileCache():
     def __init__(self):
         self.general_fullpath = {}
         self.src_file_lines   = {}
         self.asm_block_lines  = {}
+        self.mir_block_lines  = {}
 
     # api for general file short name, path and its combined fullpath.
     def in_general_fullpath(self, name, path):
@@ -235,6 +303,23 @@ class MapleFileCache():
         gdb_print("mgdb_rdata.asm_block_lines cache ==== ")
         gdb_print(str(self.asm_block_lines))
 
+    # api for mir block lines cache
+    def in_mir_block_lines(self, name, start):
+        return (name, start) in self.mir_block_lines
+
+    def add_mir_block_lines(self, name, start, lines):
+        self.mir_block_lines[(name, start)] = lines
+
+    def get_mir_block_lines(self, name, start):
+        return self.mir_block_lines[(name, start)]
+
+    def del_mir_block_lines(self):
+        self.mir_block_lines.clear()
+
+    def show_mir_block_lines(self):
+        gdb_print("mgdb_rdata.mir_block_lines cache ==== ")
+        gdb_print(str(self.mir_block_lines))
+
 class MapleGDBRuntimeData():
     """
     class MapleGDBRuntimeData is an object at runtime, create and manage
@@ -252,6 +337,7 @@ class MapleGDBRuntimeData():
         self.mirbin_info = MapleMirbinInfoIndex()
         self.class_def = MapleClassDefInfo()
         self.file_cache = MapleFileCache()
+        self.mirmpl_info = MapleMirmplInfoIndex()
         self.frame_change_counter = 0
 
     def update_frame_change_counter(self):
@@ -270,8 +356,6 @@ class MapleGDBRuntimeData():
         self.mirbin_info.init_new_asm(asm_file)
 
         d = m_asm.create_asm_mirbin_label_cache(asm_file)
-        if not d:
-            d = m_asm.create_asm_mirbin_label_cache(asm_file)
         self.mirbin_info_cache_assign(asm_file, d)
 
         if m_debug.Debug:
@@ -292,6 +376,37 @@ class MapleGDBRuntimeData():
 
     def get_mirbin_cache_symbol_list(self, asm_path):
         return self.mirbin_info.get_symbol_list(asm_path)
+
+    #####################################
+    # api for mirmpl_info_cache
+    #####################################
+    def create_mirmpl_info_cache(self, mirmpl_path):
+        if self.mirmpl_info_cache_has_key(mirmpl_path):
+            return
+
+        self.mirmpl_info.init_new_mirmpl(mirmpl_path)
+
+        d = m_mirmpl.create_mirmpl_label_cache(mirmpl_path)
+        self.mirmpl_info_cache_assign(mirmpl_path, d)
+
+        if m_debug.Debug:
+            count = len(self.mirmpl_info.mirmpl_info_cache[mirmpl_path].keys())
+            m_debug.dbg_print("mirmpl path ", mirmpl_path, count, "labels found")
+
+    def get_one_label_mirmpl_info_cache(self, mirmpl, label):
+        return self.mirmpl_info.get_mirmpl_item(mirmpl, label)
+
+    def mirmpl_info_cache_has_key(self, mirmpl):
+        return self.mirmpl_info.has_key(mirmpl)
+
+    def mirmpl_info_cache_assign(self, mirmpl, d):
+        self.mirmpl_info.assign_new_mirmpl(mirmpl, dict(d))
+
+    def get_mirmpl_cache_mirmpl_list(self):
+        return self.mirmpl_info.get_mirmpl_list()
+
+    def get_mirmpl_cache_symbol_list(self, mir_path):
+        return self.mirmpl_info.get_symbol_list(mir_path)
 
     #####################################
     # api for class_def_cache
@@ -349,9 +464,23 @@ class MapleGDBRuntimeData():
     def del_asmblock_lines(self):
         self.file_cache.del_asm_block_lines()
 
+    # api for mir block lines cache
+    def in_mirblock_lines(self, name, start):
+        return self.file_cache.in_mir_block_lines(name,start)
+
+    def add_mirblock_lines(self, name, start, lines):
+        self.file_cache.add_mir_block_lines(name, start, lines)
+
+    def get_mirblock_lines(self, name, start):
+        return self.file_cache.get_mir_block_lines(name, start)
+
+    def del_mirblock_lines(self):
+        self.file_cache.del_mir_block_lines()
+
     def show_file_cache(self):
         self.file_cache.show_asm_block_lines()
         self.file_cache.show_src_file_lines()
+        self.file_cache.show_mir_block_lines()
         self.file_cache.show_general_fullpath()
 
 
@@ -360,14 +489,19 @@ class MapleGDBRuntimeData():
     #####################################
     def update_gdb_runtime_data(self):
 
-        addr_offset, so_path, asm_path, func_header, frame  = m_frame.get_closest_maple_frame_func_lib_info()
+        addr_offset, so_path, asm_path, func_header, mirmpl_path = m_frame.get_newest_maple_frame_func_lib_info()
         if m_debug.Debug:
-            m_debug.dbg_print("addr_offset", addr_offset)
-            m_debug.dbg_print("so_path", so_path)
-            m_debug.dbg_print("asm_path", asm_path)
-            m_debug.dbg_print("func_header", func_header)
-        if not addr_offset or not so_path or not asm_path or not func_header or not frame:
+            m_debug.dbg_print("addr_offset=", addr_offset)
+            m_debug.dbg_print("so_path=", so_path)
+            m_debug.dbg_print("asm_path=", asm_path)
+            m_debug.dbg_print("func_header=", func_header)
+            m_debug.dbg_print("mirmpl_path=", mirmpl_path)
+        if not addr_offset or not so_path or not asm_path or not func_header or not mirmpl_path:
             return
+
+        if not self.mirmpl_info_cache_has_key(mirmpl_path):
+            gdb_print("create Maple mir.mpl cache using file: " + mirmpl_path)
+            self.create_mirmpl_info_cache(mirmpl_path)
 
         if not self.mirbin_info_cache_has_key(asm_path):
             gdb_print("create Maple symbol cache using file: " + asm_path)
@@ -394,19 +528,24 @@ def get_stack_frame_data(frame):
 
     returns:
        a dict contains following keys and values
-        'frame_func_src_info':  whatever m_asm.look_up_src_file_info() returns
+        'frame_func_src_info':  whatever m_asm.lookup_src_file_info() returns
                 {'short_src_file_name': a string. source code short name
                  'short_src_file_line': a int. source code file line
                  'asm_line': a int. line number where func_header_name offset is found in asm file
                  'asm_offset': a int. offset in the asm file co-repsonding to asm_line
+                 'mirmpl_line': a int. symbol block line in mir.mpl file
+                 'mirmpl_line_offset': a int. symbol block line offset in mir.mpl file
+                 'mir_instidx': a string. symbol block mir instidx offset, e.g. 0008 in both .s and .s file
                 }
         'frame_func_header_info':
                 {'func_name': func_name, string.
                  'so_path': so_path full path, a string
                  'asm_path': asm_path full path,a string
+                 'mirmpl_path': mir.mpl file full path. a string
                  'func_addr_offset': func_addr_offset, string in xxxx:yyyy: format
                  'func_header_name' : func_header_name, a string. e.g. xxxxxxxxxxx_mirbin_info
                  'func_header_asm_tuple': func_header_name_block_asm_tuple, (asm line, asm_start_offset, asm_end_offset)
+                 'func_header_mirmpl_tuple': func_header_name_block_mir_tuple, (mir line, mir_start_offset, mir_end_offset)
                 }
         'func_argus_locals': same return as m_asm.get_func_arguments() returns
                 {'locals_type': local variable type list, e.g. ['void', 'v2i64'],
@@ -417,11 +556,11 @@ def get_stack_frame_data(frame):
     """
     if m_debug.Debug: m_debug.dbg_print("==== get_stack_frame_data =====")
 
-    func_addr_offset, so_path, asm_path, func_header, frame = m_frame.get_maple_frame_func_lib_info(frame)
+    func_addr_offset, so_path, asm_path, func_header, mirmpl_path = m_frame.get_maple_frame_func_lib_info(frame)
     if m_debug.Debug:
         m_debug.dbg_print("func_addr_offset =", func_addr_offset, "func_header=", func_header)
-        m_debug.dbg_print("so_path =", so_path, "asm_path=", asm_path)
-    if not func_addr_offset or not so_path or not asm_path or not func_header:
+        m_debug.dbg_print("so_path =", so_path, "asm_path=", asm_path, "mirmpl_path=", mirmpl_path)
+    if not func_addr_offset or not so_path or not asm_path or not func_header or not mirmpl_path:
         return None
 
     ### get the function label of the frame
@@ -445,6 +584,12 @@ def get_stack_frame_data(frame):
         if m_debug.Debug: m_debug.dbg_print("create mirbin info cache for asm file", asm_path)
         mgdb_rdata.create_mirbin_info_cache(asm_path)
 
+    # if mirmpl_info_cache for this mir.mpl file is not created yet in m_datastore, create it
+    # if not m_datastore.mgdb_rdata.mirmpl_info_cache_has_key(mirmpl_path):
+    if not mgdb_rdata.mirmpl_info_cache_has_key(mirmpl_path):
+        if m_debug.Debug: m_debug.dbg_print("create mirmpl info cache for mirmpl file", mirmpl_path)
+        mgdb_rdata.create_mirmpl_info_cache(mirmpl_path)
+
     asm_line_tuple = mgdb_rdata.get_one_label_mirbin_info_cache(asm_path, func_header_name)
     if not asm_line_tuple:
         return None
@@ -453,10 +598,10 @@ def get_stack_frame_data(frame):
         m_debug.dbg_print("func_addr_offset=", func_addr_offset)
         m_debug.dbg_print("func_addr_offset.split(':')[1]=", func_addr_offset.split(':')[1])
     func_addr_offset_pc = func_addr_offset.split(':')[1]
-    d = m_asm.look_up_src_file_info(asm_path, asm_line_tuple[0], asm_line_tuple[1], asm_line_tuple[2],\
+    d = m_asm.lookup_src_file_info(asm_path, asm_line_tuple[0], asm_line_tuple[1], asm_line_tuple[2],\
                                               func_addr_offset_pc)
     if not d:
-        if m_debug.Debug: m_debug.dbg_print("look_up_src_file_info returns None")
+        if m_debug.Debug: m_debug.dbg_print("lookup_src_file_info returns None")
         return None
     if m_debug.Debug: m_debug.dbg_print("first round returns dict d:", d)
 
@@ -466,11 +611,31 @@ def get_stack_frame_data(frame):
     if not d['short_src_file_name'] and (func_addr_offset_pc == '0000' or d['short_src_file_line'] == -1) and d['asm_offset'] != 0 and d['asm_line'] != 0:
         if m_debug.Debug: m_debug.dbg_print("func offset pc is 0000, check short_src_file again")
         d['short_src_file_name'], d['short_src_file_line'] = \
-            m_asm.look_up_next_src_file_info(asm_path, d['asm_line'], d['asm_offset'])
+            m_asm.lookup_next_src_file_info(asm_path, d['asm_line'], d['asm_offset'])
         if m_debug.Debug: m_debug.dbg_print("second round for func offset pc 0000 returns dict d:", d)
+
+    # read the mpl.mir.mpl file, get the func_addr_offset_pc line and offset at .mpl.mir.mpl file
+    # note, func_header_name ends with symbol_mirbin_info, while mir.mpl's symbol has no '_mirbin_info'
+    #print("mirmpl_path=",mirmpl_path, "func_header_name[:-12]=",func_header_name[:-12])
+    mirmpl_line_tuple = mgdb_rdata.get_one_label_mirmpl_info_cache(mirmpl_path, func_header_name[:-12])
+    mir_instidx = d['mir_instidx']
+    #print("mirmpl_line_tuple=",mirmpl_line_tuple, "mir_instidx=", mir_instidx)
+    d_mirmpl = m_mirmpl.lookup_mirmpl_info(mirmpl_path, mirmpl_line_tuple, mir_instidx)
+    #rint("d_mirmpl=",d_mirmpl)
+    # dictionary of d_mirmpl: {'mirmpl_line': int, 'mirmpl_Line_offset': int}
+    if not d_mirmpl:
+        if m_debug.Debug: m_debug.dbg_print("lookup_mirmpl_info returns None")
+        return None
+    if m_debug.Debug: m_debug.dbg_print("m_mirmpl.lookup_mirmpl_info() returns dict d_mirmpl:", d_mirmpl)
+
+    # merge two dictionaries
+    d = {**d, **d_mirmpl}
+    if m_debug.Debug: m_debug.dbg_print("After merging asm_d and mirmpl_d:", d)
 
     asm_line_offset = asm_line_tuple[1]
     asm_line_num = d['asm_line']
+    mirmpl_line_num = d['mirmpl_line']
+    mirmpl_line_offset = d['mirmpl_line_offset']
     src_file_short_name = d['short_src_file_name']
     src_file_line = d['short_src_file_line']
 
@@ -487,10 +652,12 @@ def get_stack_frame_data(frame):
     rdata['frame_func_src_info']    = d
     rdata['frame_func_header_info'] = { 'so_path': so_path, \
                                         'asm_path': asm_path, \
+                                        'mirmpl_path': mirmpl_path, \
                                         'func_addr_offset': func_addr_offset, \
                                         'func_name': func_name, \
                                         'func_header_name' : func_header_name, \
-                                        'func_header_asm_tuple': asm_line_tuple \
+                                        'func_header_asm_tuple': asm_line_tuple, \
+                                        'func_header_mirmpl_tuple': mirmpl_line_tuple \
                                       }
     rdata['func_argus_locals']     =  func_argus_locals
 

@@ -1,0 +1,9 @@
+set logging file /dev/null
+set logging redirect on
+set logging on
+set args -Xbootclasspath:libcore.so -classpath ./HelloWorld.so HelloWorld "子贡问曰：“有一言而可以终生行之者乎？“子曰：“其恕乎。己所不欲，勿施于人。”"
+set logging off
+mb LHelloWorld_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
+run
+mprint *(void**)(caller->operand_stack[caller->sp].x.a64 + 16)
+quit

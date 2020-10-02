@@ -23,6 +23,8 @@ import m_debug
 import m_asm
 import m_list
 import m_stepi
+import m_set
+import m_inf
 
 #def get_current_stack_level():
 #    """ get the stack level from the newest frame """
@@ -44,6 +46,9 @@ def mni_common():
     new_frame = m_frame.get_newest_frame()
     #end_level_num   = get_current_stack_level()
 
+    if not new_frame:
+        return
+
     if new_frame != prev_frame and prev_frame.is_valid():
         #assert start_level_num < end_level_num
         m_stepi.silent_finish()
@@ -52,8 +57,9 @@ def mni_common():
     #    assert start_level_num >= end_level_num
 
     # a trigger point to update m_datastore caches
-    m_datastore.mgdb_rdata.update_gdb_runtime_data()
-    m_datastore.mgdb_rdata.update_frame_change_counter()
+    if m_inf.is_inferior_running():
+        m_datastore.mgdb_rdata.update_gdb_runtime_data()
+        m_datastore.mgdb_rdata.update_frame_change_counter()
 
 def mni_display_last_opcodes():
     # to display the latest instructions will be executed after this command
@@ -64,6 +70,9 @@ def mni_display_last_opcodes():
     if not ds:
         return
     if m_debug.Debug: m_debug.dbg_print("retrieved ds=", ds)
+
+    if m_set.msettings['stack'] == 'on':
+        m_util.gdb_exec('mlocal -stack')
 
     asm_path = ds['frame_func_header_info']['asm_path']
     asm_line = ds['frame_func_src_info']['asm_line']
@@ -97,15 +106,27 @@ class MapleNextiCmd(gdb.Command):
 
     def usage(self):
         gdb_print ("mnexti: Steps one Maple instruction, but proceeds through subroutine calls")
+        gdb_print ("mnexti [num]: Steps num Maple instructions, but proceeds through subroutine calls")
 
     def mni_func(self, args, from_tty):
         s = args.split()
-        if len(s) > 0: # msi into next Maple instruction
+        if len(s) > 1: # msi into next Maple instruction
             self.usage()
             return
-        mni_common()
-        mni_display_last_opcodes()
-        m_util.gdb_exec('display')
+        if len(s) == 0:
+            mni_common()
+        elif len(s) == 1 and s[0].isdigit():
+            for i in range(int(s[0])):
+                if m_inf.is_inferior_running(): mni_common()
+                else:
+                    break
+        else:
+            self.usage()
+            return
+
+        if m_inf.is_inferior_running():
+            mni_display_last_opcodes()
+            m_util.gdb_exec('display')
 
         return
 

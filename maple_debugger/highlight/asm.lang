@@ -1,0 +1,56 @@
+Description="Maple ASM"
+
+Digits=[[0x[0-9a-f]+]]
+
+Keywords={
+  { Id=1,
+    Regex=[[OP_\w+]],
+  },
+  { Id=2,
+    List={
+"ascii",
+"byte",
+"comm",
+"data",
+"file",
+"global",
+"hidden",
+"local",
+"long",
+"p2align",
+"quad",
+"rodata",
+"section",
+"short",
+"size",
+"type",
+"weak",
+"word",
+  },
+  },
+  { Id=3,
+    Regex=[[mirbin_label_\w+|L\w+:]]
+  },
+  { Id=4,
+    Regex=[[%+\w+]],
+  },
+  { Id=5,
+    Regex=[[\/\/ (\d\w\w\w)]],
+  },
+  { Id=6,
+    Regex=[[\/\/ LINE.*]],
+  },
+}
+
+Strings={
+  Delimiter=[["|']],
+}
+
+IgnoreCase=true
+
+Comments={
+  { Block=false,
+    Delimiter={[[;]]},
+  },
+}
+

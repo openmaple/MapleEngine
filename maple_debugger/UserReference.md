@@ -174,7 +174,18 @@ Maple Traceback (most recent call first):
 #4 libcore.so:0x26d1180:0010: Ljava_2Flang_2FThreadGroup_3B_7C_3Cinit_3E_7C_28Ljava_2Flang_2FThreadGroup_3BLjava_2Flang_2FString_3B_29V(a64<java.lang.ThreadGroup> %3=0x150a0 "\310\001\020\365\377\177", a64<java.lang.ThreadGroup> %1=0x15058 "\310\001\020\365\377\177", a64<java.lang.String> %4=0x120b8 "\270\376\017\365\377\177") at //home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s:5882045
 ```
 **Note**: This is exact same Maple backtrace, but the source file is assembly file. For example, **_//home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s_** is the assembly file,  line number is **_5882045_** in the assmebly file.
-#### 3. View a full backtrace mixed with Maple frames and gdb native frames
+#### 3. View Maple backtrace in Maple IR format
+Execute 'mbt -mir' command
+Example:
+```
+(gdb) mbt -mir
+Maple Traceback (most recent call first):
+#0 libcore.so:0x2720108:0320: Ljava_2Futil_2FHashtable_3B_7Cput_7C_28Ljava_2Flang_2FObject_3BLjava_2Flang_2FObject_3B_29Ljava_2Flang_2FObject_3B(a64<java.util.Properties> %13=0x1f058 "\260\202\022\365\377\177", a64<java.lang.String> %17=0x12638 "", a64<java.lang.String> %14=0x12658 "") at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl:2700423
+#15 libcore.so:0x7989a1c:00ec: Ljava_2Flang_2FSystem_3B_7CinitProperties_7C_28Ljava_2Futil_2FProperties_3B_29Ljava_2Futil_2FProperties_3B(a64<java.util.Properties> %1=0x1f058 "\260\202\022\365\377\177") at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl:13113755
+#17 libcore.so:0x888ce38:0098: Ljava_2Flang_2FSystem_3B_7CinitializeSystemClass_7C_28_29V() at /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl:14922166
+```
+**Note**: This is an example to show mbt command in Maple MIR format. **_//home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl_** is the MIR instruction file,  line number is **_14922166_** in the mir.mpl file.
+#### 4. View a full backtrace mixed with Maple frames and gdb native frames
 Execute 'mbt -full' command
 Example:
 ```
@@ -590,7 +601,7 @@ asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImp
       355832    .byte OP_regread, 0xe, 0x1, 0x0                   // 00a0: %5
       355833    .byte OP_regread, 0xe, 0xfd, 0xff                 // 00a4: %6
 ```
-#### 6. mlist .
+#### 7. mlist .
 Lists code located by the filename and line number of current Maple frame
 Example:
 ```
@@ -618,7 +629,7 @@ src file: /home/test/my_openjdk8/jdk/src/share/classes/sun/util/PreHashedMap.jav
      120      *
 
 ```
-#### 7. mlist -asm:.
+#### 8. mlist -asm:.
 Lists code located by the filename and line number of current Maple frame
 ```
 (gdb) mbt -asm
@@ -648,6 +659,131 @@ asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImp
       355837    .byte OP_intrinsiccall, 0x0, 0x29, 0x1            // 00b0: MPL_CLEANUP_LOCALREFVARS
       355838    .byte OP_return, 0x0, 0x0, 0x0                    // 00b4
 ```
+#### 9. mlist -mir
+Lists Maple IR located by the filename and line number of current Maple frame. User can cross check with
+the result of mlist -asm command
+```
+(gdb) mlist -mir
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl line: 2700423
+     2700414 LOC 5845 473
+     2700415   regassign a64 %18 (regread a64 %20)
+     2700416   dassign %Reg0_R20359 0 (regread a64 %18)
+     2700417   #LINE Hashtable.java : 473, INSTIDX : 81||0051:  areturn
+     2700418   call &MCC_SyncExitFast (regread a64 %13)
+     2700419   intrinsiccall MPL_CLEANUP_LOCALREFVARS_SKIP (dread a64 %Reg0_R159247, dread a64 %Reg9_R20359, dread a64 %Reg0_R159245, dread a64 %Reg10_R20359, dread a64 %Reg0_R20359)
+     2700420   return (regread a64 %18)
+     2700421 @label267857   #LINE Hashtable.java : 469, INSTIDX : 82||0052:  aload 6
+     2700422 LOC 5845 469
+=>   2700423   #LINE Hashtable.java : 469, INSTIDX : 84||0054:  getfield
+     2700424   #intrinsiccallassigned : unknown
+     2700425   call &MCC_LoadRefField_NaiveRCFast (
+     2700426     regread a64 %19,
+     2700427     add a64 (regread a64 %19, constval a64 32))
+     2700428   regassign a64 %6 (regread a64 %%retval0)
+     2700429   call &MCC_DecRef_NaiveRCFast (dread a64 %Reg0_R159245)
+     2700430   regassign a64 %21 (regread a64 %6)
+     2700431   dassign %Reg0_R159245 0 (regread a64 %21)
+     2700432   #LINE Hashtable.java : 469, INSTIDX : 87||0057:  astore 6
+     2700433   call &MCC_IncDecRef_NaiveRCFast (regread a64 %21, regread a64 %19)
+
+```
+#### 10. mlist -mir:+|-[num]
+Lists current Maple IR offsetting from previous listed line. offset can be + or -
+```
+(gdb) mlist -mir
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl line: 2700423
+     2700414 LOC 5845 473
+     2700415   regassign a64 %18 (regread a64 %20)
+     2700416   dassign %Reg0_R20359 0 (regread a64 %18)
+     2700417   #LINE Hashtable.java : 473, INSTIDX : 81||0051:  areturn
+     2700418   call &MCC_SyncExitFast (regread a64 %13)
+     2700419   intrinsiccall MPL_CLEANUP_LOCALREFVARS_SKIP (dread a64 %Reg0_R159247, dread a64 %Reg9_R20359, dread a64 %Reg0_R159245, dread a64 %Reg10_R20359, dread a64 %Reg0_R20359)
+     2700420   return (regread a64 %18)
+     2700421 @label267857   #LINE Hashtable.java : 469, INSTIDX : 82||0052:  aload 6
+     2700422 LOC 5845 469
+=>   2700423   #LINE Hashtable.java : 469, INSTIDX : 84||0054:  getfield
+     2700424   #intrinsiccallassigned : unknown
+     2700425   call &MCC_LoadRefField_NaiveRCFast (
+     2700426     regread a64 %19,
+     2700427     add a64 (regread a64 %19, constval a64 32))
+     2700428   regassign a64 %6 (regread a64 %%retval0)
+     2700429   call &MCC_DecRef_NaiveRCFast (dread a64 %Reg0_R159245)
+     2700430   regassign a64 %21 (regread a64 %6)
+     2700431   dassign %Reg0_R159245 0 (regread a64 %21)
+     2700432   #LINE Hashtable.java : 469, INSTIDX : 87||0057:  astore 6
+     2700433   call &MCC_IncDecRef_NaiveRCFast (regread a64 %21, regread a64 %19)
+(gdb) mlist -mir:+10
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl line: 2700433
+     2700424   #intrinsiccallassigned : unknown
+     2700425   call &MCC_LoadRefField_NaiveRCFast (
+     2700426     regread a64 %19,
+     2700427     add a64 (regread a64 %19, constval a64 32))
+     2700428   regassign a64 %6 (regread a64 %%retval0)
+     2700429   call &MCC_DecRef_NaiveRCFast (dread a64 %Reg0_R159245)
+     2700430   regassign a64 %21 (regread a64 %6)
+     2700431   dassign %Reg0_R159245 0 (regread a64 %21)
+     2700432   #LINE Hashtable.java : 469, INSTIDX : 87||0057:  astore 6
+=>   2700433   call &MCC_IncDecRef_NaiveRCFast (regread a64 %21, regread a64 %19)
+     2700434   regassign a64 %19 (regread a64 %21)
+     2700435   dassign %Reg9_R20359 0 (regread a64 %19)
+     2700436 @@m11   #LINE Hashtable.java : 469, INSTIDX : 39||0027:  aload 6
+     2700437   #LINE Hashtable.java : 469, INSTIDX : 41||0029:  ifnull
+     2700438   brfalse @@m6 (eq i32 a64 (regread a64 %21, constval a64 0))
+     2700439 @label267858   try { @label267859 }
+     2700440   #LINE Hashtable.java : 477, INSTIDX : 92||005c:  aload_0
+     2700441 LOC 5845 477
+     2700442   #LINE Hashtable.java : 477, INSTIDX : 93||005d:  iload 4
+     2700443   #LINE Hashtable.java : 477, INSTIDX : 95||005f:  aload_1
+(gdb) mlist -mir:-8
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl line: 2700425
+     2700416   dassign %Reg0_R20359 0 (regread a64 %18)
+     2700417   #LINE Hashtable.java : 473, INSTIDX : 81||0051:  areturn
+     2700418   call &MCC_SyncExitFast (regread a64 %13)
+     2700419   intrinsiccall MPL_CLEANUP_LOCALREFVARS_SKIP (dread a64 %Reg0_R159247, dread a64 %Reg9_R20359, dread a64 %Reg0_R159245, dread a64 %Reg10_R20359, dread a64 %Reg0_R20359)
+     2700420   return (regread a64 %18)
+     2700421 @label267857   #LINE Hashtable.java : 469, INSTIDX : 82||0052:  aload 6
+     2700422 LOC 5845 469
+     2700423   #LINE Hashtable.java : 469, INSTIDX : 84||0054:  getfield
+     2700424   #intrinsiccallassigned : unknown
+=>   2700425   call &MCC_LoadRefField_NaiveRCFast (
+     2700426     regread a64 %19,
+     2700427     add a64 (regread a64 %19, constval a64 32))
+     2700428   regassign a64 %6 (regread a64 %%retval0)
+     2700429   call &MCC_DecRef_NaiveRCFast (dread a64 %Reg0_R159245)
+     2700430   regassign a64 %21 (regread a64 %6)
+     2700431   dassign %Reg0_R159245 0 (regread a64 %21)
+     2700432   #LINE Hashtable.java : 469, INSTIDX : 87||0057:  astore 6
+     2700433   call &MCC_IncDecRef_NaiveRCFast (regread a64 %21, regread a64 %19)
+     2700434   regassign a64 %19 (regread a64 %21)
+     2700435   dassign %Reg9_R20359 0 (regread a64 %19)
+```
+#### 11. mlist -mir:.
+Lists Maple IR located by the filename and line number of current Maple frame
+```
+(gdb) mlist -mir:.
+asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl line: 2700423
+     2700414 LOC 5845 473
+     2700415   regassign a64 %18 (regread a64 %20)
+     2700416   dassign %Reg0_R20359 0 (regread a64 %18)
+     2700417   #LINE Hashtable.java : 473, INSTIDX : 81||0051:  areturn
+     2700418   call &MCC_SyncExitFast (regread a64 %13)
+     2700419   intrinsiccall MPL_CLEANUP_LOCALREFVARS_SKIP (dread a64 %Reg0_R159247, dread a64 %Reg9_R20359, dread a64 %Reg0_R159245, dread a64 %Reg10_R20359, dread a64 %Reg0_R20359)
+     2700420   return (regread a64 %18)
+     2700421 @label267857   #LINE Hashtable.java : 469, INSTIDX : 82||0052:  aload 6
+     2700422 LOC 5845 469
+=>   2700423   #LINE Hashtable.java : 469, INSTIDX : 84||0054:  getfield
+     2700424   #intrinsiccallassigned : unknown
+     2700425   call &MCC_LoadRefField_NaiveRCFast (
+     2700426     regread a64 %19,
+     2700427     add a64 (regread a64 %19, constval a64 32))
+     2700428   regassign a64 %6 (regread a64 %%retval0)
+     2700429   call &MCC_DecRef_NaiveRCFast (dread a64 %Reg0_R159245)
+     2700430   regassign a64 %21 (regread a64 %6)
+     2700431   dassign %Reg0_R159245 0 (regread a64 %21)
+     2700432   #LINE Hashtable.java : 469, INSTIDX : 87||0057:  astore 6
+     2700433   call &MCC_IncDecRef_NaiveRCFast (regread a64 %21, regread a64 %19)
+```
+
 ## Maple Data Commands
 ### mlocal command
 This command displays the stack frame local varibles' value and dynamic stack data.

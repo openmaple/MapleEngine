@@ -13,6 +13,7 @@
 # See the MulanPSL - 2.0 for more details.
 #
 
+import pickle
 import m_util
 import m_debug
 
@@ -63,24 +64,30 @@ MAPLE_TYPES = [
     'Derived'       #index 0x2a
 ]
 
-def create_asm_mirbin_label_cache(asm_path, proc_saved = {}):
+def create_asm_mirbin_label_cache(asm_path, popen_only = False, proc_saved = {}):
     """ Create a dictionary for a given asm file
         When it is called the first time with a given asm file, it starts
         a subprocess to handle the asm file and returns None;
         When called subsequently using the same asm file, it will wait for the
         first subprocess to finish and return a dictionary created from its output.
     """
-    if asm_path in proc_saved:
-        d = m_util.proc_communicate(proc_saved.pop(asm_path))
-        return eval(d)
-    cmd="bash -c \"paste <(grep -bn _mirbin_info: '" + asm_path \
-        + "') <(grep -Fb .cfi_endproc '" + asm_path \
-        + "')\" | awk -F: -v a='\"' -v b='\":(' -v c=',' -v d='),' " \
-        + "'BEGIN { print \"{\" } { print a$3b$1c$2c$4d } END { print \"}\" }'"
-    proc_saved[asm_path] = m_util.proc_popen(cmd)
-    return None
+    if not asm_path:
+        for p in proc_saved.values():
+            m_util.proc_communicate(p)
+        return None
+    if asm_path not in proc_saved:
+        cmd="bash -c \"paste <(grep -bn _mirbin_info: '" + asm_path \
+            + "') <(grep -Fb .cfi_endproc '" + asm_path \
+            + "')\" | awk -F: -v a='\"' -v b='\":(' -v c=',' -v d='),' " \
+              "'BEGIN { print \"import pickle\\nimport sys\\nd={\" } " \
+              "{ print a$3b$1c$2c$4d } END { print \"}\\no=pickle.dumps(d,3)\\n" \
+              "sys.stdout.write(o.decode(\\\"latin1\\\"))\" }' | python3"
+        proc_saved[asm_path] = m_util.proc_popen(cmd)
+    if popen_only: return None
+    d = m_util.proc_communicate(proc_saved.pop(asm_path))
+    return pickle.loads(d)
 
-def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func_pc_offset):
+def lookup_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func_pc_offset):
     """
       for a given Maple symbol block a given func_pc_offset, get the corresponding
       source code information.
@@ -101,6 +108,7 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
             'short_src_file_line': int. source code line number. -1 means MPI_CLINIT_CHECK line
             'asm_line': int. line num where the source code info was found in asm file
             'asm_offset': int. offset of the asm file were source code info was found.
+            'mir_instidx': string. this is at the same line with // LINE, but it is same to .mpl.mir.mpl file
         }
     """
     if m_debug.Debug: m_debug.dbg_print("func_pc_offset=", func_pc_offset, " asm_path=", asm_path, \
@@ -119,6 +127,7 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
     src_info_line = None
     short_src_file_name = None
     short_src_file_linenum = None
+    mir_instidx = None
     last_opcode_line_pc = None
     this_line_pc = 0
     stop_on_next_byte_opcode = False
@@ -141,6 +150,8 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
                 x = src_info_line.split()
                 short_src_file_name = x[2]
                 short_src_file_linenum = int(x[4][:-1])
+                ## // LINE Throwable.java : 216, INSTIDX : 34||0022:  putstatic
+                mir_instidx = src_info_line.split('INSTIDX : ')[1].split(':')[0].split('||')[1]
 
             f.close()
             d = {}
@@ -148,6 +159,7 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
             d["short_src_file_line"] = short_src_file_linenum
             d["asm_line"] = line_num
             d["asm_offset"] = offset
+            d['mir_instidx'] = mir_instidx
             if m_debug.Debug: m_debug.dbg_print("result in dict ", d)
             return d
         elif ".byte OP_" in line:
@@ -164,6 +176,8 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
                     x = src_info_line.split()
                     short_src_file_name = x[2]
                     short_src_file_linenum = int(x[4][:-1])
+                    ## // LINE Throwable.java : 216, INSTIDX : 34||0022:  putstatic
+                    mir_instidx = src_info_line.split('INSTIDX : ')[1].split(':')[0].split('||')[1]
 
                 f.close()
                 d = {}
@@ -171,6 +185,7 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
                 d["short_src_file_line"] = short_src_file_linenum
                 d["asm_line"] = line_num
                 d["asm_offset"] = offset
+                d['mir_instidx'] = mir_instidx
                 if m_debug.Debug: m_debug.dbg_print("result in dict ", d)
                 return d
 
@@ -203,7 +218,7 @@ def look_up_src_file_info(asm_path, label_asm_ln, start_offset, end_offset, func
     f.close()
     return None
 
-def look_up_next_src_file_info(asm_path, asm_line, asm_offset):
+def lookup_next_src_file_info(asm_path, asm_line, asm_offset):
     """
       for a given asm file and asm line number and offset of the asm line number, return the next
       source file name and line.

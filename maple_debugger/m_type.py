@@ -206,11 +206,11 @@ def display_symbol_detail(symbol_name, symbol_asm_path):
         return
 
     data = m_datastore.mgdb_rdata.get_one_label_mirbin_info_cache(symbol_asm_path,symbol_name)
-    d = m_asm.look_up_src_file_info(symbol_asm_path, data[0], data[1], data[2], "0000")
+    d = m_asm.lookup_src_file_info(symbol_asm_path, data[0], data[1], data[2], "0000")
     if not d:
         return
 
-    short_src_file_name, short_src_file_line = m_asm.look_up_next_src_file_info(symbol_asm_path,\
+    short_src_file_name, short_src_file_line = m_asm.lookup_next_src_file_info(symbol_asm_path,\
                                                                                 d["asm_line"], d['asm_offset'])
 
     file_full_path = None

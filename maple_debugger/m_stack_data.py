@@ -150,5 +150,5 @@ class MapleLocalCmd(gdb.Command):
             report_count += 1
 
         if report_count == 0:
-            gdb_print("evaluated stack: empty")
+            gdb_print("evaluation stack: empty")
         return

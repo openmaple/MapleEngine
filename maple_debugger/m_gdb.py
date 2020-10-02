@@ -32,6 +32,7 @@ from m_type import MapleTypeCmd, MapleSymbolCmd
 from m_help import MapleHelpCmd
 import m_util
 import m_set
+import m_event
 
 def init_alert():
     m_util.gdb_print("\n"
@@ -65,6 +66,7 @@ def init_gdb():
     m_util.gdb_exec('set auto-load python-scripts off')
     m_util.enable_color_output(m_util.is_interactive())
     sys.excepthook = debugger_exception_handler
+    m_event.init_event_handlers()
 
 def main():
     ver = gdb.VERSION.split('.')
