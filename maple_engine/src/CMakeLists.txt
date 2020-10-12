@@ -41,7 +41,7 @@ endif()
 include_directories (AFTER PUBLIC 
 	/usr/include/
 	${CMAKE_CURRENT_SOURCE_DIR}/../include
-	${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/md5/include/
+	${BASE_INC_DIR}/../huawei_secure_c/include
 	${BASE_INC_DIR}/
 	${BASE_INC_DIR}/mempool/include
 	${BASE_INC_DIR}/maple_util/include
