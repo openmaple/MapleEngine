@@ -1234,7 +1234,8 @@ label_exception_handler:
           continue;
 
         // 2B for each local var; clean up based on the 2nd byte, which is a flag.
-        if(locals_table[2*i+1] == 2 || locals_table[2*i+1] == 3) { // flag==2: parameters of CLEANUP_LOCALREFVARS; flag==3: CLEANUP_LOCALREFVARS not called
+        if(locals_table[2*i+1] == 1 || locals_table[2*i+1] == 2 || locals_table[2*i+1] == 3) {
+        // flag==1: local ref, not parameter of CLEANUP_LOCALREFVARS; flag==2: parameters of CLEANUP_LOCALREFVARS; flag==3: CLEANUP_LOCALREFVARS not called
           void* ref = (void*)func.operand_stack[i].x.a64;
           if(ref) {
             MCC_DecRef_NaiveRCFast(ref);
@@ -1243,12 +1244,6 @@ label_exception_handler:
           void* ref = (void*)func.operand_stack[i].x.a64;
           if(ref) {
             MCC_IncRef_NaiveRCFast(ref);
-          }
-        }
-        else if(locals_table[2*i+1] == 1) { // flag==1: local refs; --RC if it is thrownval
-          void* ref = (void*)func.operand_stack[i].x.a64;
-          if(ref == thrownval) {
-            MCC_DecRef_NaiveRCFast(ref);
           }
         }
       }

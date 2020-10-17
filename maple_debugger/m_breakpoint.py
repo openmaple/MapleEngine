@@ -274,7 +274,7 @@ class MapleBreakpoint(gdb.Breakpoint):
         when enabled maple breakpoints reach to 0, we disable the breakpint of maple::maple_invoke_method
         for better performance. When enabled maple breakpoints changes from 0 to 1 or more, we enable the
         breakpoint maple::maple_invoke_method.
-        However, if the maple::maple_invoke_method is pending, we do not do anything since it is not 
+        However, if the maple::maple_invoke_method is pending, we do not do anything since it is not
         activated yet
 
         However, the beter way to do this is to use mbp_id.enabled = True or False to enable or disable
@@ -301,3 +301,11 @@ class MapleBreakpoint(gdb.Breakpoint):
         else:
             # enable this breakpoint
             update_maple_invoke_bp(buf, True)
+
+    def clearup_mbp_symbol_related_data(self):
+        for mspec in self.mbp_table:
+            self.mbp_table[mspec]['address'] = 0
+            self.mbp_table[mspec]['hex_addr'] = None
+
+        self.mbp_addr_sym_table = {}
+        self.load_objfiles = 0

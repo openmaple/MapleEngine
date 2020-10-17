@@ -228,7 +228,8 @@ class MapleStepiCmd(gdb.Command):
         self.mbp_object.set_bp_attr('thread', threadno)
         self.mbp_object.set_bp_attr('count', count)
         assert count > 0
-        self.mbp_object.ignore_count = count - 1
+        if self.mbp_object.ignore_count != count - 1:
+            self.mbp_object.ignore_count = count - 1
 
         hitcnt = self.mbp_object.hit_count
         # It is important to perform a continue command here for the msi breakpoint

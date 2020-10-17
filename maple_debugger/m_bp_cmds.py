@@ -105,6 +105,8 @@ class MapleBreakpointCmd(gdb.Command):
                 self.listall_breakpoint()
             elif x[0] == '-debug' :
                 self.debug()
+            elif x[0] == '-restart' :
+                self.clearup_bp_symbol_data()
             elif x[0][0] != '-' : # a symbol is passed in
                 self.set_breakpoint(x[0])
             else:
@@ -298,3 +300,7 @@ class MapleBreakpointCmd(gdb.Command):
             if v['index'] == index:
                 return k
         return None
+
+    def clearup_bp_symbol_data(self):
+        if self.mbp_object:
+            self.mbp_object.clearup_mbp_symbol_related_data()

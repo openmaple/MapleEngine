@@ -1237,6 +1237,10 @@ extern "C" jobject Ljava_2Flang_2FClass_3B_7CgetEnclosingMethod_7C_28_29Ljava_2F
 extern "C" jobject Ljava_2Flang_2FClass_3B_7CgetEnclosingMethod_7C_28_29Ljava_2Flang_2Freflect_2FMethod_3B(jobject jThis) {
 return Ljava_2Flang_2FClass_3B_7CgetEnclosingMethod_7C_28_29Ljava_2Flang_2Freflect_2FMethod_3B_(jThis);
 }
+extern "C" jobject Ljava_2Flang_2FClass_3B_7CgetEnumConstantsShared_7C_28_29ALjava_2Flang_2FObject_3B_ (jobject jThis) ;
+extern "C" jobject Ljava_2Flang_2FClass_3B_7CgetEnumConstantsShared_7C_28_29ALjava_2Flang_2FObject_3B (jobject jThis) {
+return Ljava_2Flang_2FClass_3B_7CgetEnumConstantsShared_7C_28_29ALjava_2Flang_2FObject_3B_(jThis);
+}
 extern "C" jobject Ljava_2Flang_2FClass_3B_7CgetField_7C_28Ljava_2Flang_2FString_3B_29Ljava_2Flang_2Freflect_2FField_3B_ (jobject javaThis, jstring name) ;
 extern "C" jobject Ljava_2Flang_2FClass_3B_7CgetField_7C_28Ljava_2Flang_2FString_3B_29Ljava_2Flang_2Freflect_2FField_3B (jobject javaThis, jstring name) {
 return Ljava_2Flang_2FClass_3B_7CgetField_7C_28Ljava_2Flang_2FString_3B_29Ljava_2Flang_2Freflect_2FField_3B_(javaThis, name);
@@ -1319,6 +1323,10 @@ extern "C" void Ljava_2Flang_2Freflect_2FAccessibleObject_3B_7CsetAccessible0_7C
 extern "C" void Ljava_2Flang_2Freflect_2FAccessibleObject_3B_7CsetAccessible0_7C_28Ljava_2Flang_2Freflect_2FAccessibleObject_3BZ_29V(jobject thisobj, jboolean flag) {
 Ljava_2Flang_2Freflect_2FAccessibleObject_3B_7CsetAccessible0_7C_28Ljava_2Flang_2Freflect_2FAccessibleObject_3BZ_29V_(thisobj, flag);
 return;
+}
+extern "C" jboolean Ljava_2Flang_2Freflect_2FConstructor_3B_7Cequals_7C_28Ljava_2Flang_2FObject_3B_29Z_(jobject javaThis, jobject obj) ;
+extern "C" jboolean Ljava_2Flang_2Freflect_2FConstructor_3B_7Cequals_7C_28Ljava_2Flang_2FObject_3B_29Z(jobject javaThis, jobject obj) {
+return Ljava_2Flang_2Freflect_2FConstructor_3B_7Cequals_7C_28Ljava_2Flang_2FObject_3B_29Z_(javaThis, obj);
 }
 extern "C" jclass Ljava_2Flang_2Freflect_2FConstructor_3B_7CgetDeclaringClass_7C_28_29Ljava_2Flang_2FClass_3B_(jobject javaThis) ;
 extern "C" jclass Ljava_2Flang_2Freflect_2FConstructor_3B_7CgetDeclaringClass_7C_28_29Ljava_2Flang_2FClass_3B(jobject javaThis) {

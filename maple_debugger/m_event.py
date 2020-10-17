@@ -23,6 +23,7 @@ from m_util import MColors
 import m_datastore
 import m_inf
 import m_info
+import m_stepi
 
 def create_libcore_label_cache(base_path):
     asm_path = base_path + '/libcore.VtableImpl.s'
@@ -49,14 +50,38 @@ def event_new_objfile_handler(e):
 def event_exited_handler(e):
     """event handler to do cleanup
     """
-    m_mirmpl.create_mirmpl_label_cache(None)
-    m_asm.create_asm_mirbin_label_cache(None)
+    # clearup the number of loaded objfiles and so that for old stale cached_proc_mapping
+    m_info.num_objfiles = 0
+    m_info.cached_proc_mapping = ""
+
+    # clearup Maple Breakpoint sym address table and symbol-to-address
+    # because after re-run, maple breakpoint address and lib address will
+    # change.
+    m_util.gdb_exec_to_null('mb -restart')
+
+    # to clear up the cache, we use the sub-process communication,
+    # we could possibly get a PythonError of read of closed file:
+    # e.g
+    # [Thread 0x7fffe110b700 (LWP 39387) exited]
+    # [Inferior 1 (process 39218) exited normally]
+    # Python Exception <class 'ValueError'> read of closed file:
+    try:
+        m_mirmpl.create_mirmpl_label_cache(None)
+    except:
+        pass
+    try:
+        m_asm.create_asm_mirbin_label_cache(None)
+    except:
+        pass
 
 def event_breakpoint_created_handler(bp):
     """event handler to handle breakpoint creation
        if a native breakpoint is created in Maple shared library program space,
        delete this breakpoint or disable it
     """
+    if isinstance(bp, m_stepi.MapleFinishBreakpoint):
+        return
+
     if bp.location == "maple::maple_invoke_method" or bp.location == "__inc_opcode_cnt":
         return
 
@@ -70,7 +95,6 @@ def event_breakpoint_created_handler(bp):
         return
 
     so_name = gdb.solib_name(int(result_value.address))
-    so_name = os.path.realpath(so_name)
     if not so_name: # this happens to be at very beginning before all the shared libraries are loaded
         return
 
@@ -92,6 +116,9 @@ def event_breakpoint_modified_handler(bp):
        if a native breakpoint is modified in Maple shared library program space,
        delete this breakpoint or disable it
     """
+    if isinstance(bp, m_stepi.MapleFinishBreakpoint):
+        return
+
     if bp.location == "maple::maple_invoke_method" or bp.location == "__inc_opcode_cnt":
         return
 
@@ -105,7 +132,6 @@ def event_breakpoint_modified_handler(bp):
         return
 
     so_name = gdb.solib_name(int(result_value.address))
-    so_name = os.path.realpath(so_name)
     if not so_name: # this happens to be at very beginning before all the shared libraries are loaded
         return
 
@@ -122,6 +148,17 @@ def event_breakpoint_modified_handler(bp):
         bp.delete()
         gdb_print("This gdb breakpoint at %s was deleted. Please set a Maple breakpoint with a 'mbreak' command" % bploc)
 
+def event_stop_handler(e):
+    stop_event_type = type(e).__name__
+    if stop_event_type == 'BreakpointEvent':
+        # TODO: should we go over the breakpoints list? or we handle this one bp by one bp
+        pass
+    elif stop_event_type == 'SignalEvent':
+        # TODO: info signal command will give a full list of signal string, too many of those.
+        # we will have to deal with them with different ways.
+        if e.stop_signal == 'SIGINT' or e.stop_signal == 'SIGSEGV' : # like Ctrl-C or segment fault
+            m_datastore.mgdb_rdata.update_frame_change_counter()
+
 def init_event_handlers():
     """initializes event handlers
     """
@@ -129,3 +166,4 @@ def init_event_handlers():
     gdb.events.exited.connect(event_exited_handler)
     gdb.events.breakpoint_created.connect(event_breakpoint_created_handler)
     gdb.events.breakpoint_modified.connect(event_breakpoint_modified_handler)
+    gdb.events.stop.connect(event_stop_handler)

@@ -251,6 +251,7 @@ namespace maple {
                         // TODO: rc?
                         throw ex;
                       } else {
+                        MCC_DecRef_NaiveRCFast(ex); // decrease RC for the exception
                         MRT_ThrowNewException("java/lang/ExceptionInInitializerError", nullptr);
                         maple::MException mex = MRT_PendingException();
                         MRT_ClearPendingException();
