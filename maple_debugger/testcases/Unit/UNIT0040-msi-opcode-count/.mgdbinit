@@ -1,0 +1,5 @@
+b main
+run
+msi
+msi -c
+quit

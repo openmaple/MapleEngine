@@ -342,6 +342,9 @@ class MapleListCmd(gdb.Command):
             new_line = self.prev_asm_file_line + offset
             self.frame_data['frame_func_src_info']['asm_line'] = new_line if new_line > 1 else 1
 
+        if len(self.frame_data) == 0:
+            return
+
         self.display_asm_file_lines(self.frame_data['frame_func_header_info']['asm_path'], \
                                     self.frame_data['frame_func_src_info']['asm_line'],\
                                     self.frame_data['frame_func_header_info']['func_header_asm_tuple'])
@@ -365,6 +368,9 @@ class MapleListCmd(gdb.Command):
         if offset != 0:
             new_line = self.prev_mir_file_line + offset
             self.frame_data['frame_func_src_info']['mirmpl_line'] = new_line if new_line > 1 else 1
+
+        if len(self.frame_data) == 0:
+            return
 
         self.display_mir_file_lines(self.frame_data['frame_func_header_info']['mirmpl_path'], \
                                     self.frame_data['frame_func_src_info']['mirmpl_line'],\
@@ -402,6 +408,9 @@ class MapleListCmd(gdb.Command):
         if offset != 0:
             new_line = self.prev_src_file_line + offset
             self.frame_data['frame_func_src_info']['short_src_file_line'] = new_line if new_line > 1 else 1
+
+        if len(self.frame_data) == 0:
+            return
 
         file_full_path = None
         for source_path in maple_source_path_list:

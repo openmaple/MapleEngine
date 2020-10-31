@@ -1221,10 +1221,11 @@ label_exception_handler:
     { // Exception not handled; do reference counting cleanup for formals and localrefvars
       uint8_t* formals_table = (uint8_t*)&func.header->primtype_table;
       for(int i=0; i<func.header->formals_num; i++) {
-        if(formals_table[2*i+1] == 1) { // 2B for each formal; clean up if the 2nd byte is 1.
+        if(formals_table[2*i+1] == 1 || formals_table[2*i+1] == 2) { // 2B for each formal; clean up if the 2nd byte is 1 or 2.
           MValue &arg = MARGS(i+1); // with MARGS(), formals index starts with 1
           void* ref = (void*)arg.x.a64;
-          MCC_DecRef_NaiveRCFast(ref);
+          if(ref)
+            MCC_DecRef_NaiveRCFast(ref);
         }
       }
 
