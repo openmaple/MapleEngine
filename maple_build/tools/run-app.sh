@@ -30,12 +30,15 @@ export JAVA_NATIVE_LIB=libjava.so
 export LD_LIBRARY_PATH=".:${RUNTIME_LIB}:${JAVA_HOME}/jre/lib/amd64:${JAVA_HOME}/jre/lib/amd64/server:${LD_LIBRARY_PATH}"
 export MAPLE_ENGINE_DEBUG=none
 
-GDB=
+DBCMD=
 if [ "x$1" = "x-gdb" ]; then
-    GDB='gdb -x "$MAPLE_DEBUGGER_ROOT/.mgdbinit" --args '
-    #export MAPLE_ENGINE_DEBUG=all
+    DBCMD='gdb -x "$MAPLE_DEBUGGER_ROOT/.mgdbinit" --args '
+    shift
+elif [ "x$1" = "x-lldb" ]; then
+    DBCMD='lldb -- '
     shift
 fi
+#[ -z "$DBCMD" ] || export MAPLE_ENGINE_DEBUG=all
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 [-gdb] -classpath <App-shared-lib> <Classname>"
@@ -45,4 +48,4 @@ fi
 libcore="-Xbootclasspath:${JAVA_CORE_LIB}.so"
 grep -q -- "-Xbootclasspath:${JAVA_CORE_LIB}.so" <<< "$*" && libcore=
 
-eval $GDB \"\${MPLSH}\" \"\$libcore\" \"\$@\"
+eval $DBCMD \"\${MPLSH}\" \"\$libcore\" \"\$@\"

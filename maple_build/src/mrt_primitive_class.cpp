@@ -1310,6 +1310,11 @@ extern "C" jboolean Ljava_2Flang_2FClassLoader_3B_7CregisterAsParallelCapable_7C
 extern "C" jboolean Ljava_2Flang_2FClassLoader_3B_7CregisterAsParallelCapable_7C_28_29Z(jclass klass) {
 return Ljava_2Flang_2FClassLoader_3B_7CregisterAsParallelCapable_7C_28_29Z_(klass);
 }
+extern "C" void Ljava_2Flang_2FClassLoader_3B_7CsetDefaultAssertionStatus_7C_28Z_29V_(jboolean enabled) ;
+extern "C" void Ljava_2Flang_2FClassLoader_3B_7CsetDefaultAssertionStatus_7C_28Z_29V(jboolean enabled) {
+Ljava_2Flang_2FClassLoader_3B_7CsetDefaultAssertionStatus_7C_28Z_29V_(enabled);
+return;
+}
 extern "C" void Ljava_2Flang_2Fref_2FReference_3B_7Cclear_7C_28_29V_(jobject javaThis) ;
 extern "C" void Ljava_2Flang_2Fref_2FReference_3B_7Cclear_7C_28_29V(jobject javaThis) {
 Ljava_2Flang_2Fref_2FReference_3B_7Cclear_7C_28_29V_(javaThis);
@@ -1569,6 +1574,10 @@ extern "C" jstring Ljava_2Flang_2Freflect_2FMethod_3B_7CtoString_7C_28_29Ljava_2
 extern "C" jstring Ljava_2Flang_2Freflect_2FMethod_3B_7CtoString_7C_28_29Ljava_2Flang_2FString_3B(jobject javaThis) {
 return Ljava_2Flang_2Freflect_2FMethod_3B_7CtoString_7C_28_29Ljava_2Flang_2FString_3B_(javaThis);
 }
+extern "C" jobject Ljava_2Flang_2Freflect_2FProxy_3B_7CdefineClass0_7C_28Ljava_2Flang_2FClassLoader_3BLjava_2Flang_2FString_3BABII_29Ljava_2Flang_2FClass_3B_(jobject loader, jstring name, jobject proxyCls, jint offset, jint length) ;
+extern "C" jobject Ljava_2Flang_2Freflect_2FProxy_3B_7CdefineClass0_7C_28Ljava_2Flang_2FClassLoader_3BLjava_2Flang_2FString_3BABII_29Ljava_2Flang_2FClass_3B(jobject loader, jstring name, jobject proxyCls, jint offset, jint length) {
+return Ljava_2Flang_2Freflect_2FProxy_3B_7CdefineClass0_7C_28Ljava_2Flang_2FClassLoader_3BLjava_2Flang_2FString_3BABII_29Ljava_2Flang_2FClass_3B_(loader, name, proxyCls, offset, length);
+}
 extern "C" jstring Ljava_2Flang_2FString_3B_7Cintern_7C_28_29Ljava_2Flang_2FString_3B_(jstring str) ;
 extern "C" jstring Ljava_2Flang_2FString_3B_7Cintern_7C_28_29Ljava_2Flang_2FString_3B(jstring str) {
 return Ljava_2Flang_2FString_3B_7Cintern_7C_28_29Ljava_2Flang_2FString_3B_(str);
@@ -1577,6 +1586,10 @@ extern "C" void Ljava_2Flang_2FShutdown_3B_7CbeforeHalt_7C_28_29V_(jclass klass)
 extern "C" void Ljava_2Flang_2FShutdown_3B_7CbeforeHalt_7C_28_29V(jclass klass) {
 Ljava_2Flang_2FShutdown_3B_7CbeforeHalt_7C_28_29V_(klass);
 return;
+}
+extern "C" jobject Lsun_2Fmisc_2FProxyGenerator_3B_7CgenerateProxyClass_7C_28Ljava_2Flang_2FString_3BALjava_2Flang_2FClass_3BI_29AB_(jstring name, jobject interfaces, jint flags) ;
+extern "C" jobject Lsun_2Fmisc_2FProxyGenerator_3B_7CgenerateProxyClass_7C_28Ljava_2Flang_2FString_3BALjava_2Flang_2FClass_3BI_29AB(jstring name, jobject interfaces, jint flags) {
+return Lsun_2Fmisc_2FProxyGenerator_3B_7CgenerateProxyClass_7C_28Ljava_2Flang_2FString_3BALjava_2Flang_2FClass_3BI_29AB_(name, interfaces, flags);
 }
 extern "C" jclass Lsun_2Freflect_2FReflection_3B_7CgetCallerClass_7C_28_29Ljava_2Flang_2FClass_3B_() ;
 extern "C" jclass Lsun_2Freflect_2FReflection_3B_7CgetCallerClass_7C_28_29Ljava_2Flang_2FClass_3B() {

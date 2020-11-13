@@ -32,3 +32,6 @@ extern "C" jboolean Ljava_2Flang_2FClassLoader_3B_7CregisterAsParallelCapable_7C
 extern "C" void Ljava_2Flang_2FClassLoader_3B_7CloadLibrary_7C_28Ljava_2Flang_2FClass_3BLjava_2Flang_2FString_3BZ_29V(jclass, jstring, jboolean);
 extern "C" jstring Ljava_2Flang_2FString_3B_7Cintern_7C_28_29Ljava_2Flang_2FString_3B(jstring);
 extern "C" void Ljava_2Flang_2FShutdown_3B_7CbeforeHalt_7C_28_29V(jclass klass);
+extern "C" jobject Lsun_2Fmisc_2FProxyGenerator_3B_7CgenerateProxyClass_7C_28Ljava_2Flang_2FString_3BALjava_2Flang_2FClass_3BI_29AB(jstring name, jobject interfaces, jint flags);
+extern "C" jobject Ljava_2Flang_2Freflect_2FProxy_3B_7CdefineClass0_7C_28Ljava_2Flang_2FClassLoader_3BLjava_2Flang_2FString_3BABII_29Ljava_2Flang_2FClass_3B(jobject loader, jstring name, jobject proxyCls, jint offset, jint length);
+extern "C" void Ljava_2Flang_2FClassLoader_3B_7CsetDefaultAssertionStatus_7C_28Z_29V(jboolean enabled);

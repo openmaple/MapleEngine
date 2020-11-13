@@ -65,16 +65,16 @@ installed. You may install these packages with following commend:
 $ sudo apt install mercurial build-essential cpio zip libx11-dev libxext-dev libxrender-dev \
               libxtst-dev libxt-dev libcups2-dev libfreetype6-dev libasound2-dev libfontconfig1-dev
 ```
-Determine the OpenJDK-8-JRE revision installed on the machine which will install and run Maple Engine. From the outputs of the following command, `8u265-b01` is the revision to be used to download the OpenJDK-8 source:
+Determine the OpenJDK-8-JRE revision installed on the machine which will install and run Maple Engine. From the outputs of the following command, `8u272-b10` is the revision to be used to download the OpenJDK-8 source:
 ```
 $ apt list openjdk-8-jre
 Listing... Done
-openjdk-8-jre/xenial-updates,xenial-security,now 8u265-b01-0ubuntu2~16.04 amd64 [installed]
+openjdk-8-jre/xenial-updates,xenial-security,now 8u272-b10-0ubuntu2~16.04 amd64 [installed]
 ```
 
-Download OpenJDK-8 source which matches the OpenJDK-8-JRE revision, 8u265-b01 for example, using `jdk8u265-b01` tag:
+Download OpenJDK-8 source which matches the OpenJDK-8-JRE revision, 8u272-b10 for example, using `jdk8u272-b10` tag:
 ```
-$ hg clone http://hg.openjdk.java.net/jdk8u/jdk8u -r jdk8u265-b01 ~/my_openjdk8
+$ hg clone http://hg.openjdk.java.net/jdk8u/jdk8u -r jdk8u272-b10 ~/my_openjdk8
 $ cd ~/my_openjdk8
 $ bash ./get_source.sh
 ```

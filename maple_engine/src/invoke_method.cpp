@@ -132,6 +132,8 @@ extern "C" std::ptrdiff_t __maple_java_PC_offset;
 extern "C" void *__maple_method_address;
 extern "C" bool MCC_JavaInstanceOf(void* obj, void* java_class);
 extern "C" void MRT_YieldpointHandler_x86_64();
+extern "C" void MRT_SaveContext_x86_64(void*);
+extern "C" void MRT_ExitContext_x86_64();
 extern "C" void MRT_SetCollectStackRefsCb(void (*cb)(void*, std::set<void*>&));
 void collect_stack_refs(void* bp, std::set<void*>& refs);
 
@@ -165,6 +167,7 @@ MValue maple_invoke_method(const method_header_t* const mir_header, const MFunct
     DEBUGARGS();
 
     MRT_YieldpointHandler_x86_64();
+    MRT_SaveContext_x86_64(&func);
 
     // Get the first mir instruction of this method
     goto *(labels[((base_node_t *)func.pc)->op]);
@@ -1052,6 +1055,7 @@ label_OP_brtrue32:
 
 label_OP_return:
   {
+    MRT_ExitContext_x86_64();
     // Handle statement node: return
     DEBUGOPCODE(return, Stmt);
 
@@ -1252,6 +1256,7 @@ label_exception_handler:
 
     func.sp = 1;
     DEBUGOPCODE(: THROW EXCEPTION, Throw);
+    MRT_ExitContext_x86_64();
     // No matched exception type
     throw thrownval;
   }
@@ -1887,9 +1892,9 @@ label_OP_cpptry:
 
 // Collect object references on the internal stack for the purpose of collecting
 // root set for GC
-void collect_stack_refs(void* bp, std::set<void*>& refs)
+void collect_stack_refs(void* c, std::set<void*>& refs)
 {
-  const MFunction* func = (MFunction*)((char*)bp + __maple_java_PC_offset);
+  const MFunction* func = (MFunction*)c;
   while(func) {
     for(size_t i = 0; i < func->sp; ++i) {
       if(func->operand_stack[i].ptyp == PTY_a64) {
