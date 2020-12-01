@@ -23,7 +23,7 @@ MAPLE_COMPILER_PARENT=$(dirname "$MAPLE_COMPILER_ROOT")
 mkdir -p "$MAPLE_COMPILER_PARENT"
 cd "$MAPLE_COMPILER_PARENT" || { echo Failed to enter dir "$MAPLE_COMPILER_PARENT"/..; exit 1; }
 if [ ! -d "mapleall" ]; then
-    git clone https://gitee.com/openarkcompiler-incubator/mapleall.git || exit 1
+    git clone -b master https://gitee.com/openarkcompiler-incubator/mapleall.git || exit 1
 else
     cd mapleall || exit 1
     git pull || exit 1
