@@ -59,7 +59,7 @@ ${CC} ${CC_FLAGS} -c "${MAPLE_BUILD_ROOT}"/src/mrt_primitive_class.cpp \
 cd "${JAR}"/ || exit 2
 JARLIST=$(find . -name "*.jar" -type f | sort -r | xargs | tr ' ' ,)
 [ -n "${JARLIST}" ] || { echo No any .jar files under "${JAR}"; exit 2; }
-"${JBC2MPL}" -injar "${JARLIST}" -out "${JAVA_CORE_LIB}" || { echo Failed with "${JBC2MPL}".; exit 2; }
+"${JBC2MPL}" -dumpPragma -injar "${JARLIST}" -out "${JAVA_CORE_LIB}" || { echo Failed with "${JBC2MPL}".; exit 2; }
 
 [ -f "${JAVA_CORE_LIB}".mpl -a -f "${JAVA_CORE_LIB}".mplt ] || { echo Failed to generate .mpl file; exit 2; }
 mv -f "${JAVA_CORE_LIB}".mpl "${JAVA_CORE_LIB}".mplt "${OUT}"/ || exit 2
@@ -67,7 +67,8 @@ mv -f "${JAVA_CORE_LIB}".mpl "${JAVA_CORE_LIB}".mplt "${OUT}"/ || exit 2
 cd "${OUT}"/ || exit 2
 cp "${JAVA_CORE_LIB}".mplt "${ORIG_JAVA_CORE_LIB}".mplt
 "${IRB_OPENARK}" i "${JAVA_CORE_LIB}".mplt
-mv "${JAVA_CORE_LIB}".irb.mpl "${JAVA_CORE_LIB}".tmpl
+#mv "${JAVA_CORE_LIB}".irb.mpl "${JAVA_CORE_LIB}".tmpl
+sed -e '/^ *pragma .* var / s/".*"//' "${JAVA_CORE_LIB}".irb.mpl > "${JAVA_CORE_LIB}".tmpl
 
 # Convert ASCII mplt to binary using irbuild from Maple build.
 "${IRB_MAPLE}" -b "${JAVA_CORE_LIB}".tmpl

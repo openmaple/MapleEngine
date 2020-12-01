@@ -89,10 +89,10 @@ for f in $* ; do
   
   cd "$TMPDIR" 
   CLASSES=`ls *.class | tr '\n' ',' | sed "s/^/$FILE_ROOT_NAME.class,/" | sed -e "s/,$FILE_ROOT_NAME.class//" -e "s/[,]*$//"`
-  "$PREBUILT_BIN"/jbc2mpl -inclass "$CLASSES" -mplt "$ORIG_COREALL_MPLT" -asciimplt || exit 2
+  "$PREBUILT_BIN"/jbc2mpl -dumpPragma -inclass "$CLASSES" -mplt "$ORIG_COREALL_MPLT" -asciimplt || exit 2
   
   if [ -f "$FILE_ROOT_NAME".mpl ]; then
-    sed -e '/^var/d' -e '/^func/d' "$FILE_ROOT_NAME".mplt > "$FILE_ROOT_NAME".tmpl
+    sed -e '/^var/d' -e '/^func/d' -e '/^ *pragma .* var / s/".*"//' "$FILE_ROOT_NAME".mplt > "$FILE_ROOT_NAME".tmpl
     "$IRB_MAPLE" -srclang=java -b "$FILE_ROOT_NAME".tmpl
     mv -f "$FILE_ROOT_NAME".irb.mplt "$OUTPUT_DIR/$FILE_ROOT_NAME".mplt
     sed "s/^import.*libcore.mplt\"/import \"${COREALL_MPLT//\//\\/}\"/" "$FILE_ROOT_NAME".mpl > "$OUTPUT_DIR/$FILE_ROOT_NAME".mpl
