@@ -35,3 +35,4 @@ extern "C" void Ljava_2Flang_2FShutdown_3B_7CbeforeHalt_7C_28_29V(jclass klass);
 extern "C" jobject Lsun_2Fmisc_2FProxyGenerator_3B_7CgenerateProxyClass_7C_28Ljava_2Flang_2FString_3BALjava_2Flang_2FClass_3BI_29AB(jstring name, jobject interfaces, jint flags);
 extern "C" jobject Ljava_2Flang_2Freflect_2FProxy_3B_7CdefineClass0_7C_28Ljava_2Flang_2FClassLoader_3BLjava_2Flang_2FString_3BABII_29Ljava_2Flang_2FClass_3B(jobject loader, jstring name, jobject proxyCls, jint offset, jint length);
 extern "C" void Ljava_2Flang_2FClassLoader_3B_7CsetDefaultAssertionStatus_7C_28Z_29V(jboolean enabled);
+extern "C" jobject Ljava_2Flang_2Freflect_2FParameter_3B_7CgetAnnotation_7C_28Ljava_2Flang_2FClass_3B_29Ljava_2Flang_2Fannotation_2FAnnotation_3B(jobject jThis, jclass annotationClass);

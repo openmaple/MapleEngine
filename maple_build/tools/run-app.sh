@@ -35,7 +35,7 @@ if [ "x$1" = "x-gdb" ]; then
     DBCMD='gdb -x "$MAPLE_DEBUGGER_ROOT/.mgdbinit" --args '
     shift
 elif [ "x$1" = "x-lldb" ]; then
-    DBCMD='lldb -- '
+    DBCMD='lldb -o "command script import $MAPLE_DEBUGGER_LLDB_SRC/LLDB/m_lldb.py"  -- '
     shift
 fi
 #[ -z "$DBCMD" ] || export MAPLE_ENGINE_DEBUG=all
