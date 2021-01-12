@@ -587,7 +587,7 @@ label_OP_sext:
     DEBUGOPCODE(sext, Expr);
 
     MASSERT(expr.param.extractbits.boffset == 0, "Unexpected offset");
-    uint64 mask = (1ull << expr.param.extractbits.bsize) - 1;
+    uint64 mask = expr.param.extractbits.bsize < 64 ? (1ull << expr.param.extractbits.bsize) - 1 : ~0ull;
     MValue &op = MTOP();
     op.x.i64 = ((uint64)op.x.i64 >> (expr.param.extractbits.bsize - 1) & 1ull) ? op.x.i64 | ~mask : op.x.i64 & mask;
     op.ptyp = expr.primType;
@@ -603,7 +603,7 @@ label_OP_zext:
     DEBUGOPCODE(zext, Expr);
 
     MASSERT(expr.param.extractbits.boffset == 0, "Unexpected offset");
-    uint64 mask = (1ull << expr.param.extractbits.bsize) - 1;
+    uint64 mask = expr.param.extractbits.bsize < 64 ? (1ull << expr.param.extractbits.bsize) - 1 : ~0ull;
     MValue &op = MTOP();
     op.x.i64 &= mask;
     op.ptyp = expr.primType;
