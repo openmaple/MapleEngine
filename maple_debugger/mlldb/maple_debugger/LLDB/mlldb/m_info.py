@@ -1,5 +1,5 @@
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reverved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -508,8 +508,8 @@ def get_uninitialized_maple_func_addrs():
 ####  API section for retrieving Maple frame caller information
 ######################################################################
 """
-use these api calls to get the current frame's caller's information. Due to 
-the fact that at the time we call it the frame is in the stack, it's 
+use these api calls to get the current frame's caller's information. Due to
+the fact that at the time we call it the frame is in the stack, it's
 caller's information must also be available.
 """
 
@@ -601,7 +601,7 @@ def get_maple_caller_argument_value(arg_idx, arg_num, mtype):
 
     try:
         #buffer = m_util.mdb_exec_to_str('p caller->operand_stack[' + str(idx) + ']')
-        stbuffer = m_util.mdb_exec_to_str('p caller->operand_stack') 
+        stbuffer = m_util.mdb_exec_to_str('p caller->operand_stack')
         #if m_debug.Debug: m_debug.dbg_print("stbuffer=", stbuffer)
         buffer = stbuffer.split('x = (')[(idx+1)]
         #if m_debug.Debug: m_debug.dbg_print("buffer=", buffer)

@@ -1,5 +1,5 @@
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reverved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -115,7 +115,7 @@ def is_maple_frame(frame):
     #mdb_print("LLDB Frame func name:  " + frame.GetSymbol().GetName())
     #mdb_print("LLDB Frame func dname: " + frame.GetSymbol().GetDisplayName())
     #return frame.GetSymbol().GetDisplayName() == "maple::maple_invoke_method"
-    return "maple::maple_invoke_method" in frame.GetSymbol().GetDisplayName() 
+    return "maple::maple_invoke_method" in frame.GetSymbol().GetDisplayName()
 
 def get_frame_info(frame):
     """

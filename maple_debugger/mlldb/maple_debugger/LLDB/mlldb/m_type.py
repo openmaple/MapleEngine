@@ -1,6 +1,5 @@
-#!/usr/bin/python
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reverved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -48,7 +47,7 @@ class MTypeCommand:
         description = ('Basically:  mtype <regex>: print a matching class and its inheritance hierarchy by a given search expression')
 
         """print a matching class and its inheritance hierarchy by a given search expression
-        mtype: given a regex, searches and prints all matching class names if multiple are found, 
+        mtype: given a regex, searches and prints all matching class names if multiple are found,
         or print detailed information of class inheritance hierarchy if a single match is found
         mtype <regular-express>: e.g. mtype _2Fjava
         """
@@ -138,7 +137,7 @@ class MSymbolCommand:
         description = ('Basically:  msymbol <regex>: prints a matching symbol list or it\'s detailed infomation')
 
         """prints a matching symbol list or it's detailed infomation
-        msymbol: given a regex, searches and prints all matching symbol names if multiple are found, 
+        msymbol: given a regex, searches and prints all matching symbol names if multiple are found,
         or print detailed information of the symbol if a single match is found
         msymbol <regular-express>: e.g. msymbol sun.*executor
         """

@@ -1,5 +1,5 @@
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reverved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -266,7 +266,7 @@ def lookup_next_src_file_info(asm_path, asm_line, asm_offset):
 def look_up_next_opcode(asm_path, asm_line, asm_offset):
     """
       for a given asm file and asm line number and offset of the asm line number, return whether next opcode
-      is going to jump to different source code line (e.g. Java code). If True, return next opcode's short 
+      is going to jump to different source code line (e.g. Java code). If True, return next opcode's short
       source file name and line.
 
       params:

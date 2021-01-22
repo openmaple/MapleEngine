@@ -1,5 +1,5 @@
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reverved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -17,10 +17,6 @@ import pickle
 from shared import m_util
 from mlldb import m_config_lldb as m_debug
 
-### following code has been tested working, for 166193 lables, it took less than 3 seconds
-### real    0m3.044s
-### user    0m2.151s
-### sys     0m0.641s
 def create_mirmpl_label_cache(mir_path, popen_only = False, proc_saved = {}):
     """ Create a dictionary for a given mir file
         When it is called the first time with a given mir file, it starts

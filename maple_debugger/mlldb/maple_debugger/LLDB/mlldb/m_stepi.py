@@ -1,6 +1,5 @@
-#!/usr/bin/python
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reverved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -119,8 +118,8 @@ class MStepiCommand:
             print(options)
             print(args)
             if options.stepi_help:
-                print("mstepi : Steps into specified index n of Maple instruction\n" 
-                    "    msi is an alias of mstepi command\n" 
+                print("mstepi : Steps into specified index n of Maple instruction\n"
+                    "    msi is an alias of mstepi command\n"
                     "    mstepi : Steps into next Maple instruction\n"
                     "    mstepi [n]: Steps into next n Maple instructions\n"
                     "    mstepi -abs [n]: Steps into specified index n of Maple instruction\n"
@@ -446,7 +445,7 @@ class MapleConditionStep:
 
 # MapleFinishPrintCont steps out of the current frame, gathers some information
 # and then continues.  The information in this case is rax.  Currently the thread
-# plans do not seem to be a  safe place to call lldb command-line commands, so 
+# plans do not seem to be a  safe place to call lldb command-line commands, so
 # information is gathered through SB API calls. This is meant to gther Maple Data
 # as the Data tree is expanded.
 

@@ -1,5 +1,5 @@
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reverved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -15,7 +15,6 @@
 
 from shared import m_util
 from mlldb import m_config_lldb as m_debug
-#import m_debug
 
 def get_symbol_address(symbol):
     """

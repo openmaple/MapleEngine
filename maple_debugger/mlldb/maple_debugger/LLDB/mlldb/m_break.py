@@ -1,6 +1,5 @@
-#!/usr/bin/python
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reverved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -277,7 +276,7 @@ class MBreakpointCommand:
                 #self.set_breakpoint(symbol, false)
                 self.set_breakpoint("main", False)
 
-            #TODO:  Globals stopped working, WHY? 
+            #TODO:  Globals stopped working, WHY?
             #m_breakpoint.mbp_glo_table = copy.deepcopy(self.mbp_object.mbp_table)
             #Save breakpoint dict to a  local file
             self.mbp_object.update_mbp()
@@ -488,7 +487,7 @@ class MBreakpointCommand:
         bp_info = "in maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*) at /vagrant/maple_engine/maple_engine/src/invoke_method.cpp:150"
         addr, bp_info = m_breakpoint.get_maple_invoke_bp_stop_addr(buf)
         bp_addr = hex(addr)
-        if not bp_info: 
+        if not bp_info:
             bp_info = "maple::maple_invoke_method()"
             bp_addr = "pending address"
 
