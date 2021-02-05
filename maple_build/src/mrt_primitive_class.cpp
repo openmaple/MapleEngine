@@ -1309,6 +1309,10 @@ extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisInterface_7C_28_29Z_ (jobject ja
 extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisInterface_7C_28_29Z (jobject javaThis) {
 return Ljava_2Flang_2FClass_3B_7CisInterface_7C_28_29Z_(javaThis);
 }
+extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisLocalOrAnonymousClass_7C_28_29Z_(jobject javaThis) ;
+extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisLocalOrAnonymousClass_7C_28_29Z(jobject javaThis) {
+return Ljava_2Flang_2FClass_3B_7CisLocalOrAnonymousClass_7C_28_29Z_(javaThis);
+}
 extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisPrimitive_7C_28_29Z_ (jobject javaThis) ;
 extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisPrimitive_7C_28_29Z (jobject javaThis) {
 return Ljava_2Flang_2FClass_3B_7CisPrimitive_7C_28_29Z_(javaThis);
