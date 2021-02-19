@@ -21,7 +21,6 @@ def get_symbol_address(symbol):
     for a given Maple symbol, returns its address in hex string via gdb p command,
     or None if not found
     """
-
     cmd = 'p ' + symbol
     try:
         result  = m_util.gdb_exec_to_str(cmd)
@@ -75,6 +74,22 @@ def get_symbol_addr_by_current_frame_args():
     else:
         return None
 
+def get_dynamic_symbol_addr_by_current_frame():
+    """
+    get the Maple symbol address in currect frame stack via gdb print command
+    """
+    #cmd = 'p/x *(long long*)&mir_header'
+    cmd = 'p func.header'
+    try:
+        result = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None
+
+    if result[0] == '$' and '(maple::DynamicMethodHeaderT *) 0x' in result:
+        return result.split()[4]
+    else:
+        return None
+
 def get_mirheader_name_by_mirheader_addr(addr):
     cmd = 'x ' + addr
     try:
@@ -88,6 +103,18 @@ def get_mirheader_name_by_mirheader_addr(addr):
         return result.split()[1][1:-2]
     else:
         return None
+
+def get_symbol_name_by_current_frame_args_dync():
+    cmd = 'p func.header'
+    try:
+        result = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None, None
+
+    if result[0] == '$' and '(maple::DynamicMethodHeaderT *) 0x' in result and '_mirbin_info' in result:
+        return result.split()[4], result.split()[5].rstrip()[1:-1]
+    else:
+        return None, None
 
 def get_symbol_name_by_current_frame_args():
     """

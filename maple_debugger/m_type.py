@@ -21,6 +21,7 @@ import m_symbol
 import m_asm
 import m_list
 import m_info
+import m_frame
 import m_util
 from m_util import MColors
 from m_util import gdb_print
@@ -205,8 +206,18 @@ def display_symbol_detail(symbol_name, symbol_asm_path):
     if not symbol_name or not symbol_asm_path:
         return
 
+    frame = m_frame.get_selected_frame()
+    if not frame:
+        return
+    is_dync = False
+    if m_frame.is_maple_frame_dync(frame):
+        is_dync = True
+
     data = m_datastore.mgdb_rdata.get_one_label_mirbin_info_cache(symbol_asm_path,symbol_name)
-    d = m_asm.lookup_src_file_info(symbol_asm_path, data[0], data[1], data[2], "0000")
+    if is_dync == True:
+        d = m_asm.lookup_src_file_info_dync(symbol_asm_path, symbol_name, "0000")
+    else:
+        d = m_asm.lookup_src_file_info(symbol_asm_path, data[0], data[1], data[2], "0000")
     if not d:
         return
 
@@ -226,7 +237,10 @@ def display_symbol_detail(symbol_name, symbol_asm_path):
         gdb_print("source        : unknown")
     else:
         gdb_print("source        : " + file_full_path)
-    gdb_print("demangled name: " + m_symbol.get_demangled_maple_symbol(m_util.color_symbol(MColors.SP_SNAME, symbol_name[:-12])))
+    if is_dync == True:
+        return
+    else:
+        gdb_print("demangled name: " + m_symbol.get_demangled_maple_symbol(m_util.color_symbol(MColors.SP_SNAME, symbol_name[:-12])))
 
 
 class MapleSymbolCmd(gdb.Command):

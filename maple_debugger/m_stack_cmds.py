@@ -36,6 +36,104 @@ def print_maple_frame(frame, index, mbt_format):
       index: a index number of the frame.
       mbt_format: print Maple backtrace in specified format, MBT_FORMAT_SRC or MBT_FORMAT_ASM or MBT_FORMAT_MIR
     """
+    if m_frame.is_maple_frame_dync(frame):
+        return print_maple_frame_dync(frame, index, mbt_format)
+    else:
+        return print_maple_frame_static(frame, index, mbt_format)
+
+def print_maple_frame_dync(frame, index, mbt_format):
+    """
+    prints one Maple backtrace frame.
+
+    params:
+      frame: a gdb.Frame object
+      index: a index number of the frame.
+      mbt_format: print Maple backtrace in specified format, MBT_FORMAT_SRC or MBT_FORMAT_ASM or MBT_FORMAT_MIR
+    """
+
+    data = m_datastore.get_stack_frame_data(frame)
+    if not data:
+        gdb_print('#%i no info' % (index))
+        return
+
+    so_path = data['frame_func_header_info']['so_path']
+    asm_path = data['frame_func_header_info']['asm_path']
+    mmpl_path = data['frame_func_header_info']['mmpl_path']
+    func_addr_offset = data['frame_func_header_info']['func_addr_offset']
+    func_name = data['frame_func_header_info']['func_name']
+
+    src_file_short_name = data['frame_func_src_info']['short_src_file_name']
+    asm_line_num = data['frame_func_src_info']['asm_line']
+    mmpl_line_num = 0 #data['frame_func_src_info']['mmpl_line']
+    src_file_line = data['frame_func_src_info']['short_src_file_line']
+
+    #func_argus_locals = data['func_argus_locals']
+
+    if src_file_short_name:
+        file_full_path = None
+        for source_path in m_list.maple_source_path_list:
+            file_full_path = m_list.find_one_file(src_file_short_name, source_path)
+            if not file_full_path:
+                continue
+            else:
+                break
+        if not file_full_path: file_full_path = "unknown"
+    else:
+        file_full_path = 'unknown'
+
+    # buffer format
+    # index func_offset func_symbol (type argu=value, ...) at source-file-full-path:line_num
+    args_buffer = ""
+    '''
+    arg_num = len(func_argus_locals['formals_name'])
+    for i in range(arg_num):
+        arg_value = m_info.get_maple_caller_argument_value(i, arg_num, func_argus_locals['formals_type'][i])
+        if arg_value:
+            if func_argus_locals['formals_type'][i] == 'a64':
+                mtype = m_info.get_maple_a64_pointer_type(arg_value)
+                if not mtype:
+                    mtype = ""
+            else:
+                mtype = ""
+        else:
+            arg_value = '...'
+            mtype = ""
+        args_buffer += func_argus_locals['formals_type'][i]
+        args_buffer += '<' + mtype + '>'
+        args_buffer += ' '
+        args_buffer += MColors.BT_ARGNAME + func_argus_locals['formals_name'][i] + MColors.ENDC
+        #args_buffer += func_argus_locals['formals_name'][i]
+        args_buffer += '='
+        args_buffer += arg_value
+        args_buffer += ', '
+    if arg_num > 0:
+        args_buffer = args_buffer[:-2]
+    if m_debug.Debug: m_debug.dbg_print("arg_num=", arg_num, " args_buffer=", args_buffer)
+    '''
+
+    if mbt_format == MBT_FORMAT_ASM:
+        buffer = '#%i %s:%s %s(%s) at %s:%s' % \
+           (index, MColors.BT_ADDR + so_path.split('/')[-1] + MColors.ENDC,MColors.BT_ADDR + func_addr_offset + MColors.ENDC,\
+             m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + asm_path + MColors.ENDC, asm_line_num)
+    elif mbt_format == MBT_FORMAT_SRC:
+        buffer = '#%i %s:%s %s(%s) at %s:%s' % \
+           (index, MColors.BT_ADDR + so_path.split('/')[-1] + MColors.ENDC, MColors.BT_ADDR + func_addr_offset + MColors.ENDC,\
+            m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + file_full_path + MColors.ENDC, src_file_line)
+    else:
+        buffer = '#%i %s:%s %s(%s) at %s:%s' % \
+           (index, MColors.BT_ADDR + so_path.split('/')[-1] + MColors.ENDC,MColors.BT_ADDR + func_addr_offset + MColors.ENDC,\
+             m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + mmpl_path + MColors.ENDC, mmpl_line_num)
+    gdb_print(buffer)
+
+def print_maple_frame_static(frame, index, mbt_format):    
+    """
+    prints one Maple backtrace frame.
+
+    params:
+      frame: a gdb.Frame object
+      index: a index number of the frame.
+      mbt_format: print Maple backtrace in specified format, MBT_FORMAT_SRC or MBT_FORMAT_ASM or MBT_FORMAT_MIR
+    """
 
     data = m_datastore.get_stack_frame_data(frame)
     if not data:

@@ -82,7 +82,8 @@ def event_breakpoint_created_handler(bp):
     if isinstance(bp, m_stepi.MapleFinishBreakpoint):
         return
 
-    if bp.location == "maple::maple_invoke_method" or bp.location == "__inc_opcode_cnt":
+    if bp.location == "maple::maple_invoke_method" or bp.location == "__inc_opcode_cnt" \
+       or bp.location == "maple::InvokeInterpretMethod" or bp.location == "__inc_opcode_cnt_dyn":
         return
 
     if not m_inf.is_inferior_running():
@@ -119,7 +120,8 @@ def event_breakpoint_modified_handler(bp):
     if isinstance(bp, m_stepi.MapleFinishBreakpoint):
         return
 
-    if bp.location == "maple::maple_invoke_method" or bp.location == "__inc_opcode_cnt":
+    if bp.location == "maple::maple_invoke_method" or bp.location == "__inc_opcode_cnt" \
+       or bp.location == "maple::InvokeInterpretMethod" or bp.location == "__inc_opcode_cnt_dyn":
         return
 
     if not m_inf.is_inferior_running():

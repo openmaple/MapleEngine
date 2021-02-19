@@ -512,11 +512,125 @@ class MapleGDBRuntimeData():
             gdb_print("create def cache using file: " + def_file_path)
             self.create_class_def(def_file_path)
 
+    def update_gdb_runtime_data_dync(self):
+
+        addr_offset, so_path, asm_path, func_header, mmpl_path = m_frame.get_newest_maple_frame_func_lib_info(True)
+        if m_debug.Debug:
+            m_debug.dbg_print("addr_offset=", addr_offset)
+            m_debug.dbg_print("so_path=", so_path)
+            m_debug.dbg_print("asm_path=", asm_path)
+            m_debug.dbg_print("func_header=", func_header)
+            m_debug.dbg_print("mmpl_path=", mmpl_path)
+        if not addr_offset or not so_path or not asm_path or not func_header or not mmpl_path:
+            return
+
+        if not self.mirbin_info_cache_has_key(asm_path):
+            gdb_print("create Maple symbol cache using file: " + asm_path)
+            self.create_mirbin_info_cache(asm_path)
+
+        '''
+        if not self.mirmpl_info_cache_has_key(mirmpl_path):
+            gdb_print("create Maple mir.mpl cache using file: " + mirmpl_path)
+            self.create_mirmpl_info_cache(mirmpl_path)
+
+        if not self.mirbin_info_cache_has_key(asm_path):
+            gdb_print("create Maple symbol cache using file: " + asm_path)
+            self.create_mirbin_info_cache(asm_path)
+
+        def_file_path = asm_path[:-1] + 'macros.def' if 'VtableImpl' in asm_path else asm_path[:-1] + 'VtableImpl.macros.def'
+        if not def_file_path in self.class_def.def_paths:
+            gdb_print("create def cache using file: " + def_file_path)
+            self.create_class_def(def_file_path)
+        '''
+
+
 
 mgdb_rdata =  MapleGDBRuntimeData()
 
-
 def get_stack_frame_data(frame):
+    #if frame.name() == 'maple::InvokeInterpretMethod':
+    if m_frame.is_maple_frame_dync(frame):
+        return get_stack_frame_data_dync(frame)
+    else:
+        return get_stack_frame_data_static(frame)
+
+def get_stack_frame_data_dync(frame):
+    func_addr_offset, so_path, asm_path, func_header, mmpl_path = m_frame.get_maple_frame_func_lib_info_dync(frame)
+    if m_debug.Debug:
+        m_debug.dbg_print("func_addr_offset =", func_addr_offset, "func_header=", func_header)
+        m_debug.dbg_print("so_path =", so_path, "asm_path=", asm_path, "mmpl_path=", mmpl_path)
+    if not func_addr_offset or not so_path or not asm_path or not func_header or not mmpl_path:
+        return None
+
+    ### get the function label of the frame
+    label_addr, func_header_name = m_symbol.get_symbol_name_by_current_frame_args_dync()
+    if m_debug.Debug: m_debug.dbg_print("func_header_name=", func_header_name)
+    if func_header_name:
+        func_name = func_header_name[:-12]
+        if m_debug.Debug: m_debug.dbg_print("func_name=", func_name)
+    '''
+    else:
+        label_addr, func_header_name = m_symbol.get_symbol_name_by_current_func_args()
+        func_name = func_header_name[:-12]
+        if m_debug.Debug: m_debug.dbg_print("func_name=", func_name)
+    '''
+
+    if m_debug.Debug: m_debug.dbg_print("func_header_name=", func_header_name)
+    if m_debug.Debug: m_debug.dbg_print("func_name=", func_name)
+    if not func_header_name:
+        return None
+
+    '''
+    asm_cache = m_asm.create_asm_mirbin_label_cache(asm_path)
+    if not asm_cache:
+        asm_cache = m_asm.create_asm_mirbin_label_cache(asm_path)
+    print ("asm_cache = ", asm_cache)
+    '''
+
+    asm_tuple = mgdb_rdata.get_one_label_mirbin_info_cache(asm_path, func_header_name)
+    if not asm_tuple:
+        return None
+
+    rdata = {}
+    rdata['frame_func_header_info'] = { 'so_path': so_path, \
+                                        'asm_path': asm_path, \
+                                        'mirmpl_path': None, \
+                                        'mmpl_path': mmpl_path, \
+                                        'func_addr_offset': func_addr_offset, \
+                                        'func_name': func_name, \
+                                        'func_header_name' : func_header_name, \
+                                        'func_header_asm_tuple': asm_tuple, \
+                                        'func_header_mirmpl_tuple': None \
+                                      }
+
+    ### TODO!!!
+    ### 1, fill in data for js source file name, line, asm line, asm offset, mmple_line,
+    ###    mmple_line_offset
+    ### 2. local and formal data returns None for now for JS.
+    func_addr_offset_pc = func_addr_offset.split(':')[1]
+    d = m_asm.lookup_src_file_info_dync(asm_path, func_header_name, func_addr_offset_pc)
+    if not d:
+        if m_debug.Debug: m_debug.dbg_print("lookup_src_file_info_dync returns None")
+        return None
+    if m_debug.Debug: m_debug.dbg_print("first round returns dict d:", d)
+
+    # In some cases, when func_addr_offset's pc partion is 0000, or func_addr_offset is followed by "MPL_CLINIT_CHECK",
+    # the source code file information can be missing.
+    # In this case, we can check few more lines from its reported asm line ONLY for pc = '0000' or "MPI_CLINIT_CHECK" situation
+    if not d['short_src_file_name'] and (func_addr_offset_pc == '0000' or d['short_src_file_line'] == -1) and d['asm_offset'] != 0 and d['asm_line'] != 0:
+        if m_debug.Debug: m_debug.dbg_print("func offset pc is 0000, check short_src_file again")
+        d['short_src_file_name'], d['short_src_file_line'] = \
+            m_asm.lookup_next_src_file_info(asm_path, d['asm_line'], d['asm_offset'])
+        if m_debug.Debug: m_debug.dbg_print("second round for func offset pc 0000 returns dict d:", d)
+
+    rdata['frame_func_src_info'] = d
+
+    #print ("rdata dync", rdata)
+    return rdata
+
+ 
+
+def get_stack_frame_data_static(frame):
     """
     For a given Maple stack frame, get all finds of frame data including
     1, function. Header info

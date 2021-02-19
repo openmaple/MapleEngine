@@ -16,6 +16,7 @@
 import pickle
 import m_util
 import m_debug
+import m_datastore
 
 """ Maple types defined in Maple Engine source code """
 MAPLE_TYPES = [
@@ -240,7 +241,7 @@ def lookup_next_src_file_info(asm_path, asm_line, asm_offset):
     short_src_file_linenum = None
 
     additional_lines = 0
-    while additional_lines < 5:
+    while additional_lines < 6:
         line = f.readline()
         if "// LINE " in line:
             x = line.split()
@@ -465,3 +466,145 @@ def get_func_arguments(asm_path, mirbin_label, offset):
     d["locals_type"] = locals_type
     d["locals_name"] = locals_name
     return d
+
+########################################################
+### asm function api for dynamic language support
+########################################################
+def lookup_src_file_info_dync(asm_path, symbol_name, func_pc_offset):
+    """
+      for a given Maple symbol block a given func_pc_offset, get the corresponding
+      source code information.
+
+      params:
+        asm_path: string. asm (.s) file full path.
+        label_asm_ln: int. starting line num of Maple symbol block in asm file
+        start_offset: int. starting offset of Maple symbol block in asm file
+        end_offset:   int. ending offset of Maple symbol block in asm file
+        func_pc_offset: string. func_pc_offset to searched in the symbol block
+
+      return:
+        None if source code infomration is not found, or
+        a dict that contains information including source file name, source code line,
+        corresponding symbol block line number and file offset in asm file.
+        {
+            'short_src_file_name': string. source code short file name.
+            'short_src_file_line': int. source code line number. -1 means MPI_CLINIT_CHECK line
+            'asm_line': int. line num where the source code info was found in asm file
+            'asm_offset': int. offset of the asm file were source code info was found.
+            'mir_instidx': string. this is at the same line with // LINE, but it is same to .mpl.mir.mpl file
+        }
+    """
+    func_pc_offset = func_pc_offset.lower()
+    if m_debug.Debug: m_debug.dbg_print("func_pc_offset=", func_pc_offset, " asm_path=", asm_path, "symbol_name=", symbol_name)
+    try:
+        func_pc_offset_int = int(func_pc_offset, 16)
+        if m_debug.Debug: m_debug.dbg_print("func_pc_offset_int=", func_pc_offset_int)
+    except:
+        return None
+
+    #f = open(asm_path, "r")
+    #f.seek(start_offset)
+    asm_tuple = m_datastore.mgdb_rdata.get_one_label_mirbin_info_cache(asm_path, symbol_name)
+    if not asm_tuple:
+        return None
+
+    offset = asm_tuple[1]
+    line_num = asm_tuple[0]
+    src_info_line = None
+    short_src_file_name = None
+    short_src_file_linenum = None
+    mir_instidx = None
+    last_opcode_line_pc = None
+    this_line_pc = 0
+    stop_on_next_byte_opcode = False
+    #while offset < end_offset:
+
+    with open(asm_path) as f:
+        f.seek(offset)
+        for line in f:
+            #line = f.readline()
+            if "// LINE " in line:
+                src_info_line = line
+                if m_debug.Debug: print("src_info_line=", src_info_line, " line_num=", line_num )
+            elif func_pc_offset in line:
+                ''' this is the line that matches the func_pc_offset '''
+                if m_debug.Debug: print("found func_pc_offset = ", func_pc_offset, " line_num = ", line_num)
+                if not src_info_line: #there is no co-responding source code file
+                    short_src_file_name = None
+                    if "MPL_CLINIT_CHECK" in line:
+                        # special signature -1 to indicate MPI_CLINT_CHECK line
+                        short_src_file_linenum = -1
+                    else:
+                        short_src_file_linenum = 0
+                else:
+                    x = src_info_line.split()
+                    short_src_file_name = x[2]
+                    short_src_file_linenum = int(x[4][:-1])
+
+                    ## // LINE array_lastindexof.js : 2: var array = [2, 5, 9, 2];
+                    ## mir_instidx = src_info_line.split('INSTIDX : ')[1].split(':')[0].split('||')[1]
+
+                #f.close()
+                d = {}
+                d["short_src_file_name"] = short_src_file_name
+                d["short_src_file_line"] = short_src_file_linenum
+                d["asm_line"] = line_num
+                d["asm_offset"] = offset
+                d['mir_instidx'] = mir_instidx
+                if m_debug.Debug: m_debug.dbg_print("result in dict ", d)
+                return d
+            elif ".byte OP_" in line:
+                if stop_on_next_byte_opcode == True:
+                    if m_debug.Debug: m_debug.dbg_print("found func_pc_offset = ", func_pc_offset, " line_num = ", line_num)
+                    if not src_info_line: #there is no co-responding source code file
+                        short_src_file_name = None
+                        if "MPL_CLINIT_CHECK" in line:
+                            # special signature -1 to indicate MPI_CLINT_CHECK line
+                            short_src_file_linenum = -1
+                        else:
+                            short_src_file_linenum = 0
+                    else:
+                        x = src_info_line.split()
+                        short_src_file_name = x[2]
+                        short_src_file_linenum = int(x[4][:-1])
+                        ## // LINE Throwable.java : 216, INSTIDX : 34||0022:  putstatic
+                        mir_instidx = src_info_line.split('INSTIDX : ')[1].split(':')[0].split('||')[1]
+
+                    #f.close()
+                    d = {}
+                    d["short_src_file_name"] = short_src_file_name
+                    d["short_src_file_line"] = short_src_file_linenum
+                    d["asm_line"] = line_num
+                    d["asm_offset"] = offset
+                    d['mir_instidx'] = mir_instidx
+                    if m_debug.Debug: m_debug.dbg_print("result in dict ", d)
+                    return d
+
+                try:
+                    this_line_pc = int(line.split("// ")[1][:4],16)
+                except:
+                    # in case of no pc offset shown in .byte Op line, the offset is same to previous byte OP line's offset
+                    if m_debug.Debug: m_debug.dbg_print("byte opcode line cannot retrieve pc value, line_num=", line_num, "line=", line)
+                    offset += len(line)
+                    line_num += 1
+                    continue
+                last_opcode_line_pc = this_line_pc
+                if m_debug.Debug: m_debug.dbg_print("last_opcode_line_pc=", last_opcode_line_pc)
+            elif line.strip().startswith(".long") or line.strip().startswith(".quad"):
+                if not last_opcode_line_pc:
+                    # Opcode not started yet.
+                    offset += len(line)
+                    line_num += 1
+                    continue
+
+                this_line_pc = last_opcode_line_pc + 4
+                if func_pc_offset_int == this_line_pc:
+                    stop_on_next_byte_opcode = True
+
+            elif ".cfi_endproc" in line:
+                break
+
+            offset += len(line)
+            line_num += 1
+        #f.close()
+        return None

@@ -54,6 +54,10 @@ class MapleLocalCmd(gdb.Command):
             gdb_print("no valid frame found")
             return
 
+        if m_frame.is_maple_frame_dync(frame):
+            gdb_print("this command does not support dynamic language stack data yet")
+            return
+
         data = m_datastore.get_stack_frame_data(frame)
         if not data:
             gdb_print("no valid frame data found")

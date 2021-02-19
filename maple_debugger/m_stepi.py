@@ -34,7 +34,7 @@ def is_msi_bp_existed():
         if m_debug.Debug:
              m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", \
                      b.thread, "b.enabled=", b.enabled, "b.is_valid()=", b.is_valid())
-        if '__inc_opcode_cnt' in b.location and b.is_valid():
+        if '__inc_opcode_cnt' == b.location and b.is_valid():
             return True, b
     return False, None
 
@@ -45,14 +45,14 @@ def get_msi_bp_id():
         if m_debug.Debug:
              m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", \
                      b.thread, "b.enabled=", b.enabled, "b.is_valid()=", b.is_valid())
-        if '__inc_opcode_cnt' in b.location and b.is_valid():
+        if '__inc_opcode_cnt' == b.location and b.is_valid():
             return b
     return None
 
 def enable_msi_bp():
     blist = gdb.breakpoints()
     for b in blist:
-        if '__inc_opcode_cnt' in b.location and b.is_valid():
+        if '__inc_opcode_cnt' == b.location and b.is_valid():
             b.enabled = True
             break
     return
@@ -60,7 +60,7 @@ def enable_msi_bp():
 def disable_msi_bp():
     blist = gdb.breakpoints()
     for b in blist:
-        if '__inc_opcode_cnt' in b.location and b.is_valid():
+        if '__inc_opcode_cnt' == b.location and b.is_valid():
             b.enabled = False
             break
     return
@@ -115,17 +115,26 @@ class MapleStepiCmd(gdb.Command):
 
         self.mbp_object = None
         self.msi_bp_id = None
+        self.mbp_dync_object = None
+        self.msi_bp_dync_id = None
         m_util.gdb_exec('alias msi = mstepi')
 
         self.msi_mode_default = 0
         self.msi_mode_internal = 1
 
-    def init_gdb_breakpoint(self, threadno, count):
+    def init_gdb_breakpoint(self, threadno, count, bp_on_static=True, bp_on_dync=True):
         # create a msi breakpoint object on a specified thread
-        self.mbp_object = MapleStepiBreakpoint(threadno, count)
-        self.mbp_object.thread = threadno
-        self.mbp_object.silent = True
-        self.msi_bp_id = self.mbp_object.msi_bp_object_id
+        if bp_on_static:
+            self.mbp_object = MapleStepiBreakpoint(threadno, count)
+            self.mbp_object.thread = threadno
+            self.mbp_object.silent = True
+            self.msi_bp_id = self.mbp_object.msi_bp_object_id
+
+        if bp_on_dync:
+            self.mbp_dync_object = MapleStepiDyncBreakpoint(threadno, count)
+            self.mbp_dync_object.thread = threadno
+            self.mbp_dync_object.silent = True
+            self.msi_bp_dync_id = self.mbp_dync_object.msi_bp_object_id
 
     def invoke(self, args, from_tty):
         self.msi_func(args, from_tty)
@@ -173,13 +182,28 @@ class MapleStepiCmd(gdb.Command):
         else:
             self.usage()
 
+    # determine current frame is static or dynamic, and then return current opcode count
     def get_current_opcode_cnt(self):
+        if m_frame.is_current_maple_frame_dync():
+            return self.get_current_opcode_cnt_dync()
+        else:
+            return self.get_current_opcode_cnt_static()
+
+    def get_current_opcode_cnt_static(self):
         """returns: string as the current opcode cnt"""
         current_opcode_cnt = m_symbol.get_variable_value('__opcode_cnt')
         if not current_opcode_cnt:
             return None
         return current_opcode_cnt
 
+    def get_current_opcode_cnt_dync(self):
+        """returns: string as the current opcode cnt"""
+        current_opcode_cnt_dync = m_symbol.get_variable_value('__opcode_cnt_dyn')
+        if not current_opcode_cnt_dync:
+            return None
+        return current_opcode_cnt_dync
+
+    # determine current frame is static or dynamic, and then display the current opcode count
     def show_current_opcode_cnt(self):
         current_opcode_cnt = self.get_current_opcode_cnt()
         tobject= m_info.get_current_thread()
@@ -209,10 +233,17 @@ class MapleStepiCmd(gdb.Command):
         """
         # check if there is existing msi point, it could be created by msi command
         # previously, or it could be created by gdb b command.
+        if m_frame.is_current_maple_frame_dync():
+            return self.mstepi_common_dync(threadno, count)
+        else:
+            return self.mstepi_common_static(threadno, count)
+
+    def mstepi_common_static(self, threadno, count):
         msi_bp_exist, msi_bp_id = is_msi_bp_existed()
+        print ("msi_bp_exist=", msi_bp_exist, "msi_bp_id=", msi_bp_id, "self.msi_bp_id=", self.msi_bp_id)
         if not msi_bp_exist:
             # there is no msi bp exist, so just create a new msi breakpoint
-            self.init_gdb_breakpoint(threadno, count)
+            self.init_gdb_breakpoint(threadno, count, True, False)
         else:
             if msi_bp_id != self.msi_bp_id:
                 # if existing msi bp id does not match to self.msi_bp_id
@@ -269,6 +300,69 @@ class MapleStepiCmd(gdb.Command):
 
         # always disable msi breakpoint after msi is excuted
         disable_msi_bp()
+        return frame
+
+    def mstepi_common_dync(self, threadno, count):
+        msi_bp_dync_exist, msi_bp_dync_id = is_msi_bp_dync_existed()
+        if not msi_bp_dync_exist:
+            # there is no msi bp exist, so just create a new msi breakpoint
+            self.init_gdb_breakpoint(threadno, count, False, True)
+        else:
+            if msi_bp_dync_id != self.msi_bp_dync_id:
+                # if existing msi bp id does not match to self.msi_bp_id
+                gdb_print("There are one or more breakpints already created at __inc_opcode_cnt_dyn\n"
+                          "In order to use mstepi command, please delete those breakpoints first\n")
+                return None
+            else:
+                # the existing msi bp id matches to self.msi_bp_id, it was created
+                # by mstepi command previously.
+                if self.msi_bp_dync_id.enabled is False:
+                    enable_msi_bp_dync()
+
+        self.mbp_dync_object.set_bp_attr('thread', threadno)
+        self.mbp_dync_object.set_bp_attr('count', count)
+        assert count > 0
+        if self.mbp_dync_object.ignore_count != count - 1:
+            self.mbp_dync_object.ignore_count = count - 1
+
+        hitcnt = self.mbp_dync_object.hit_count
+        # It is important to perform a continue command here for the msi breakpoint
+        # to be reached.
+        m_util.gdb_exec("continue")
+
+        """
+        if the msi breakpoint's count reaches to 1, it will return True to cause gdb
+        stop at msi breakpoint by previous 'continue' command.
+        Once gdb stops here, a gdb 'finish' command shall be called. However,
+        'finish' command must NOT be called inside of msi breakpoint stop() logic
+        """
+        frame = None
+        if self.mbp_dync_object.hit_count - hitcnt == count:
+            """
+            if gdb stops here, it must have hit one breakpoint. However. the breakpoint
+            it hits may not be the msi breakpoint, it could be another breakpoint the user set up.
+            In this case, we check if it is a Maple frame. If it is, then the breakpoint is
+            ours. Otherwise just stop here and return because it hit a user's other stop.
+            """
+            frame = m_frame.get_selected_frame()
+            if not frame:
+                return None
+            if not m_frame.is_maple_frame(frame):
+                if m_set.msettings['opcode'] == 'on':
+                    m_util.gdb_exec("finish")
+                else:
+                    silent_finish()
+                # now get the new selected frame
+                frame = m_frame.get_selected_frame()
+                if not frame:
+                    return None
+
+        # this will update the Maple gdb runtime metadata store.
+        m_datastore.mgdb_rdata.update_gdb_runtime_data()
+        m_datastore.mgdb_rdata.update_frame_change_counter()
+
+        # always disable msi breakpoint after msi is excuted
+        disable_msi_bp_dync()
         return frame
 
     def mstepi_update_and_display(self, frame):
@@ -350,6 +444,9 @@ class MapleFinishCmd(gdb.Command):
         if not frame:
             return
         silent_finish()
+
+        frame = m_frame.get_selected_frame()
+        print ("frame.name()=", frame.name())
         m_util.gdb_exec("msi")
         m_util.gdb_exec("mlist")
         m_datastore.mgdb_rdata.update_frame_change_counter()
@@ -422,3 +519,78 @@ class MapleStepCmd(gdb.Command):
         else:
             m_list.display_src_file_lines(file_full_path, short_src_file_line)
         return
+
+#################################################################################
+### Dynamic maple stepi 
+#################################################################################
+def is_msi_bp_dync_existed():
+    """ determines if the msi breakpoints exist or not """
+    blist = gdb.breakpoints()
+    for b in blist:
+        if m_debug.Debug:
+             m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", \
+                     b.thread, "b.enabled=", b.enabled, "b.is_valid()=", b.is_valid())
+        if '__inc_opcode_cnt_dyn' == b.location and b.is_valid():
+            return True, b
+    return False, None
+
+def get_msi_bp_dync_id():
+    """ gets an msi breakpoint gdb.Breakpoint object id """
+    blist = gdb.breakpoints()
+    for b in blist:
+        if m_debug.Debug:
+             m_debug.dbg_print("b.type=", b.type, "b.location=", b.location, "b.thread=", \
+                     b.thread, "b.enabled=", b.enabled, "b.is_valid()=", b.is_valid())
+        if '__inc_opcode_cnt_dyn' == b.location and b.is_valid():
+            return b
+    return None
+
+def enable_msi_bp_dync():
+    blist = gdb.breakpoints()
+    for b in blist:
+        if '__inc_opcode_cnt_dyn' == b.location and b.is_valid():
+            b.enabled = True
+            break
+    return
+
+def disable_msi_bp_dync():
+    blist = gdb.breakpoints()
+    for b in blist:
+        if '__inc_opcode_cnt_dyn' == b.location and b.is_valid():
+            b.enabled = False
+            break
+    return
+
+class MapleStepiDyncBreakpoint(gdb.Breakpoint):
+    """
+    this class defines a Maple msi breakpoint. msi breakpoint is a breakpoint
+    at symbol of __int_opcode_cnt, and can be set along with a specified running
+    thread
+    """
+
+    def __init__(self, threadno, count = 1, mtype=gdb.BP_BREAKPOINT, mqualified=False):
+        """
+        creates an msi breakpoint with specified thread
+        """
+        self.settings = {}
+        self.settings['symbol'] = '__inc_opcode_cnt_dyn'
+        self.settings['variable'] = '__opcode_cnt_dyn'
+        self.settings['count'] = count
+        self.settings['thread'] = threadno
+
+        spec = self.settings['symbol'] + ' thread ' + str(threadno)
+        super().__init__(spec)
+        self.msi_bp_object_id = get_msi_bp_dync_id()
+
+    def set_bp_attr(self, key, value):
+        self.settings[key] = value
+
+    def get_bp_attr(self, key):
+        return self.settings[key]
+
+    def get_bp_id(self):
+        return self.msi_bp_object_id
+
+    def display_settings(self):
+        gdb_print ("msi dync break point settings ---- ")
+        gdb_print (str(self.settings))

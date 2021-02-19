@@ -56,6 +56,10 @@ class MapleBreakpointCmd(gdb.Command):
         """
         self.mbp_object = None
         self.mbp_id = None
+
+        self.mbp_dync_object = None
+        self.mbp_dync_id = None
+
         self.symbol_index = 1
         self.initialized_gdb_bp = False
 
@@ -66,6 +70,10 @@ class MapleBreakpointCmd(gdb.Command):
         # create a gdb.Breakpoint object
         self.mbp_object = m_breakpoint.MapleBreakpoint()
         self.mbp_id = m_breakpoint.get_mbp_id()
+
+        self.mbp_dync_object = m_breakpoint.MapleBreakpointDync()
+        self.mbp_dync_id = m_breakpoint.get_mbp_dync_id()
+
 
     def invoke(self, args, from_tty):
         self.mbp_func(args, from_tty)
@@ -138,9 +146,19 @@ class MapleBreakpointCmd(gdb.Command):
         buf = "set breakpoint " + str(symbol)
         gdb_print(buf)
         mbp_exist, mbp_id = m_breakpoint.is_mbp_existed()
+        #print ("mbp_id = ", mbp_id, "self.mbp_id=", self.mbp_id)
         if mbp_exist:
             if mbp_id != self.mbp_id:
                 gdb_print("There are one or more breakpints already created at maple::maple_invoke_method.")
+                gdb_print("In order to use mbreakpoint command, please delete those breakpoints first")
+                gdb_print("")
+                return
+
+        mbp_dync_exist, mbp_dync_id = m_breakpoint.is_mbp_dync_existed()
+        #print ("mbp_dync_id = ", mbp_dync_id, "self.mbp_dync_id=", self.mbp_dync_id)
+        if mbp_dync_exist:
+            if mbp_dync_id != self.mbp_dync_id:
+                gdb_print("There are one or more breakpints already created at maple::InvokeInterpretMethod.")
                 gdb_print("In order to use mbreakpoint command, please delete those breakpoints first")
                 gdb_print("")
                 return
@@ -149,26 +167,37 @@ class MapleBreakpointCmd(gdb.Command):
             self.init_gdb_breakpoint()
             self.initialized_gdb_bp = True
 
-        if symbol in self.mbp_object.mbp_table:
-            self.mbp_object.mbp_table[symbol]['disabled'] = False
+        if symbol in m_breakpoint.mbp_table:
+            m_breakpoint.mbp_table[symbol]['disabled'] = False
         else:
-            self.mbp_object.mbp_table[symbol] = {}
-            self.mbp_object.mbp_table[symbol]['disabled'] = False
-            self.mbp_object.mbp_table[symbol]['hit_count'] = 0
-            self.mbp_object.mbp_table[symbol]['ignore_count'] = 0
-            self.mbp_object.mbp_table[symbol]['index'] = self.symbol_index
+            m_breakpoint.mbp_table[symbol] = {}
+            m_breakpoint.mbp_table[symbol]['disabled'] = False
+            m_breakpoint.mbp_table[symbol]['hit_count'] = 0
+            m_breakpoint.mbp_table[symbol]['ignore_count'] = 0
+            m_breakpoint.mbp_table[symbol]['index'] = self.symbol_index
             # NOTE!!! symbol we pass in here is NOT a mirbin_info symbol.
-            addr = m_symbol.get_symbol_address(symbol)
-            if not addr:
-                self.mbp_object.mbp_table[symbol]['address'] = 0
-                self.mbp_object.mbp_table[symbol]['hex_addr'] = None
+            # !!!Workaround for symbol is 'main'. This main could be a inferior's main
+            # other than JS's main.
+            if symbol == "main":
+                addr = m_symbol.get_symbol_address("main_mirbin_info")
             else:
-                self.mbp_object.mbp_table[symbol]['address'] = int(addr, 16)
-                self.mbp_object.mbp_table[symbol]['hex_addr'] = addr
+                addr = m_symbol.get_symbol_address(symbol)
+            if not addr:
+                m_breakpoint.mbp_table[symbol]['address'] = 0
+                m_breakpoint.mbp_table[symbol]['hex_addr'] = None
+            else:
+                if symbol == "main":
+                    m_breakpoint.mbp_table[symbol]['address'] = int(addr, 16) - 4
+                    m_breakpoint.mbp_table[symbol]['hex_addr'] = str(hex(m_breakpoint.mbp_table[symbol]['address']))
+                else:
+                    m_breakpoint.mbp_table[symbol]['address'] = int(addr, 16)
+                    m_breakpoint.mbp_table[symbol]['hex_addr'] = addr
                 self.mbp_object.add_known_addr_symbol_into_addr_sym_table(symbol)
+                self.mbp_dync_object.add_known_addr_symbol_into_addr_sym_table(symbol)
             self.symbol_index += 1
 
         self.mbp_object.update_mbp()
+        self.mbp_dync_object.update_mbp_dync()
 
     def disable_breakpoint(self, s):
         if not self.mbp_object:
@@ -185,8 +214,8 @@ class MapleBreakpointCmd(gdb.Command):
             gdb_print(buf)
             return
 
-        if symbol in self.mbp_object.mbp_table:
-            self.mbp_object.mbp_table[symbol]['disabled'] = True
+        if symbol in m_breakpoint.mbp_table:
+            m_breakpoint.mbp_table[symbol]['disabled'] = True
         else:
             buf = "disable symbol: " + str(symbol) + " not found"
             gdb_print(buf)
@@ -208,8 +237,8 @@ class MapleBreakpointCmd(gdb.Command):
             gdb_print(buf)
             return
 
-        if symbol in self.mbp_object.mbp_table:
-            self.mbp_object.mbp_table[symbol]['disabled'] = False
+        if symbol in m_breakpoint.mbp_table:
+            m_breakpoint.mbp_table[symbol]['disabled'] = False
         else:
             buf = "enable symbol: " + str(symbol) + " not found"
             gdb_print(buf)
@@ -231,7 +260,7 @@ class MapleBreakpointCmd(gdb.Command):
             gdb_print(buf)
             return
 
-        if symbol in self.mbp_object.mbp_table:
+        if symbol in m_breakpoint.mbp_table:
             self.mbp_object.clear_one_symbol(symbol)
         else:
             buf = "clear symbol: " + str(symbol) + " not found"
@@ -261,7 +290,7 @@ class MapleBreakpointCmd(gdb.Command):
         count = int(c)
         if count < 0:
             count = 0
-        self.mbp_object.mbp_table[symbol]['ignore_count'] = count
+        m_breakpoint.mbp_table[symbol]['ignore_count'] = count
 
     def clearall_breakpoint(self):
         if not self.mbp_object:
@@ -276,7 +305,7 @@ class MapleBreakpointCmd(gdb.Command):
 
         gdb_print ("list all Maple breakpoints")
         # sort the dict with the index, so that we can display in index order
-        blist = [{k:v} for k, v in sorted(self.mbp_object.mbp_table.items(), key=(lambda x:x[1]['index']))]
+        blist = [{k:v} for k, v in sorted(m_breakpoint.mbp_table.items(), key=(lambda x:x[1]['index']))]
         bp_info = self.mbp_object.bp_info if self.mbp_object.bp_info else "in maple::maple_invoke_method()"
         bp_addr = hex(self.mbp_object.bp_addr) if self.mbp_object.bp_addr else "pending address"
         for v in blist:
@@ -296,7 +325,7 @@ class MapleBreakpointCmd(gdb.Command):
         self.mbp_object.display_mbp_addr_sym_table()
 
     def lookup_symbol_by_index(self,index):
-        for k,v in self.mbp_object.mbp_table.items():
+        for k,v in m_breakpoint.mbp_table.items():
             if v['index'] == index:
                 return k
         return None

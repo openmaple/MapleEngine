@@ -20,6 +20,7 @@ import m_set
 import m_util
 from m_util import gdb_print
 import m_debug
+import m_symbol
 
 def get_current_thread():
     return gdb.selected_thread()
@@ -49,8 +50,11 @@ def get_maple_frame_addr():
     if buf.find('_mirbin_info') != -1 and buf.find('mir_header') != -1:
         x = buf.split()
         return x[2]
+    elif buf.find('_mirbin_info') != -1 and buf.find('_mirbin_code') != -1 and buf.find('header = ') != -1: #for dynamic language
+        return buf.split('header = ')[1].split()[0]
     else:
         return None
+
 
 def get_so_base_addr(name):
     """
@@ -299,6 +303,76 @@ def get_lib_so_info(addr):
             return None, None, None, None
     return None, None, None, None
 
+def get_dync_lib_so_info(addr):
+    """
+    for a given Maple method address, look up the lib so file, and get informations
+    about the so library and its co-responding asm file info.
+
+    params:
+      addr: address of a method in hex string with prefix '0x', i.e 0x7fff6021c308
+
+    returns:
+      1, so lib start address: int
+      2, lib so file full path in string
+      3, lib asm file full path in string
+      4, lib mpl.mir.mpl file full path in string
+    """
+    a = int(addr, 0)
+
+    buf = get_info_proc_mapping()
+    start = None
+    end = None
+    path = None
+    so_path = None
+    asm_path = None
+    mirmpl_path = None
+    for (hexstart, hexend, path) in re.findall(proc_mapping_re, buf):
+        try:
+            start = int(hexstart, 16)
+        except:
+            start = None
+        try:
+            end = int(hexend, 16)
+        except:
+            end = None
+        if not start or not end or not path:
+            continue
+
+        if a >= start and a <= end:
+            if not path.rstrip().lower().endswith('.so'):
+                if m_debug.Debug: m_debug.dbg_print("path does not end with .so, path = ", path)
+                return None, None, None, None
+            so_path = path.rstrip().replace('/./','/')
+            if m_debug.Debug: m_debug.dbg_print("gdb.solib_name(addr)=", gdb.solib_name(a))
+            mmpl_path = so_path[:-3] + '.mmpl'
+            mmpl_path = os.path.realpath(mmpl_path)
+            asm_path = so_path[:-3] + '.s'
+            asm_path = os.path.realpath(asm_path)
+            if os.path.exists(so_path) and os.path.exists(asm_path) and os.path.exists(mmpl_path):
+                # both .so file and co-responding .s file exist in same directory
+                if m_debug.Debug: m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path,\
+                                                    "asm_path=", asm_path, "mmpl_path=", mmpl_path)
+                return start, so_path, asm_path, mmpl_path
+
+            so_path_short_name = so_path.split('/')[-1][:-3]
+
+            if not 'maple_lib_asm_path' in m_set.msettings:
+                return None, None, None, None
+            for v in m_set.msettings['maple_lib_asm_path']:
+                mmpl_path = v + '/'+ so_path_short_name + '.mmpl'
+                mmpl_path = os.path.realpath(mirmpl_path)
+                asm_path = v + '/' + so_path_short_name + '.s'
+                asm_path = os.path.realpath(asm_path)
+                #asm_path = path.split('maple/out')[0] + 'maple/out/common/share/' + so_path_short_name + '.VtableImpl.s'
+                if os.path.exists(so_path) and os.path.exists(asm_path) and os.path.exists(mmpl_path):
+                    # .s file is in the search path list
+                    if m_debug.Debug:
+                        m_debug.dbg_print("return lib info: start=", start, "so_path=",so_path, \
+                                          "asm_path=", asm_path, "mmpl_path", mmpl_path)
+                    return start, so_path, asm_path, mmpl_path
+
+            return None, None, None, None
+    return None, None, None, None
 
 exclude_lib_path = ['/lib/', '/lib64/', '/usr/']
 def lib_file_filter(path):
@@ -407,6 +481,45 @@ def get_uninitialized_maple_func_addrs():
     pc = '0000'
 
     return hex(offset) + ":" + pc + ":", so_path, asm_path, func_header, mirmpl_path
+
+def get_uninitialized_dync_maple_func_addrs():
+    """
+    get func addr information from an uninitialized Maple frame.
+    NOTE: call this when Maple func is NOT initialized yet.
+
+    returns:
+      1, func header address in string format of xxxxxx:yyyyyy: format where
+         xxxxxx means (header - lib_base_addr),
+         yyyyyy means (pc - header - header_size)
+      2, so_path: in string. so library full path.
+      3, asm_path: in string. asm (.s) file full path
+      4, func_header: func header address in string.
+      5, mmpl_path: in string. .mpl.mir.mpl file full path
+    """
+
+    #func_header = get_maple_frame_addr()
+    func_header = m_symbol.get_dynamic_symbol_addr_by_current_frame()
+    if not func_header:
+        return None, None, None, None, None
+    if m_debug.Debug: m_debug.dbg_print("func_header=", func_header)
+
+    func_lib_addr, so_path, asm_path, mmpl_path = get_dync_lib_so_info(func_header)
+    if not func_lib_addr or not so_path or not asm_path or not mmpl_path:
+        return None, None, None, None, None
+    if m_debug.Debug: m_debug.dbg_print("func_lib_addr=", func_lib_addr)
+
+    header = int(func_header, 16)
+    if (header < func_lib_addr):
+        #gdb_print ("Warning: The header address is lower than lib_addr.")
+        if m_debug.Debug: m_debug.dbg_print("Warning: The header address is lower than lib_addr.")
+        return None, None, None, None, None
+
+    offset = header - func_lib_addr
+
+    # when a func in a frame is not initialized yet, pc value is 0000
+    pc = '0000'
+
+    return hex(offset) + ":" + pc + ":", so_path, asm_path, func_header, mmpl_path
 
 #######################################################################
 ####  API section for retrieving Maple frame caller information

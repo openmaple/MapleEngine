@@ -35,6 +35,7 @@ mpl_lang = os.path.expandvars('$MAPLE_DEBUGGER_ROOT/highlight/mpl.lang')
 MLIST_MODE_SRC = 0
 MLIST_MODE_ASM = 1
 MLIST_MODE_MIR = 2
+MLIST_MODE_MPL = 3
 
 def find_one_file(name, path):
     """ find the file with specified name and given base path """
