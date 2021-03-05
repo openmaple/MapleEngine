@@ -1,5 +1,5 @@
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -72,6 +72,9 @@ def get_next_newer_frame(frame):
 def is_maple_frame(frame):
     return frame.name() == "maple::maple_invoke_method" or is_maple_frame_dync(frame)
 
+def is_maple_frame_static(frame):
+    return frame.name() == "maple::maple_invoke_method"
+
 def is_maple_frame_dync(frame):
     return frame.name() == "maple::InvokeInterpretMethod"
 
@@ -87,6 +90,20 @@ def is_current_maple_frame_dync():
     if not frame:
         return False
     return is_maple_frame_dync(frame) or is_maple_frame_dync_other(frame)
+
+def is_closest_older_maple_frame_dync():
+    frame = get_selected_frame()
+    if not frame:
+        return False, None
+    while frame:
+        if not frame.name(): #there are cases found that frame name is None
+            return False, None
+        if is_maple_frame_dync(frame) or is_maple_frame_dync_other(frame):
+            return True, frame
+        if is_maple_frame_static(frame):
+            return False, frame
+        frame = frame.older()
+    return False, None
 
 def get_frame_info(frame):
     """

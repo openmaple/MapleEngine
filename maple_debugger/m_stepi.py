@@ -1,5 +1,5 @@
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
 # Licensed under the Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
@@ -236,11 +236,22 @@ class MapleStepiCmd(gdb.Command):
         if m_frame.is_current_maple_frame_dync():
             return self.mstepi_common_dync(threadno, count)
         else:
-            return self.mstepi_common_static(threadno, count)
+            result, frame = m_frame.is_closest_older_maple_frame_dync()
+            if not result and not frame:
+                #return None
+                return self.mstepi_common_static(threadno, count)
+
+            elif result and frame:
+                return self.mstepi_common_dync(threadno, count)
+            elif not result and frame:
+                return self.mstepi_common_static(threadno, count)
+            else:
+                return self.mstepi_common_static(threadno, count)
+            #return None
 
     def mstepi_common_static(self, threadno, count):
         msi_bp_exist, msi_bp_id = is_msi_bp_existed()
-        print ("msi_bp_exist=", msi_bp_exist, "msi_bp_id=", msi_bp_id, "self.msi_bp_id=", self.msi_bp_id)
+        #print ("msi_bp_exist=", msi_bp_exist, "msi_bp_id=", msi_bp_id, "self.msi_bp_id=", self.msi_bp_id)
         if not msi_bp_exist:
             # there is no msi bp exist, so just create a new msi breakpoint
             self.init_gdb_breakpoint(threadno, count, True, False)
