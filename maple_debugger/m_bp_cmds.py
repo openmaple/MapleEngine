@@ -143,6 +143,11 @@ class MapleBreakpointCmd(gdb.Command):
             return
 
     def set_breakpoint(self, symbol):
+        if str(symbol) == "main":
+            gdb_print("Setting Maple Breakpoint named 'main' is not allowed")
+            gdb_print("")
+            return
+
         buf = "set breakpoint " + str(symbol)
         gdb_print(buf)
         mbp_exist, mbp_id = m_breakpoint.is_mbp_existed()
@@ -178,20 +183,13 @@ class MapleBreakpointCmd(gdb.Command):
             # NOTE!!! symbol we pass in here is NOT a mirbin_info symbol.
             # !!!Workaround for symbol is 'main'. This main could be a inferior's main
             # other than JS's main.
-            if symbol == "main":
-                addr = m_symbol.get_symbol_address("main_mirbin_info")
-            else:
-                addr = m_symbol.get_symbol_address(symbol)
+            addr = m_symbol.get_symbol_address(symbol)
             if not addr:
                 m_breakpoint.mbp_table[symbol]['address'] = 0
                 m_breakpoint.mbp_table[symbol]['hex_addr'] = None
             else:
-                if symbol == "main":
-                    m_breakpoint.mbp_table[symbol]['address'] = int(addr, 16) - 4
-                    m_breakpoint.mbp_table[symbol]['hex_addr'] = str(hex(m_breakpoint.mbp_table[symbol]['address']))
-                else:
-                    m_breakpoint.mbp_table[symbol]['address'] = int(addr, 16)
-                    m_breakpoint.mbp_table[symbol]['hex_addr'] = addr
+                m_breakpoint.mbp_table[symbol]['address'] = int(addr, 16)
+                m_breakpoint.mbp_table[symbol]['hex_addr'] = addr
                 self.mbp_object.add_known_addr_symbol_into_addr_sym_table(symbol)
                 self.mbp_dync_object.add_known_addr_symbol_into_addr_sym_table(symbol)
             self.symbol_index += 1

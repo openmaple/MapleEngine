@@ -582,18 +582,6 @@ class MapleBreakpointDync(gdb.Breakpoint):
             self.mbp_addr_sym_table[hex(mirbin_addr)] = {}
             self.mbp_addr_sym_table[hex(mirbin_addr)]['mir_symbol']  = mirbin_symbol
             self.mbp_addr_sym_table[hex(mirbin_addr)]['symbol']   = symbol
-        else:
-            addr = m_symbol.get_symbol_address(symbol + '_mirbin_info')
-            if not addr:
-                return
-            mbp_table[symbol]['address'] = int(addr,16) - 4
-            mbp_table[symbol]['hex_addr'] = hex(mbp_table[symbol]['address'])
-
-            mirbin_addr = mbp_table[symbol]['address']  + 4
-            mirbin_symbol = symbol + '_mirbin_info'
-            self.mbp_addr_sym_table[hex(mirbin_addr)] = {}
-            self.mbp_addr_sym_table[hex(mirbin_addr)]['mir_symbol']  = mirbin_symbol
-            self.mbp_addr_sym_table[hex(mirbin_addr)]['symbol']   = symbol
 
     def get_enabled_mbp_number(self):
         global mbp_table
