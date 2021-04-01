@@ -219,4 +219,16 @@ Run following script to:
 cd maple_engine/maple_build/examples/JavaScript/add
 $MAPLE_ROOT/maple_build/tools/run-js-app.sh add
 ```
-
+##### Table of Contents
+- [Maple Compiler and Maple Engine](#maple-编译器和引擎)
+  * [Setup the Maple environment](#setup-the-maple-environment)
+  * [Build the Maple compiler and engine](#build-the-maple-compiler-and-engine)
+  * [Build the Java core library](#build-the-java-core-library)
+  * [Build and run an app](#build-and-run-an-app)
+  * [Debug an app with Maple debugger](#debug-an-app-with-maple-debugger)
+  <br/>
+- [Maple JavaScript Compiler and Maple Engine](#linux-server-setup)
+  * [Linux server setup](#linux-server-setup)
+  * [Setup the MapleJS environment](#setup-the-maplejs-environment)
+  * [Build the MapleJS compiler and engine](#build-the-maplejs-compiler-and-engine)
+  * [Build and run a JS App](#build-and-run-a-js-app)
