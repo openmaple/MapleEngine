@@ -144,92 +144,6 @@
   
   登录服务器后，执行如下命令安装所需的软件包：
 ```
-sudo apt install -y build-essential clang cmake libffi-dev libunwind-dev libssl-dev:i386 libelf-dev:i386 g++-5 gcc-5 g++-multilib gcc-multilib libc6-dev-i386 
-```
-
-## MapleJS构建环境设置
-
-  下载代码并设置MapleJS 构建环境：
-
-```
-  git clone https://gitee.com/openarkcompiler-incubator/maple_engine.git
-```
-
-  若要执行后续命令，需先执行`source  maple_engine/envsetup.sh`.
-
-## 构建MapleJS 编译器和Maple引擎
-
-  以下脚本下载与构建JavaScript引擎，构建与安装maple编译器，构建MapleJS引擎:
-
-```
-maple_engine/maple_build/tools/build-maple-js.sh
-```
-
-## 编译和执行JS应用程序
-
-以add.js为例，编译和执行一个应用程序：
-
-```
-cd maple_engine/maple_build/examples/JavaScript/add
-$MAPLE_ROOT/maple_build/tools/run-js-app.sh add
-```
-
-你将看到：
-
-```
-add: pass
-```
-
-## Linux server setup
-This requires an x86_64 server with more than 16GB of RAM and Ubuntu 16.04/18.04 installed.
-  
-Execute the following command to install the packages used by the MapleJS build.
-
-```
-sudo apt install -y build-essential clang cmake libffi-dev libunwind-dev openjdk-8-jdk-headless \
-       libssl-dev:i386 libelf-dev:i386 g++-5 gcc-5 g++-multilib gcc-multilib libc6-dev-i386 \
-       unzip python-minimal python3 gdb bc highlight
-```
-
-## Setup the Maple environment
-```
-  cd maple_engine
-  source ./envsetup.sh
-```
-
-## Build the Maple compiler and engine
-```
-  ./maple_build/tools/build-maple.sh
-```
-## Build the Java core library
-   Following the doc at ./maple_build/doc/build_OpenJDK8.md to build the customized OpenJDK8.
-   Make sure the needed .jar files are copied into ./maple_build/jar/ directory.
-
-```
-   ./maple_build/tools/build-libcore.sh
-```
-## Build and run an app
-```
-  cd ./maple_build/examples/HelloWorld
-  "$MAPLE_BUILD_TOOLS"/java2asm.sh HelloWorld.java
-  "$MAPLE_BUILD_TOOLS"/asm2so.sh HelloWorld.s
-
-  "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
-```
-
-## Debug an app with Maple debugger
-```
-  "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
-```
-                            
-
-# Maple JavaScript编译器和引擎 
-
-## Linux服务器环境设置
-  需要一台Linux x86_64服务器，至少6GB或以上内存，安装Ubuntu 16.04或18.04系统.
-  
-  登录服务器后，执行如下命令安装所需的软件包：
-```
 sudo apt install -y build-essential clang cmake libffi-dev libunwind-dev openjdk-8-jdk-headless \
        libssl-dev:i386 libelf-dev:i386 g++-5 gcc-5 g++-multilib gcc-multilib libc6-dev-i386 \
        unzip python-minimal python3 gdb bc highlight
@@ -269,7 +183,7 @@ add: pass
 ```
 
 ## Linux server setup
-This requires an x86_64 server with more than 16GB of RAM and Ubuntu 16.04/18.04 installed.
+This requires an x86_64 server with more than 6GB of RAM and Ubuntu 16.04/18.04 installed.
   
 Execute the following command to install the packages used by the MapleJS build.
 
