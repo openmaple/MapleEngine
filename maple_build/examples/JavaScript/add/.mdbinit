@@ -1,0 +1,5 @@
+mb __jsmain
+run
+msi 20
+mlist
+echo You may delete .mdbinit file to not run it automatically\n

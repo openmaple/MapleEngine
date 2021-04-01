@@ -1,7 +1,0 @@
-mb Ljava_2Flang_2FSystem_3B_7CinitProperties_7C_28Ljava_2Futil_2FProperties_3B_29Ljava_2Futil_2FProperties_3B
-mb LHelloWorld_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
-run
-continue
-mb -clearall
-mb -list
-q

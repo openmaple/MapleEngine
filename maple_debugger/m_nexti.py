@@ -1,7 +1,7 @@
 #
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -155,6 +155,8 @@ class MapleNextCmd(gdb.Command):
         """
 
         frame = m_frame.get_selected_frame()
+        if not frame:
+            return
         ds = m_datastore.get_stack_frame_data(frame)
         if not ds:
             return
@@ -180,6 +182,8 @@ class MapleNextCmd(gdb.Command):
                 m_debug.dbg_print("executed %d opcodes", count)
             # retrieve the new frame data since one opcode can change to a different frame
             frame = m_frame.get_selected_frame()
+            if not frame:
+                return
             ds = m_datastore.get_stack_frame_data(frame)
             if not ds:
                 gdb_print("Warning: Failed to get new stack frame to continue")

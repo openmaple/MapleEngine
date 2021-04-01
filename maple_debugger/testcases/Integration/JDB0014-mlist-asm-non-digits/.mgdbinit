@@ -1,5 +1,0 @@
-mb Ljava_2Futil_2FHashtable_3B_7Cput_7C_28Ljava_2Flang_2FObject_3BLjava_2Flang_2FObject_3B_29Ljava_2Flang_2FObject_3B
-run
-mlist -asm
-mlist -asm:X
-quit

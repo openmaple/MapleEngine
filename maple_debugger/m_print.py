@@ -1,7 +1,7 @@
 #
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -20,6 +20,8 @@ import m_util
 from m_util import MColors
 from m_util import gdb_print
 import m_debug
+import m_frame
+import m_info
 
 class MaplePrintCmd(gdb.Command):
     """prints Maple runtime object data
@@ -39,6 +41,7 @@ class MaplePrintCmd(gdb.Command):
     def usage(self):
         gdb_print ("  mprint      : prints Maple object data")
         gdb_print ("  mprint <addr-in-hex>: e.g. mprint 0x13085")
+        gdb_print ("  mprint <variable-name>: e.g. mprint [object_name.]my_var")
 
     def mprint_func(self, args, from_tty):
         s = str(args)
@@ -49,12 +52,18 @@ class MaplePrintCmd(gdb.Command):
             pass
 
         x = s.split()
-        if len(x) == 1: # address
-            try:
-                addr = int(x[0],16)
-            except:
-                self.usage()
+        if len(x) == 1: # address or a variable
+            # if address: x[0] is list 0x123456
+            # if variable: x[0] must not be a number character
+            if not x[0][0].isdigit(): # x[0] is a variable
+                self.mprint_func_dync(x[0])
                 return
+            else:
+                try:
+                    addr = int(x[0],16)
+                except:
+                    self.usage()
+                    return
         else:
             self.usage()
             return
@@ -515,3 +524,36 @@ class MaplePrintCmd(gdb.Command):
         else:
             if m_debug.Debug: m_debug.dbg_print()
             return None
+
+    def mprint_func_dync(self, var):
+        #input 'var': is a variable name
+
+        is_dync, frame = m_frame.is_closest_older_maple_frame_dync()
+        if not is_dync:
+            gdb_print("Program is not running in a dynamic language mode, mprint property not supported")
+            return
+
+        data = m_info.get_all_dync_properties_data()
+        if not data or len(data) == 0:
+            gdb_print("property data not ready yet")
+            return
+        if len(data) == 0:
+            gdb_print("property data not ready yet")
+            return
+        match = [x for x in data if x['ascii_name'] == var]
+        if not match or len(match) == 0:
+            buf = "property " + var + " data not available yet"
+            gdb_print(buf)
+        else:
+            buf = "property name    : " + var
+            gdb_print(buf)
+            buf = "  tag            : " + match[0]['tag']
+            gdb_print(buf)
+            buf = "  value          : " + match[0]['value']
+            gdb_print(buf)
+            buf = "  next addr      : " + match[0]['next']
+            gdb_print(buf)
+            buf = "  parent         : " + "Global Object"
+            gdb_print(buf)
+
+        return

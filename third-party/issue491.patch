@@ -1,0 +1,15 @@
+--- mozjs-31.2.0.maple/js/src/frontend/Parser.cpp	2021-03-03 16:09:25.290577989 -0800
++++ mozjs-31.2.0/js/src/frontend/Parser.cpp	2021-03-03 15:45:43.418654258 -0800
+@@ -96,10 +96,12 @@
+ 
+ void static addToVec(std::vector<JSAtom *> &vec, JSAtom *name) {
+     std::vector<JSAtom *>::iterator I;
++#if 0
+     for (I = vec.begin() ; I != vec.end(); ++I) {
+         if (*I == name)
+             return;
+     }
++#endif
+     vec.push_back(name);
+     return;
+ }

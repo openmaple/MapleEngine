@@ -1,0 +1,23 @@
+cmake_minimum_required(VERSION 3.5)
+
+project(jscre C CXX)
+
+add_library(jscre
+  ASCIICType.h
+  config.h
+  pcre.h
+  pcre_internal.h
+  ucpinternal.h
+  pcre_compile.cpp 
+  pcre_exec.cpp 
+  pcre_tables.cpp 
+  pcre_ucp_searchfuncs.cpp 
+  pcre_xclass.cpp 
+)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_FLAGS "-g -DDEBUG -fPIC -DSUPPORT_UTF8 -DSUPPORT_UCP -DNO_RECURSE")
+
+target_compile_options(jscre PUBLIC -w)
+

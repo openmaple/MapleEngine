@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -33,6 +33,8 @@ fi
 cd "$MAPLE_COMPILER_ROOT" || exit 2
 cd tools || exit 2
 ./setup_tools.sh
+[ -f dwarf/include/dwarf2.h -a -f ninja/ninja -a -f gn/gn -a open64_prebuilt/README.md ] || ./setup_tools.sh
+[ -f dwarf/include/dwarf2.h -a -f ninja/ninja -a -f gn/gn -a open64_prebuilt/README.md ] || { echo Failed to setup tools.; exit 2; }
 
 cd "$MAPLE_COMPILER_ROOT" || exit 2
 source envsetup.sh ark release
@@ -40,9 +42,9 @@ make || exit 2
 make install || exit 2
 echo Installed Maple compiler into "$MAPLE_COMPILER_ROOT/bin/ark-clang-release/".
 
-cd "$MAPLE_ENGINE_ROOT" || exit 1
-git pull
-./buildit.sh
+cd "$MAPLE_ENGINE_ROOT" || exit 3
+git pull || exit 3
+./buildit.sh mplre || exit 3
 
 if [ -f "$MAPLE_ENGINE_ROOT"/build/src/libmplre.so ]; then
     cp "$MAPLE_ENGINE_ROOT"/build/src/libmplre.so "$MAPLE_RUNTIME_ROOT/lib/$MAPLE_TARGET_ARCH"

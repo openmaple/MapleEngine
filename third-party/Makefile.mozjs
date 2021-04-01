@@ -1,0 +1,44 @@
+BUILD = mozjs-build
+MKDIR_P = mkdir -p
+
+all: DIRECTORIES build
+
+config: DIRECTORIES
+	touch mozjs-31.2.0/js/src/configure
+	(cd $(BUILD); \
+    export PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig; \
+    export CC="gcc -m32" \
+    export CXX="g++ -m32"; \
+    export AR=ar; \
+    ../mozjs-31.2.0/js/src/configure --disable-optimize --target=i686-pc-linux)
+
+DIRECTORIES:
+	$(MKDIR_P) $(BUILD)
+
+build:
+	$(MAKE) -C $(BUILD)
+
+
+#debug mode
+BUILD_D = mozjs-build-debug
+
+debug: DIRECTORIES_D build_d
+
+config_d: DIRECTORIES_D
+	touch mozjs-31.2.0/js/src/configure
+	(cd $(BUILD_D); \
+    export PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig; \
+    export CC="gcc -m32" \
+    export CXX="g++ -m32"; \
+    export AR=ar; \
+    ../mozjs-31.2.0/js/src/configure --disable-optimize --enable-debug --target=i686-pc-linux)
+
+DIRECTORIES_D:
+	$(MKDIR_P) $(BUILD_D)
+
+build_d:
+	$(MAKE) -C $(BUILD_D)
+
+
+clean: 
+	$(MAKE) clean -C $(BUILD)

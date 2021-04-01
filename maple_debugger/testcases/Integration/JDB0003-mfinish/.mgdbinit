@@ -1,8 +1,0 @@
-mb LFibonacci_3B_7Cfib_7C_28I_29I
-run
-c 30
-mb -disable LFibonacci_3B_7Cfib_7C_28I_29I
-mbt
-mfinish
-mbt
-quit

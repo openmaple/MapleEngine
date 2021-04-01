@@ -1,7 +1,7 @@
 ```
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -14,25 +14,44 @@
 #
 ```
 
+## Run a Java app
+
 cd HelloWorld
 
-### Compile Java program to assembly code: .java -> .s
+### Compile a Java program to assembly code: .java -> .s
 
 ```
   "$MAPLE_BUILD_TOOLS"/java2asm.sh HelloWorld.java
 ```
 
-### Compile assembly code to shared library: .s -> .so
+### Compile the assembly code to a shared library: .s -> .so
 ```
   "$MAPLE_BUILD_TOOLS"/asm2so.sh HelloWorld.s
 ```
 
-### Run program with Maple engine
+### Run the program with Maple engine
 ```
   "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
 ```
 
-### Debug program with Maple debugger
+### Debug the program with Maple debugger
 ```
   "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
+```
+
+## Run a JavaScript app
+
+First of all, run "$MAPLE_BUILD_TOOLS"/build-maple-js.sh to build Maple JS compiler and engine.
+
+```
+cd JavaScript/add
+```
+### Command to run a JavaScript app
+```
+"$MAPLE_BUILD_TOOLS"/run-js-app.sh add.js
+```
+
+### Debug the program with Maple debugger
+```
+"$MAPLE_BUILD_TOOLS"/run-js-app.sh -gdb add.js
 ```

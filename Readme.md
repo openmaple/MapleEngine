@@ -1,8 +1,25 @@
+##### [English Version Readme](#table-of-contents)
+##### 目录
+- [Maple Java 编译器和引擎](#maple-编译器和引擎)
+  * [Linux服务器环境设置](#linux服务器环境设置)
+  * [Maple 构建环境设置](#maple-构建环境设置)
+  * [构建Maple 编译器和Maple引擎](#构建maple-编译器和maple引擎)
+  * [构建Java 核心库](#构建java-核心库)
+  * [编译和执行应用程序](#编译和执行应用程序)
+  * [调试应用程序](#调试应用程序)      
+  <br/>
+- [Maple JavaScript 编译器和引擎](#maple-javascript编译器和引擎) 
+  * [Linux服务器环境设置](#linux服务器环境设置) 
+  * [MapleJS 构建环境设置](#maplejs构建环境设置)
+  * [构建MapleJS 编译器和Maple引擎](#构建maplejs-编译器和maple引擎)
+  * [编译和执行应用程序](#编译和执行js应用程序)
+
+
 ```
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -14,7 +31,8 @@
 # See the MulanPSL - 2.0 for more details.
 #
 ```
-# Maple 编译器和引擎 
+
+# Maple 编译器和引擎
 
 ![输入图片说明](https://images.gitee.com/uploads/images/2020/0721/050904_9b03f7b1_5583371.png "Maple-engine.PNG")
 
@@ -76,8 +94,8 @@
 
 ---
 
-## Build envionment setup
-  Needs a Linux x86_64 server with 16GB or more RAM and Ubuntu 16.04/18.04 installed.
+## Build environment setup
+  This requires an x86_64 server with more than 16GB of RAM and Ubuntu 16.04/18.04 installed.
   If your server has 16GB RAM, please setup 8GB or more swap space.
 
   Execute the following command to install the packages used by the Maple build.
@@ -85,24 +103,24 @@
     sudo apt install -y build-essential clang cmake libffi-dev libelf-dev libunwind-dev \
             libssl-dev openjdk-8-jdk-headless unzip python-minimal python3 gdb bc highlight
 
-## Setup Maple environment
+## Setup the Maple environment
 ```
   cd maple_engine
   source ./envsetup.sh
 ```
 
-## Build Maple compiler and engine
+## Build the Maple compiler and engine
 ```
   ./maple_build/tools/build-maple.sh
 ```
-## Build Java core library
+## Build the Java core library
    Following the doc at ./maple_build/doc/build_OpenJDK8.md to build the customized OpenJDK8.
    Make sure the needed .jar files are copied into ./maple_build/jar/ directory.
 
 ```
    ./maple_build/tools/build-libcore.sh
 ```
-## Build and run app
+## Build and run an app
 ```
   cd ./maple_build/examples/HelloWorld
   "$MAPLE_BUILD_TOOLS"/java2asm.sh HelloWorld.java
@@ -111,7 +129,234 @@
   "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
 ```
 
-## Debug app with Maple debugger
+## Debug an app with Maple debugger
 ```
   "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
 ```
+                            
+
+# Maple JavaScript编译器和引擎 
+
+## Linux服务器环境设置
+  需要一台Linux x86_64服务器，至少6GB或以上内存，安装Ubuntu 16.04或18.04系统.
+  
+  登录服务器后，执行如下命令安装所需的软件包：
+```
+sudo apt install -y build-essential clang cmake libffi-dev libunwind-dev libssl-dev:i386 libelf-dev:i386 g++-5 gcc-5 g++-multilib gcc-multilib libc6-dev-i386 
+```
+
+## MapleJS构建环境设置
+
+  下载代码并设置MapleJS 构建环境：
+
+```
+  git clone https://gitee.com/openarkcompiler-incubator/maple_engine.git
+```
+
+  若要执行后续命令，需先执行`source  maple_engine/envsetup.sh`.
+
+## 构建MapleJS 编译器和Maple引擎
+
+  以下脚本下载与构建JavaScript引擎，构建与安装maple编译器，构建MapleJS引擎:
+
+```
+maple_engine/maple_build/tools/build-maple-js.sh
+```
+
+## 编译和执行JS应用程序
+
+以add.js为例，编译和执行一个应用程序：
+
+```
+cd maple_engine/maple_build/examples/JavaScript/add
+$MAPLE_ROOT/maple_build/tools/run-js-app.sh add
+```
+
+你将看到：
+
+```
+add: pass
+```
+
+## Linux server setup
+This requires an x86_64 server with more than 16GB of RAM and Ubuntu 16.04/18.04 installed.
+  
+Execute the following command to install the packages used by the MapleJS build.
+
+```
+sudo apt install -y build-essential clang cmake libffi-dev libunwind-dev openjdk-8-jdk-headless \
+       libssl-dev:i386 libelf-dev:i386 g++-5 gcc-5 g++-multilib gcc-multilib libc6-dev-i386 \
+       unzip python-minimal python3 gdb bc highlight
+
+## Setup the Maple environment
+```
+  cd maple_engine
+  source ./envsetup.sh
+```
+
+## Build the Maple compiler and engine
+```
+  ./maple_build/tools/build-maple.sh
+```
+## Build the Java core library
+   Following the doc at ./maple_build/doc/build_OpenJDK8.md to build the customized OpenJDK8.
+   Make sure the needed .jar files are copied into ./maple_build/jar/ directory.
+
+```
+   ./maple_build/tools/build-libcore.sh
+```
+## Build and run an app
+```
+  cd ./maple_build/examples/HelloWorld
+  "$MAPLE_BUILD_TOOLS"/java2asm.sh HelloWorld.java
+  "$MAPLE_BUILD_TOOLS"/asm2so.sh HelloWorld.s
+
+  "$MAPLE_BUILD_TOOLS"/run-app.sh -classpath ./HelloWorld.so HelloWorld
+```
+
+## Debug an app with Maple debugger
+```
+  "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
+```
+                            
+
+# Maple JavaScript编译器和引擎 
+
+## Linux服务器环境设置
+  需要一台Linux x86_64服务器，至少6GB或以上内存，安装Ubuntu 16.04或18.04系统.
+  
+  登录服务器后，执行如下命令安装所需的软件包：
+```
+sudo apt install -y build-essential clang cmake libffi-dev libunwind-dev openjdk-8-jdk-headless \
+       libssl-dev:i386 libelf-dev:i386 g++-5 gcc-5 g++-multilib gcc-multilib libc6-dev-i386 \
+       unzip python-minimal python3 gdb bc highlight
+```
+
+## MapleJS构建环境设置
+
+  下载代码并设置MapleJS 构建环境：
+
+```
+  git clone https://gitee.com/openarkcompiler-incubator/maple_engine.git
+```
+
+  若要执行后续命令，需先执行`source  maple_engine/envsetup.sh`.
+
+## 构建MapleJS 编译器和Maple引擎
+
+  以下脚本下载与构建JavaScript引擎，构建与安装maple编译器，构建MapleJS引擎:
+
+```
+maple_engine/maple_build/tools/build-maple-js.sh
+```
+
+## 编译和执行JS应用程序
+
+以add.js为例，编译和执行一个应用程序：
+
+```
+cd maple_engine/maple_build/examples/JavaScript/add
+$MAPLE_ROOT/maple_build/tools/run-js-app.sh add
+```
+
+你将看到：
+
+```
+add: pass
+```
+
+## Linux server setup
+This requires an x86_64 server with more than 16GB of RAM and Ubuntu 16.04/18.04 installed.
+  
+Execute the following command to install the packages used by the MapleJS build.
+
+```
+sudo apt install -y build-essential clang cmake libffi-dev libunwind-dev openjdk-8-jdk-headless \
+       libssl-dev:i386 libelf-dev:i386 g++-5 gcc-5 g++-multilib gcc-multilib libc6-dev-i386 \
+       unzip python-minimal python3 gdb bc highlight
+```    
+
+## Setup the MapleJS environment
+
+Download MapleJS code:
+
+```
+  git clone https://gitee.com/openarkcompiler-incubator/maple_engine.git
+```
+Set up build enviroment: `source  maple_engine/envsetup.sh`.
+
+## Build the MapleJS compiler and engine
+
+Run following script to:
+  Download and build jscre
+  Build Maple compiler release (mplbe, mplcg, js2mpl) for Maple Engine
+  Build Maple Engine for JS
+
+```
+  ./maple_build/tools/build-maple-js.sh
+```
+
+## Build and run a JS App
+   Build and run examples in JavaScript:
+```
+cd maple_engine/maple_build/examples/JavaScript/add
+$MAPLE_ROOT/maple_build/tools/run-js-app.sh add
+```
+
+##### Table of Contents
+- [Maple Compiler and Maple Engine](#maple-编译器和引擎)
+  * [Setup the Maple environment](#setup-maple-environment)
+  * [Build the Maple compiler and engine](#build-maple-compiler-and-engine)
+  * [Build the Java core library](#build-java-core-library)
+  * [Build and run an app](#build-and-run-app)
+  * [Debug an app with Maple debugger](#debug-app-with-maple-debugger)
+  <br/>
+- [Maple JavaScript Compiler and Maple Engine](#linux-server-setup)
+  * [Linux server setup](#linux-server-setup)
+  * [Setup the MapleJS environment](#setup-maplejs-environment)
+  * [Build the MapleJS compiler and engine](#build-maplejs-compiler-and-engine)
+  * [Build and run a JS App](#build-and-run-js-app)
+
+```    
+
+## Setup the MapleJS environment
+
+Download MapleJS code:
+
+```
+  git clone https://gitee.com/openarkcompiler-incubator/maple_engine.git
+```
+Set up build enviroment: `source  maple_engine/envsetup.sh`.
+
+## Build the MapleJS compiler and engine
+
+Run following script to:
+  Download and build jscre
+  Build Maple compiler release (mplbe, mplcg, js2mpl) for Maple Engine
+  Build Maple Engine for JS
+
+```
+  ./maple_build/tools/build-maple-js.sh
+```
+
+## Build and run a JS App
+   Build and run examples in JavaScript:
+```
+cd maple_engine/maple_build/examples/JavaScript/add
+$MAPLE_ROOT/maple_build/tools/run-js-app.sh add
+```
+
+##### Table of Contents
+- [Maple Compiler and Maple Engine](#maple-编译器和引擎)
+  * [Setup the Maple environment](#setup-maple-environment)
+  * [Build the Maple compiler and engine](#build-maple-compiler-and-engine)
+  * [Build the Java core library](#build-java-core-library)
+  * [Build and run an app](#build-and-run-app)
+  * [Debug an app with Maple debugger](#debug-app-with-maple-debugger)
+  <br/>
+- [Maple JavaScript Compiler and Maple Engine](#linux-server-setup)
+  * [Linux server setup](#linux-server-setup)
+  * [Setup the MapleJS environment](#setup-maplejs-environment)
+  * [Build the MapleJS compiler and engine](#build-maplejs-compiler-and-engine)
+  * [Build and run a JS App](#build-and-run-js-app)
+

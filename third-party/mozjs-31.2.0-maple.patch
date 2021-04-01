@@ -1,0 +1,363 @@
+diff -ur mozjs-31.2.0/js/src/builtin/TypedObject.cpp mozjs-31.2.0.maple/js/src/builtin/TypedObject.cpp
+--- mozjs-31.2.0/js/src/builtin/TypedObject.cpp	2020-12-02 22:15:25.257699550 -0800
++++ mozjs-31.2.0.maple/js/src/builtin/TypedObject.cpp	2020-10-13 11:33:39.794337628 -0700
+@@ -710,12 +710,12 @@
+     contents.append(")");
+     RootedAtom stringRepr(cx, contents.finishAtom());
+     if (!stringRepr)
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     // Extract ArrayType.prototype
+     RootedObject arrayTypePrototype(cx, GetPrototype(cx, arrayTypeGlobal));
+     if (!arrayTypePrototype)
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     // Create the instance of ArrayType
+     Rooted<UnsizedArrayTypeDescr *> obj(cx);
+@@ -728,7 +728,7 @@
+     if (!JSObject::defineProperty(cx, obj, cx->names().length,
+                                   UndefinedHandleValue, nullptr, nullptr,
+                                   JSPROP_READONLY | JSPROP_PERMANENT))
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     args.rval().setObject(*obj);
+     return true;
+@@ -762,7 +762,7 @@
+     if (!size.isValid()) {
+         JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+                              JSMSG_TYPEDOBJECT_TOO_BIG);
+-        return nullptr;
++        return (bool)nullptr;
+     }
+ 
+     // Construct a canonical string `new ArrayType(<elementType>).dimension(N)`:
+@@ -775,7 +775,7 @@
+     contents.append(")");
+     RootedAtom stringRepr(cx, contents.finishAtom());
+     if (!stringRepr)
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     // Create the sized type object.
+     Rooted<SizedArrayTypeDescr*> obj(cx);
+@@ -793,7 +793,7 @@
+     if (!JSObject::defineProperty(cx, obj, cx->names().length,
+                                   lengthVal, nullptr, nullptr,
+                                   JSPROP_READONLY | JSPROP_PERMANENT))
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     // Add `unsized` property, which is a link from the sized
+     // array to the unsized array.
+@@ -801,7 +801,7 @@
+     if (!JSObject::defineProperty(cx, obj, cx->names().unsized,
+                                   unsizedTypeDescrValue, nullptr, nullptr,
+                                   JSPROP_READONLY | JSPROP_PERMANENT))
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     args.rval().setObject(*obj);
+     return true;
+@@ -1253,7 +1253,7 @@
+     Rooted<TypedProto*> proto(cx);
+     proto = NewObjectWithProto<TypedProto>(cx, objProto, nullptr, TenuredObject);
+     if (!proto)
+-        return nullptr;
++        return (bool)nullptr;
+     proto->initTypeDescrSlot(*descr);
+     descr->initReservedSlot(JS_DESCR_SLOT_TYPROTO, ObjectValue(*proto));
+ 
+@@ -1358,14 +1358,14 @@
+ #define BINARYDATA_SCALAR_DEFINE(constant_, type_, name_)                       \
+     if (!DefineSimpleTypeDescr<ScalarTypeDescr>(cx, global, module, constant_,      \
+                                             cx->names().name_))                 \
+-        return nullptr;
++        return (bool)nullptr;
+     JS_FOR_EACH_SCALAR_TYPE_REPR(BINARYDATA_SCALAR_DEFINE)
+ #undef BINARYDATA_SCALAR_DEFINE
+ 
+ #define BINARYDATA_REFERENCE_DEFINE(constant_, type_, name_)                    \
+     if (!DefineSimpleTypeDescr<ReferenceTypeDescr>(cx, global, module, constant_,   \
+                                                cx->names().name_))              \
+-        return nullptr;
++        return (bool)nullptr;
+     JS_FOR_EACH_REFERENCE_TYPE_REPR(BINARYDATA_REFERENCE_DEFINE)
+ #undef BINARYDATA_REFERENCE_DEFINE
+ 
+@@ -1375,14 +1375,14 @@
+     arrayType = DefineMetaTypeDescr<ArrayMetaTypeDescr>(
+         cx, global, module, TypedObjectModuleObject::ArrayTypePrototype);
+     if (!arrayType)
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     RootedValue arrayTypeValue(cx, ObjectValue(*arrayType));
+     if (!JSObject::defineProperty(cx, module, cx->names().ArrayType,
+                                   arrayTypeValue,
+                                   nullptr, nullptr,
+                                   JSPROP_READONLY | JSPROP_PERMANENT))
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     // StructType.
+ 
+@@ -1390,14 +1390,14 @@
+     structType = DefineMetaTypeDescr<StructMetaTypeDescr>(
+         cx, global, module, TypedObjectModuleObject::StructTypePrototype);
+     if (!structType)
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     RootedValue structTypeValue(cx, ObjectValue(*structType));
+     if (!JSObject::defineProperty(cx, module, cx->names().StructType,
+                                   structTypeValue,
+                                   nullptr, nullptr,
+                                   JSPROP_READONLY | JSPROP_PERMANENT))
+-        return nullptr;
++        return (bool)nullptr;
+ 
+     // Everything is setup, install module on the global object:
+     RootedValue moduleValue(cx, ObjectValue(*module));
+@@ -1407,7 +1407,7 @@
+                                   nullptr, nullptr,
+                                   0))
+     {
+-        return nullptr;
++        return (bool)nullptr;
+     }
+ 
+     return module;
+@@ -2466,7 +2466,7 @@
+         if (length < 0) {
+             JS_ReportErrorNumber(cx, js_GetErrorMessage,
+                                  nullptr, JSMSG_TYPEDOBJECT_BAD_ARGS);
+-            return nullptr;
++            return (bool)nullptr;
+         }
+         Rooted<TypedObject*> obj(cx, createZeroed(cx, callee, length));
+         if (!obj)
+diff -ur mozjs-31.2.0/js/src/frontend/BytecodeCompiler.cpp mozjs-31.2.0.maple/js/src/frontend/BytecodeCompiler.cpp
+--- mozjs-31.2.0/js/src/frontend/BytecodeCompiler.cpp	2020-12-02 22:15:25.249698782 -0800
++++ mozjs-31.2.0.maple/js/src/frontend/BytecodeCompiler.cpp	2020-10-13 11:33:39.822340252 -0700
+@@ -416,6 +416,21 @@
+     if (!SetSourceMap(cx, parser.tokenStream, ss))
+         return nullptr;
+ 
++    // set funcFormals and funcLocals in script
++    if (parser.funcFormals.size()) {
++        std::vector<funcVarVecPair>::iterator I;
++        for (I=parser.funcFormals.begin(); I!=parser.funcFormals.end(); I++) {
++            script->funcFormals.push_back(*I);
++        }
++    }
++
++    if (parser.funcLocals.size()) {
++        std::vector<funcVarVecPair>::iterator I;
++        for (I=parser.funcLocals.begin(); I!=parser.funcLocals.end(); I++) {
++            script->funcLocals.push_back(*I);
++        }
++    }
++
+     /*
+      * Source map URLs passed as a compile option (usually via a HTTP source map
+      * header) override any source map urls passed as comment pragmas.
+@@ -544,7 +559,7 @@
+ 
+     RootedScriptSource sourceObject(cx, CreateScriptSourceObject(cx, options));
+     if (!sourceObject)
+-        return nullptr;
++        return (bool)nullptr;
+     ScriptSource *ss = sourceObject->source();
+ 
+     SourceCompressionTask sct(cx);
+diff -ur mozjs-31.2.0/js/src/frontend/Parser.cpp mozjs-31.2.0.maple/js/src/frontend/Parser.cpp
+--- mozjs-31.2.0/js/src/frontend/Parser.cpp	2020-12-02 22:15:25.249698782 -0800
++++ mozjs-31.2.0.maple/js/src/frontend/Parser.cpp	2020-10-13 11:33:39.826340627 -0700
+@@ -94,6 +94,16 @@
+     PushStatement(pc, stmt, type);
+ }
+ 
++void static addToVec(std::vector<JSAtom *> &vec, JSAtom *name) {
++    std::vector<JSAtom *>::iterator I;
++    for (I = vec.begin() ; I != vec.end(); ++I) {
++        if (*I == name)
++            return;
++    }
++    vec.push_back(name);
++    return;
++}
++
+ // See comment on member function declaration.
+ template <>
+ bool
+@@ -159,6 +169,7 @@
+         }
+         if (name == ts.names().empty)
+             break;
++        addToVec(argvec_, name);
+         if (!decls_.addUnique(name, dn))
+             return false;
+         break;
+@@ -177,6 +188,7 @@
+                 return false;
+             }
+         }
++        addToVec(localvec_, name);
+         if (!decls_.addUnique(name, dn))
+             return false;
+         break;
+@@ -208,6 +220,7 @@
+ 
+     // Keep track of the number of arguments in args_, for fun->nargs.
+     if (kind == Definition::ARG) {
++        addToVec(argvec_, name);
+         if (!args_.append((Definition *) nullptr))
+             return false;
+         if (args_.length() >= ARGNO_LIMIT) {
+@@ -216,6 +229,10 @@
+         }
+     }
+ 
++    if (kind == Definition::VAR) {
++      addToVec(localvec_, name);
++    }
++
+     return decls_.addUnique(name, kind);
+ }
+ 
+@@ -2146,6 +2163,20 @@
+                 return false;
+             }
+ 
++            if (parser->funcFormals.size()) {
++              std::vector<funcVarVecPair>::iterator I;
++              for (I=parser->funcFormals.begin(); I!=parser->funcFormals.end(); I++) {
++                funcFormals.push_back(*I);
++              }
++            }
++
++            if (parser->funcLocals.size()) {
++              std::vector<funcVarVecPair>::iterator I;
++              for (I=parser->funcLocals.begin(); I!=parser->funcLocals.end(); I++) {
++                funcLocals.push_back(*I);
++              }
++            }
++
+             outerpc->blockidGen = funpc.blockidGen;
+ 
+             // Advance this parser over tokens processed by the syntax parser.
+@@ -2344,6 +2375,18 @@
+     }
+ #endif
+ 
++    // keep entries for anonymous function as well 
++    // we will use it to create anonymous func names
++    if (pc->argvec().size() || !fun->name()) {
++      funcVarVecPair P(fun, pc->argvec());
++      funcFormals.push_back(P);
++    }
++
++    if (pc->localvec().size() || !fun->name()) {
++      funcVarVecPair P(fun, pc->localvec());
++      funcLocals.push_back(P);
++    }
++
+     return finishFunctionDefinition(pn, funbox, prelude, body);
+ }
+ 
+diff -ur mozjs-31.2.0/js/src/frontend/Parser.h mozjs-31.2.0.maple/js/src/frontend/Parser.h
+--- mozjs-31.2.0/js/src/frontend/Parser.h	2020-12-02 22:15:25.249698782 -0800
++++ mozjs-31.2.0.maple/js/src/frontend/Parser.h	2020-10-13 11:33:39.826340627 -0700
+@@ -20,6 +20,8 @@
+ #include "frontend/SharedContext.h"
+ #include "frontend/SyntaxParseHandler.h"
+ 
++#include <vector>
++
+ namespace js {
+ namespace frontend {
+ 
+@@ -37,6 +39,7 @@
+ class SharedContext;
+ 
+ typedef Vector<Definition *, 16> DeclVector;
++typedef std::pair<JSFunction *, std::vector<JSAtom *>> funcVarVecPair;
+ 
+ struct GenericParseContext
+ {
+@@ -130,6 +133,8 @@
+     AtomDecls<ParseHandler> decls_; /* function, const, and var declarations */
+     DeclVector      args_;          /* argument definitions */
+     DeclVector      vars_;          /* var/const definitions */
++    std::vector<JSAtom *> argvec_;  /* argument vector */
++    std::vector<JSAtom *> localvec_;  /* local var vector */
+ 
+   public:
+     const AtomDecls<ParseHandler> &decls() const {
+@@ -141,6 +146,14 @@
+         return args_.length();
+     }
+ 
++     std::vector<JSAtom *> argvec() {
++         return argvec_;
++     }
++
++     std::vector<JSAtom *> localvec() {
++         return localvec_;
++     }
++
+     /*
+      * This function adds a definition to the lexical scope represented by this
+      * ParseContext.
+@@ -339,6 +352,11 @@
+     /* Perform constant-folding; must be true when interfacing with the emitter. */
+     const bool          foldConstants:1;
+ 
++    /* func formal args */
++    std::vector<funcVarVecPair> funcFormals;
++    /* func local vars */
++    std::vector<funcVarVecPair> funcLocals;
++
+   private:
+     /*
+      * Not all language constructs can be handled during syntax parsing. If it
+diff -ur mozjs-31.2.0/js/src/jsscript.h mozjs-31.2.0.maple/js/src/jsscript.h
+--- mozjs-31.2.0/js/src/jsscript.h	2020-12-02 22:15:25.153689560 -0800
++++ mozjs-31.2.0.maple/js/src/jsscript.h	2020-10-13 11:33:39.966353748 -0700
+@@ -25,6 +25,8 @@
+ #include "jit/IonCode.h"
+ #include "vm/Shape.h"
+ 
++#include <vector>
++
+ namespace JS {
+ struct ScriptSourceInfo;
+ }
+@@ -698,6 +700,11 @@
+     /* Persistent type information retained across GCs. */
+     js::types::TypeScript *types;
+ 
++    /* access args */
++    typedef std::pair<JSFunction *, std::vector<JSAtom *>> funcVarVecPair;
++    std::vector<funcVarVecPair> funcFormals;
++    std::vector<funcVarVecPair> funcLocals;
++
+   private:
+     // This script's ScriptSourceObject, or a CCW thereof.
+     //
+diff -ur mozjs-31.2.0/js/src/Makefile.in mozjs-31.2.0.maple/js/src/Makefile.in
+--- mozjs-31.2.0/js/src/Makefile.in	2020-12-02 22:15:25.153689560 -0800
++++ mozjs-31.2.0.maple/js/src/Makefile.in	2020-10-13 11:33:39.790337253 -0700
+@@ -220,7 +220,7 @@
+ # Windows, MOZ_ZLIB_LIBS is empty because zlib is part of libmozglue. We thus
+ # also enable zlib if mozglue is present.
+ ifneq (,$(MOZ_ZLIB_LIBS)$(MOZ_GLUE_LDFLAGS))
+-DEFINES += -DUSE_ZLIB
++#DEFINES += -DUSE_ZLIB
+ endif
+ 
+ ifdef MOZ_SHARED_ICU
+

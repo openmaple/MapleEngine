@@ -1,7 +1,7 @@
 ```
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -12,6 +12,12 @@
 # FIT FOR A PARTICULAR PURPOSE.
 # See the MulanPSL - 2.0 for more deta
 ```
+## Version 2.0
+*__Date: 2021/03/31__*
+
+* Added support for JavaScript using same set of code for Java
+* .mgdbinit file changed to .mdbinit for default launch up
+
 ## Version 1.2
 *__Date: 2020/09/21__*
 

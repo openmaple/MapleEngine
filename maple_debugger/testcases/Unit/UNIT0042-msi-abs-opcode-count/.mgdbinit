@@ -1,6 +1,0 @@
-b main
-run
-msi 10000
-msi -abs 21000
-msi -c
-quit

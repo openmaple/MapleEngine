@@ -1,7 +1,7 @@
 #
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -457,7 +457,7 @@ class MapleFinishCmd(gdb.Command):
         silent_finish()
 
         frame = m_frame.get_selected_frame()
-        print ("frame.name()=", frame.name())
+        if m_debug.Debug: m_debug.dbg_print("frame.name()=", frame.name())
         m_util.gdb_exec("msi")
         m_util.gdb_exec("mlist")
         m_datastore.mgdb_rdata.update_frame_change_counter()

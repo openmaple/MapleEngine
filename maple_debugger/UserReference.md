@@ -1,7 +1,7 @@
 ```
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -13,37 +13,39 @@
 # See the MulanPSL - 2.0 for more details.
 ```
 ## Before Start
-Once the Maple Debugger is launched, following messages will be displayed
+Once the Maple Debugger is launched, the following message will be displayed:
 
 ```
-Before start to use Maple debugger, please make sure to setup two sets of search paths:
+Before starting to use the Maple debugger, please make sure to setup two sets of search paths:
 
-1, The search paths of user's program and library source code.
-   This is required to display source code of your application and library
-   Use msrcpath command to show/add/del source code search paths
-2, The search paths of the generated assembly files of user's program and library.
-   This is required by many of Maple debugger commands
-   Use mset command to show/add/del library asm file search paths
+1, The search paths for the user program and library source code.
+   This is required to display the source code of your application and libraries
+   Use the "msrcpath" command to show/add/delete source code search paths
+2, The search paths of the generated assembly files of the user program and library.
+   This is required by many of the Maple debugger commands
+   Use the "mset" command to show/add/delete the library asm file search paths
 ```
-On #1, a search path list should be set, for Maple Debugger to search the source code of libraries and user's application source code. mlist command uses this search list to look up the source code files.
-On #2, a search path list should be set, for Maple Debugger to search assembly files at the time of co-responding .so file is compiled. mbt, mup, mdown and other commands use this search list to look up a lot of information from the assembly files.
+For item #1, a search path list should be set for the Maple Debugger to find the source code of libraries and user applications. The "mlist" command uses this search list to look up the source code files.
+For item #2, a search path list should be set for the Maple Debugger to find assembly files when the corresponding .so file is compiled. The "mbt", "mup", "mdown" and other commands will use this search list to look up information from the assembly files.
 
 ## Maple Command Summary
-* **_mbreakpoint_**: Sets and manages Maple breakpoints
-* **_mbacktrace_** : Displays Maple backtrace in multiple modes
-* **_mup_**        : Selects and prints Maple stack frame that called this one
-* **_mdown_**      : Selects and prints Maple stack frame called by this one
-* **_mlist_**      : Lists source code in multiple modes
-* **_msrcpath_**   : Adds and manages the Maple source code search paths
-* **_mlocal_**     : Displays selected Maple frame arguments, local variables and stack dynamic data
-* **_mprint_**     : Prints Maple runtime object data
-* **_mtype_**      : Prints a matching class and its inheritance hierarchy by a given search expression
-* **_msymbol_**    : Prints a matching symbol list or its detailed infomatioin
-* **_mstepi_**     : Steps specified number of Maple instructions
-* **_mnexti_**     : Steps one Maple instruction, but proceed through subroutine calls
-* **_mfinish_**    : Executes until selected Maple stack frame returns
-* **_mset_**       : Sets and displays Maple debugger settings
-* **_mhelp_**      : Provides help, usage and etc
+* _mbreakpoint_  : Sets and manages Maple breakpoints
+* _mbacktrace_   : Displays Maple backtrace in multiple modes
+* _mup_          : Selects and prints the Maple stack frame that called the current one
+* _mdown_        : Selects and prints the Maple stack frame called by the current one
+* _mlist_        : Lists source code in multiple modes
+* _msrcpath_     : Adds and manages the Maple source code search path
+* _mlocal_       : Displays selected Maple frame arguments and local variables and stack dynamic data
+* _mprint_       : Prints Maple runtime object data
+* _mtype_        : Prints a matching class and its inheritance hierarchy by a given search expression
+* _msymbol_      : Prints a matching symbol list or its detailed infomation
+* _mstepi_       : Steps a specified number of Maple instructions
+* _mstep_        : Steps the program until it reaches a different source line of the Maple Application
+* _mnexti_       : Steps one Maple instruction, but proceed through subroutine calls
+* _mnext_        : Steps the program, proceeding through subroutine calls of the Maple application
+* _mfinish_      : Executes until the selected Maple stack frame returns
+* _mset_         : Sets and displays the Maple debugger settings
+* _mhelp_        : Prints help for commands and their usage
 
 ## Maple Breakpoint command
 ### mbreak command
@@ -74,7 +76,7 @@ set breakpoint  LTypeTest_3B_7CshowLongList_7C_28AJ_29V
 Function "maple::maple_invoke_method" not defined.
 Breakpoint 1 (maple::maple_invoke_method) pending.
 ```
-***Note***: this shows a pending Maple breakpoints because the program has not been loaded in yet
+***Note***: this shows "pending" Maple breakpoints because the program has not been loaded in yet
 
 #### 3. Display breakpoints and info
 Execute 'mbreak -list' or 'mbreak -listall'
@@ -94,7 +96,7 @@ list all Maple breakpoints
 #1 Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V enabled hit_count 1 ignore_count 0 at 0x7ffff5b51c66 in maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:158
 #2 LTypeTest_3B_7CshowShortList_7C_28AS_29V enabled hit_count 0 ignore_count 0 at 0x7ffff5b51c66 in maple::maple_invoke_method(maple::method_header_t const*, maple::MFunction const*) at /home/test/gitee/maple_engine/maple_engine/src/invoke_method.cpp:158
 ```
-***Note***: this output shows the Maple breakpoints with real address and additional information when the libraries are loaded.
+***Note***: when the libraries are loaded, the output shows the Maple breakpoints with real addresses and additional information.
 
 #### 4. Disable a Maple breakpoint
 Execute 'mb -disable <symbol | index>' command
@@ -103,7 +105,7 @@ Example 1:
 (gdb) mb -disable 1
 disable breakpoint  1
 ```
-***Note***: use Maple breakpoint index 1 which is Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V from the Maple breakpoint listed above
+***Note***: use Maple breakpoint index 1 (which is Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V from the Maple breakpoint listed above)
 Example 2:
 ```
 (gdb) mb -disable Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
@@ -116,7 +118,7 @@ Example:
 (gdb) mb -enable 1
 enable breakpoint  1
 ```
-***Note***: use Maple breakpoint index 1 which is Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V from the Maple breakpoint listed above
+***Note***: use Maple breakpoint index 1 (which is Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V from the Maple breakpoint listed above)
 Example 2:
 ```
 (gdb) mb -enable Ljava_2Flang_2FThreadGroup_3B_7CcheckAccess_7C_28_29V
@@ -519,7 +521,7 @@ src file: /home/test/my_openjdk8/jdk/src/share/classes/java/lang/System.java lin
     1173         // of autoboxing.  Typically, the library will obtain these values
 ```
 #### 5. mlist +|-[num]
-Lists current source code file offsetting from previous listed line, offset can be + or -
+Lists current source code file offsetting from the previous listed line, offset can be + or -
 Example:
 ```
 (gdb) mlist PreHashedMap.java:110
@@ -548,7 +550,7 @@ src file: /home/test/my_openjdk8/jdk/src/share/classes/sun/util/PreHashedMap.jav
      123      *
 ```
 #### 6. mlist -asm:+|-[num]
-Lists current assembly instructions offsetting from previous listed line. offset can be + or -
+Lists current assembly instructions offsetting from the previous listed line. offset can be + or -
 ```
 (gdb) mlist -asm
 asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.VtableImpl.s line: 355834
@@ -688,7 +690,7 @@ asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.m
 
 ```
 #### 10. mlist -mir:+|-[num]
-Lists current Maple IR offsetting from previous listed line. offset can be + or -
+Lists current Maple IR offsetting from the previous listed line. offset can be + or -
 ```
 (gdb) mlist -mir
 asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.mpl line: 2700423
@@ -788,7 +790,7 @@ asm file: /home/test/gitee/maple_engine/maple_build/out/x86_64/libcore.mpl.mir.m
 ### mlocal command
 This command displays the stack frame local varibles' value and dynamic stack data.
 #### 1. mlocal
-This is used to display all local variables' value of a function. Use mlocal command at a Maple breakpoint and after a msi command to step into a function
+This is used to display all local variables' value for a function. Use mlocal command at a Maple breakpoint and after a msi command to step into a function
 Example:
 ```
 (gdb) mlocal
@@ -831,7 +833,7 @@ sp=1: type=a64 value=0x7ffff49915e8 <_C_STR_aa6c9e888c754e206fadbf41fdc90033> "0
 sp=2: type=a64 value=0x0
 ```
 ### mprint command
-This command is used to display the object data and object type includind the inheritence hierarchy
+This command is used to display the object data and object type included in the inheritance hierarchy
 #### 1. syntax: mprint <hex address>
 Example:
 ```
@@ -918,7 +920,7 @@ Example:
 
 ## Maple Miscellaneous Commands
 ### mset command
-This command is used to set Maple debugger's environment variables and flags
+This command is used to set the Maple debugger's environment variables and flags
 #### 1. mset -show
 display the mset settings
 Example:
@@ -943,7 +945,7 @@ delete ~/gitee/maple_engine/maple_build/out/x86_64/ from maple_lib_asm_path asm 
 (gdb)mset -del maple_lib_asm_path ~/gitee/maple_engine/maple_build/out/x86_64/
 ```
 #### 5. mset linecount <n>
-set the number of lines mlist will display for source file and assembly file
+set the number of lines mlist will display for source files and assembly files
 ```
 (gdb) mset linecount 20
 (gdb) mlist
@@ -996,9 +998,9 @@ mfinish:    Execute until the selected Maple stack frame returns
 mhelp:      Lists Maple help information
 ```
 
-#### 2. Help of individual Maple command
+#### 2. Help on individual Maple commands
 mhelp <command name>
-***Note***: command name must be a Maple command full name other than its alias name
+***Note***: the command name used must be the full name for the Maple command and not it's alias name
 Example:
 ```
 (gdb) mhelp mbreak
@@ -1012,3 +1014,4 @@ mbreak -clearall : Deletes all existing Maple breakpoints
 mbreak -listall : Lists all existing Maple breakpoints
 mbreak -ignore <symbol | index> <count>: Sets ignore count for specified Maple breakpoints
 ```
+

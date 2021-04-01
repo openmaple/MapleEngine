@@ -1,7 +1,7 @@
 /*
- * Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+ * Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reserved.
  *
- * Licensed under the Mulan Permissive Software License v2.
+ * OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
  * You can use this software according to the terms and conditions of the MulanPSL - 2.0.
  * You may obtain a copy of MulanPSL - 2.0 at:
  *
@@ -163,7 +163,7 @@ MValue maple_invoke_method(const method_header_t* const mir_header, const MFunct
 
     DEBUGMETHODSYMBOL(mir_header, "Running Java method:", mir_header->eval_depth);
 
-    MFunction::MStack::size_type const caller_args = caller->sp - mir_header->formals_num;
+    MStack::size_type const caller_args = caller->sp - mir_header->formals_num;
     DEBUGARGS();
 
     MRT_YieldpointHandler_x86_64();
@@ -1356,6 +1356,13 @@ label_OP_ireadfpoff: // offset from stack frame
     goto *(labels[*func.pc]);
   }
 
+label_OP_ireadfpoff32:
+  {
+    // Not supported yet: ireadfpoff32
+    DEBUGOPCODE(ireadfpoff32, Unused);
+    MASSERT(false, "Not supported yet");
+  }
+
 label_OP_addroflabel:
   {
     // Handle expression node: addroflabel
@@ -1516,6 +1523,13 @@ label_OP_iassignfpoff:
     MASSERT(false, "Not supported yet");
     func.pc += sizeof(base_node_t);
     goto *(labels[*func.pc]);
+  }
+
+label_OP_iassignfpoff32:
+  {
+    // Not supported yet: iassignpoff32
+    DEBUGOPCODE(iassignfpoff32, Unused);
+    MASSERT(false, "Not supported yet");
   }
 
 label_OP_xintrinsiccall:

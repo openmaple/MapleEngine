@@ -1,7 +1,7 @@
 #
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -16,8 +16,8 @@
 import gdb
 from m_util import gdb_print
 
-maple_debugger_version_major = 1
-maple_debugger_version_minor = 2
+maple_debugger_version_major = 2
+maple_debugger_version_minor = 0
 
 maple_commands_info = '\n'\
     'mbreak:     Sets and manages Maple breakpoints\n'\
@@ -80,7 +80,8 @@ maple_commands_detail_info = {
                 'mlocal [-s|-stack]: Displays runtime operand stack changes of current selected Maple frame\n',
 
     'mprint':   'mprint: Displays Maple object data\n'\
-                'mprint <addr-in-hex>: e.g. mprint 0x13085\n',
+                'mprint <addr-in-hex>: e.g. mprint 0x13085\n'\
+                'mprint <property name>: e.g. mprint my_var\n',
 
     'mtype' :   'mtype: Given a regex, searches and prints all matching class names if multiple are found, or\n'\
                 'prints detailed information of class inheritance hierarchy if a single match is found\n'\

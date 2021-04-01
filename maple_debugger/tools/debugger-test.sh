@@ -2,7 +2,7 @@
 #
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -36,7 +36,7 @@ while read d; do
     cp -aL "$d" "$TESTOUT"/"$testcase" || exit $LINENO
     cd "$TESTOUT"/"$testcase" || exit $LINENO
     [ -f test.cfg ] || { echo FAILED; echo "Error: File $testcase/test.cfg not found" > FAILED; continue; }
-    [ -f .mgdbinit ] || { echo FAILED; echo "Error: File $testcase/.mgdbinit not found" > FAILED; continue; }
+    [ -f .mdbinit ] || { echo FAILED; echo "Error: File $testcase/.mdbinit not found" > FAILED; continue; }
 
     TESTCASE= UNEXPECTED= EXPECTED= TIMEOUT=
     source ./test.cfg > /dev/null || { echo FAILED; echo "Error: Failed to source $testcase/cfg" > FAILED; continue; }
@@ -45,13 +45,13 @@ while read d; do
     app=$(basename "$TESTCASE")
     if [ -L ../$app ]; then
         cp -a "../$app/" "$app"
-        rm -f "$app"/{.mgdbinit,log.txt,TIMEOUT,*ED,err.txt,*expected-output.txt,*-*.log}
+        rm -f "$app"/{.mdbinit,log.txt,TIMEOUT,*ED,err.txt,*expected-output.txt,*-*.log}
     else
         mkdir -p "$app"
         ln -s "$PWD/$app" ../"$app"
     fi
-    cp -a .mgdbinit "$MAPLE_BUILD_ROOT/$TESTCASE"/*.java "$app"/ || exit $LINENO
-    grep -v "^echo " .mgdbinit | sed -e '/^python/,/^end/s/^/@/' -e 's/^[^@].*/echo (gdb) & \\n\n&/' -e 's/^@//' > "$app"/.mgdbinit
+    cp -a .mdbinit "$MAPLE_BUILD_ROOT/$TESTCASE"/*.java "$app"/ || exit $LINENO
+    grep -v "^echo " .mdbinit | sed -e '/^python/,/^end/s/^/@/' -e 's/^[^@].*/echo (gdb) & \\n\n&/' -e 's/^@//' > "$app"/.mdbinit
     cd "$app" || exit $LINENO
     "$MAPLE_DEBUGGER_TOOLS"/debugger-trace.sh >& log.txt &
     pid=$!

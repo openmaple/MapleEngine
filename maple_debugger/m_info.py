@@ -1,7 +1,7 @@
 #
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -803,3 +803,240 @@ def get_one_frame_stack_dynamic(sp, idx):
 
     if m_debug.Debug: m_debug.dbg_print("return maple_type=", maple_type, "v=", v)
     return maple_type, v
+
+################################################################################
+### API to get dynamic language data, e.g JS support.
+### APIs include how to get all JS properties data, name, value, object index etc
+################################################################################
+# jstype from jsvalue.h
+jstype_dict = {
+  "JSTYPE_NONE",
+  "JSTYPE_NULL",
+  "JSTYPE_BOOLEAN",
+  "JSTYPE_STRING",
+  "JSTYPE_NUMBER",
+  "JSTYPE_OBJECT",
+  "JSTYPE_ENV",
+  "JSTYPE_UNKNOWN",
+  "JSTYPE_UNDEFINED",
+  "JSTYPE_DOUBLE",
+  "JSTYPE_NAN",
+  "JSTYPE_INFINITY"
+}
+
+def get_current_thisbinding():
+    cmd = "p __js_ThisBinding"
+    buf = gdb.execute(cmd, to_string=True)
+    # example of output: $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
+    buf = buf.rstrip()
+
+    if buf[0] != '$' or 'tag = JSTYPE' not in buf:
+        return None, None
+    tag = buf.split("tag = ")[-1][:-2]
+    if tag == "JSTYPE_OBJECT":
+        val = buf.split("obj = ")[1].split(',')[0]
+    elif tag == "JSTYPE_NUMBER":
+        val = buf.split("i32 = ")[1].split(',')[0]
+    elif tag == "JSTYPE_BOOLEAN":
+        val = buf.split("boo = ")[1].split(',')[0]
+    elif tag == "JSTYPE_STRING":
+        val = buf.split("str = ")[1].split(',')[0]
+    else:
+        val = None
+
+    if m_debug.Debug: m_debug.dbg_print("tag = ", tag, "val = ", val)
+    return tag, val
+
+def get_realAddr_by_index(index):
+    cmd = "p memory_manager->GetRealAddr(" + str(index) + ")"
+    buf = gdb.execute(cmd, to_string=True)
+    # example of a command to issue "p memory_manager->GetRealAddr(1)"
+    buf = buf.rstrip()
+    # example of returning output: "$39 = (void *) 0x7ffff63d4014"
+
+    if buf[0] != '$' or ' = ' not in buf:
+        return None
+    addr = buf.split()[4]
+    return addr
+
+def get_realAddr_data(addr, jstype):
+    if jstype == "JSTYPE_OBJECT":
+        return get_obj_prop_list_head(addr)
+    else:
+        return None
+
+def get_obj_prop_list_head(addr):
+    cmd = "p *(struct __jsobject *)" + str(addr)
+    # example of output could be:
+    # 1. when prop_list is not available meaning nothing should be interpreted.
+    #   "$40 = {prop_list = 0x0, prototype = {obj = 0x2, id = JSBUILTIN_OBJECTPROTOTYPE}, extensible = 1 '\001', object_class = JSGLOBAL, object_type = 0 '\000',
+    #   is_builtin = 1 '\001', proto_is_builtin = 1 '\001', builtin_id = JSBUILTIN_GLOBALOBJECT, shared = {fast_props = 0x0, array_props = 0x0, fun = 0x0,
+    #   prim_string = 0x0, prim_regexp = 0x0, prim_number = 0, prim_bool = 0, arr = 0x0, primDouble = 0}}
+    #
+    # 2. when prop_list is available, we should get the list and traverse the prop list
+    #    $85 = {prop_list = 0x7ffff63d4178, prototype = {obj = 0x2, id = JSBUILTIN_OBJECTPROTOTYPE}, extensible = 1 '\001', object_class = JSGLOBAL, object_type = 0 '\000'    #    , is_builtin = 1 '\001', proto_is_builtin = 1 '\001', builtin_id = JSBUILTIN_GLOBALOBJECT, shared = {fast_props = 0x0, array_props = 0x0, fun = 0x0,
+    #    prim_string = 0x0, prim_regexp = 0x0, prim_number = 0, prim_bool = 0, arr = 0x0, primDouble = 0}}
+
+    buf = gdb.execute(cmd, to_string = True)
+    buf = buf.rstrip()
+    if m_debug.Debug: m_debug.dbg_print("get_obj_prop_list_head buf = ", buf)
+
+    if buf[0] != '$' or 'prop_list = ' not in buf:
+        return None
+    prop_list = buf.split("prop_list = ")[1].split(',')[0]
+    try:
+        prop_list_addr = int(prop_list, 16)
+    except:
+        return None
+
+    if m_debug.Debug: m_debug.dbg_print("prop_list_addr=", prop_list_addr)
+    if prop_list_addr == 0:
+        return None
+    else:
+        return prop_list
+
+def get_prop_name_value(addr):
+    # input example: 0x55555576d1a8
+    cmd = "p *(__jsstring *)" + str(addr)
+    buf = gdb.execute(cmd, to_string = True)
+    buf = buf.rstrip()
+    if buf[0] != '$' or 'length = ' not in buf or 'ascii = ' not in buf:
+        return None,None
+    # example of command output:
+    # $87 = {kind = (unknown: 0), builtin = JSBUILTIN_STRING_ARGUMENTS, length = 2, x = {ascii = 0x55555576d1ac "v1", utf16 = 0x55555576d1ac u"ㅶ"}}
+    if m_debug.Debug: m_debug.dbg_print("get_prop_name_value buf=", buf)
+
+    length_str = buf.split('length = ')[1].split(',')[0]
+    if m_debug.Debug: m_debug.dbg_print("get_prop_name_value length_str=", length_str)
+    try:
+        length = int(length_str, 10)
+    except:
+        return None,None
+    if length == 0:
+        return None,None
+
+    ascii_name = buf.split('x = {ascii = ')[1].split(',')[0].split()[1][1:-1]
+    utf16_name = buf.split('utf16 = ')[1].split()[1][2:-3]
+    return ascii_name, utf16_name
+
+def get_string_value_from_index(index):
+    addr = get_realAddr_by_index(str(index))
+    if not addr:
+        return None, None
+    return get_prop_name_value(addr)
+
+def get_prop_list_node_data(node_addr):
+    # input: node_addr is the address of node, a pointer value to 'struct __jsprop'
+    # output: return node data in dict format.
+    # dict:
+    # {'tag': 'JSTYPE_NUMBER'
+    #  'ascii_name': 'var'
+    #  'utf16_name : 'ㅶ'
+    #  'next': 0x12323434
+    #  'name_addr': 0x55555576d1a8
+    #  'value':  6 (if tag JSTYPE_NUMBER)
+    #         :  hello world (if tag = JSTYPE_STRING
+    #         :  index (if tag = JSTYPE_OBJECT)
+    #         :  None: if tag = JSTYPE_UNDEFINED or JSTYPE_NONE or JSTYPE_NULL
+    #
+    cmd = "p *(struct __jsprop *)" + node_addr
+    if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
+    buf = gdb.execute(cmd, to_string = True)
+    buf = buf.rstrip()
+    if m_debug.Debug: m_debug.dbg_print("get_prop_list_data buf=", buf)
+
+    # example of output:
+    # "$86 = {n = {index = 1433850280, name = 0x55555576d1a8}, next = 0x0, desc = {{named_data_property = {value = {asbits = 34359738368, s = {payload = {i32 = 0,u32 = 0, boo = 0, str = 0, obj = 0, ptr = 0}, tag = JSTYPE_UNDEFINED}}}, named_accessor_property = {get = 0x800000000, set = 0x0}}, {s = {attr_writable = 3 '\003', attr_enumerable = 3 '\003', attr_configurable = 2 '\002', fields = 0 '\000'}, attrs = 131843}}, isIndex = false}"
+    if buf[0] != '$' or 'next = ' not in buf or 'desc = ' not in buf:
+        return data
+    prop_next = buf.split("next = ")[1].split(',')[0]
+    prop_name_addr = buf.split("name = ")[1].split(',')[0][:-1]
+    tag = buf.split("tag = ")[1].split('}}}')[0]
+
+    if m_debug.Debug: m_debug.dbg_print("prop_next=", prop_next, "prop_name_addr=", prop_name_addr, "tag=", tag)
+    ascii_name, utf16_name = get_prop_name_value(prop_name_addr)
+    if m_debug.Debug: m_debug.dbg_print("ascii_name=", ascii_name, "utf16_name=", utf16_name)
+    element = {}
+    element['tag'] = tag
+    element['ascii_name'] = ascii_name
+    element['utf16_name'] = utf16_name
+    element['next'] = prop_next
+    element['name_addr'] = prop_name_addr
+
+
+    if tag == 'JSTYPE_UNDEFINED' or tag == 'JSTYPE_NONE' or tag == 'JSTYPE_NULL':
+        element['value'] = ""
+    elif tag == 'JSTYPE_NUMBER':
+        value = buf.split('payload = {i32 = ')[1].split(',')[0]
+        element['value'] = value
+    elif tag == 'JSTYPE_BOOLEAN':
+        value = buf.split('boo = ')[1].split(',')[0]
+        element['value'] = value
+    elif tag == 'JSTYPE_STRING':
+        index = buf.split('str = ')[1].split(',')[0]
+        ascii_v, utf16_v = get_string_value_from_index(index)
+        element['value'] = ascii_v
+    else:
+        element['value'] = ""
+
+    if m_debug.Debug: m_debug.dbg_print("element=", element)
+    return element
+
+def get_prop_list_data(prop_list_head):
+    # input: prop_list_head is the address of the head node address in struct __jsprop
+    #
+    # output: a list contains each property's data in dict format
+    # dict:
+    # {'tag': 'JSTYPE_NUMBER'
+    #  'ascii_name': 'var'
+    #  'utf16_name : 'ㅶ'
+    #  'next': 0x12323434
+    #  'name_addr': 0x55555576d1a8
+    #  'value':  6 (if tag JSTYPE_NUMBER)
+    #         :  hello world (if tag = JSTYPE_STRING
+    #         :  index (if tag = JSTYPE_OBJECT)
+    #         :  None: if tag = JSTYPE_UNDEFINED or JSTYPE_NONE or JSTYPE_NULL
+    #
+    data = []
+
+    node_addr = prop_list_head
+    while True:
+        element = get_prop_list_node_data(node_addr)
+        if len(element) == 0:
+            return data
+        data.append(element)
+        try:
+            next_node_addr_num = int(element['next'], 16)
+        except:
+            break
+
+        if next_node_addr_num == 0:
+            # if no more nodes
+            break
+        node_addr = element['next']
+
+    return data
+
+def get_all_dync_properties_data():
+    #output: a list contains elements, each element is a dict representing one node of property list
+    tag,val = get_current_thisbinding()
+    if m_debug.Debug: m_debug.dbg_print("tag=", tag, "val=", val)
+    if tag and val:
+        addr = get_realAddr_by_index(val)
+        if m_debug.Debug: m_debug.dbg_print("real addr=", addr)
+
+        #only when prop_list returns non-0 address, could the prop_list starts
+        # to have meaningful data filled in.
+        # also nite, prop_list_head is in struct of struct __jsprop. reference this
+        # structure, we can get the list node data immediately
+        prop_list_head = get_realAddr_data(addr, tag)
+        if m_debug.Debug: m_debug.dbg_print("prop_list_head=", prop_list_head)
+
+        if not prop_list_head:
+            gdb_print("prop_list no data filled in yet")
+            return None
+        else:
+            # get all the node data from property list
+            data =  get_prop_list_data(prop_list_head)
+            if m_debug.Debug: m_debug.dbg_print("data=", data)
+            return data

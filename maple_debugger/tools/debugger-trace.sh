@@ -1,4 +1,19 @@
 #!/bin/bash
+#
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reserved.
+#
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
+# You can use this software according to the terms and conditions of the MulanPSL - 2.0.
+# You may obtain a copy of MulanPSL - 2.0 at:
+#
+#   https://opensource.org/licenses/MulanPSL-2.0
+#
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
+# FIT FOR A PARTICULAR PURPOSE.
+# See the MulanPSL - 2.0 for more details.
+#
+
 if [ $# -ge 1 -a -f "$1" ]; then
     arg2=${2:-99999999}
     [[ "$arg2" == +([0-9]) ]] || { grep -n -e "^(gdb)" -e "^(gdb_exec)" -e "$arg2" "$1"; exit 0; }
@@ -28,7 +43,7 @@ if [ ! -f "$app".so ]; then
 fi
 if [ "x$1" = "x-f" ]; then
     sed -n '/^mset trace on/,$p' "$0" | sed -e "s/\${app}/$app/" -e '/^python/,/^end/s/^/@/' \
-        -e 's/^[^@].*/echo (gdb) & \\n\n&/' -e 's/^@//' > .mgdbinit
+        -e 's/^[^@].*/echo (gdb) & \\n\n&/' -e 's/^@//' > .mdbinit
 fi
 tracelog="$app-$(date +%y%m%d-%H%M).log"
 "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./"$app".so "$app" 32 2> >(tee -a "$tracelog" >&2)
@@ -45,7 +60,7 @@ else
 fi
 exit
 
-### .mgdbinit
+### .mdbinit
 mset trace on
 b main
 run

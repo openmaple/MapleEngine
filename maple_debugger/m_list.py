@@ -1,7 +1,7 @@
 #
 # Copyright (C) [2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -320,8 +320,15 @@ class MapleListCmd(gdb.Command):
             self.mlist_asm_file_func(line_offset)
         elif mlist_mode == MLIST_MODE_SRC:
             self.mlist_source_file_func(filename = src_file_name, line = src_line_num, offset = line_offset)
+        elif mlist_mode == MLIST_MODE_MIR:
+            dync, _ = m_frame.is_closest_older_maple_frame_dync()
+            if not dync:
+                self.mlist_mir_file_func(line_offset)
+            else:
+                gdb_print("mlist -mir mode does not support JavaScript")
         else:
-            self.mlist_mir_file_func(line_offset)
+            self.usage()
+            return
 
     def mlist_asm_file_func(self, offset):
         frame_change_count = m_datastore.mgdb_rdata.read_frame_change_counter()

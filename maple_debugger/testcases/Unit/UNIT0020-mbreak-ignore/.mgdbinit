@@ -1,6 +1,0 @@
-mb LHelloWorld_3B_7Cmain_7C_28ALjava_2Flang_2FString_3B_29V
-mb -ignore 1 1
-run
-run
-mb -list
-q

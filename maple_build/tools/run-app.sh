@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Copyright (C) [2020] Futurewei Technologies, Inc. All rights reverved.
+# Copyright (C) [2020-2021] Futurewei Technologies, Inc. All rights reserved.
 #
-# Licensed under the Mulan Permissive Software License v2.
+# OpenArkCompiler is licensed underthe Mulan Permissive Software License v2.
 # You can use this software according to the terms and conditions of the MulanPSL - 2.0.
 # You may obtain a copy of MulanPSL - 2.0 at:
 #
@@ -32,7 +32,7 @@ export MAPLE_ENGINE_DEBUG=none
 
 DBCMD=
 if [ "x$1" = "x-gdb" ]; then
-    DBCMD='gdb -x "$MAPLE_DEBUGGER_ROOT/.mgdbinit" --args '
+    DBCMD='gdb -x "$MAPLE_DEBUGGER_ROOT/.mdbinit" --args '
     shift
 elif [ "x$1" = "x-lldb" ]; then
     DBCMD='lldb -o "command script import $MAPLE_DEBUGGER_LLDB_SRC/LLDB/m_lldb.py"  -- '
