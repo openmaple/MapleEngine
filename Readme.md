@@ -100,8 +100,10 @@
 
   Execute the following command to install the packages used by the Maple build.
 
+```
     sudo apt install -y build-essential clang cmake libffi-dev libelf-dev libunwind-dev \
             libssl-dev openjdk-8-jdk-headless unzip python-minimal python3 gdb bc highlight
+```
 
 ## Setup the Maple environment
 ```
@@ -187,6 +189,7 @@ Execute the following command to install the packages used by the MapleJS build.
 sudo apt install -y build-essential clang cmake libffi-dev libunwind-dev openjdk-8-jdk-headless \
        libssl-dev:i386 libelf-dev:i386 g++-5 gcc-5 g++-multilib gcc-multilib libc6-dev-i386 \
        unzip python-minimal python3 gdb bc highlight
+```
 
 ## Setup the Maple environment
 ```
