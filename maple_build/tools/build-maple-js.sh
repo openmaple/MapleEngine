@@ -63,9 +63,8 @@ echo Built mozilla
 
 cd "$MAPLE_COMPILER_ROOT" || exit 3
 if [ ! -d "js2mpl" ]; then
-    git clone ssh://10.212.145.47:/home/git/maple/js2mpl.git || exit 3
+    git clone https://gitee.com/openarkcompiler-incubator/js2mpl.git || exit 3
     cd js2mpl || exit 3
-    sed -i "s/zeiss\///" BUILD.gn || exit 3
 else
     cd js2mpl
     git pull
