@@ -170,7 +170,11 @@ class MapleSourcePathCmd(gdb.Command):
         if path in maple_source_path_list:
             maple_source_path_list.remove(path)
         if not os.path.exists(os.path.expandvars(os.path.expanduser(path))):
-            buffer = "%s specified but not found, please verify: " % (path)
+            buffer = "Warning: %s specified but not found, please verify: " % (path)
+            gdb_print(buffer)
+            buffer = "         1, If Java support is desired, make sure you have source files are downloaded and placed at correct location."
+            gdb_print(buffer)
+            buffer = "         2, If only JS support is configured and Java support is not configured intentionally, this message can be ignored."
             gdb_print(buffer)
         else:
             maple_source_path_list = [os.path.expandvars(os.path.expanduser(path))] + maple_source_path_list
@@ -431,6 +435,7 @@ class MapleListCmd(gdb.Command):
         if not file_full_path:
             if self.frame_data['frame_func_src_info']['short_src_file_name']:
                 gdb_print ("Warning: Source code file " + self.frame_data['frame_func_src_info']['short_src_file_name'] + " not found in any path")
+                gdb_print ("         Please use msrcpath command to check if your desired source file search paths are set")
             else:
                 gdb_print ("Warning: Source code file not found. try 'mlist -asm' instead")
             return

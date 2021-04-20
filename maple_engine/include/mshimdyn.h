@@ -88,6 +88,7 @@ public:
   MValue JSopCVT(MValue, PrimType, PrimType);
   void * JSopNewArrLength(MValue &);
   void JSopSetProp(MValue &, MValue &, MValue &);
+  void JSopInitProp(MValue &, MValue &, MValue &);
   MValue  JSopNew(MValue &size);
   uint64_t JSopNewIterator(MValue &, MValue &);
   MValue JSopNextIterator(MValue &);
@@ -113,6 +114,9 @@ public:
   MValue JSopThis();
   MValue JSUnary(MIRIntrinsicID, MValue &);
   MValue JSopUnary(MValue &, Opcode, PrimType);
+  MValue JSopUnaryNeg(MValue &);
+  MValue JSopUnaryLnot(MValue &);
+  MValue JSopUnaryBnot(MValue &);
   MValue JSopRequire(MValue);
   void CreateJsPlugin(char *);
   void SwitchPluginContext(JsFileInforNode *);

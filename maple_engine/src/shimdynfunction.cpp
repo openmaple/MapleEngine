@@ -614,7 +614,12 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);  // ???
           } else {
-            resVal = memory_manager->SetF64ToU32(rtx);
+            if (rtx == 0) {
+              resTag = JSTYPE_NUMBER;
+              resVal = 0;
+            } else {
+              resVal = memory_manager->SetF64ToU32(rtx);
+            }
           }
           break;
         }
@@ -1545,6 +1550,28 @@ void InterSource::JSopSetProp(MValue &mv0, MValue &mv1, MValue &mv2) {
   }
 }
 
+void InterSource::JSopInitProp(MValue &mv0, MValue &mv1, MValue &mv2) {
+  __jsvalue v0 = MValueToJsval(mv0);
+  __jsvalue v1 = MValueToJsval(mv1);
+  __jsvalue v2 = MValueToJsval(mv2);
+  __jsop_initprop(&v0, &v1, &v2);
+  // check if it's set prop for arguments
+  DynMFunction *curFunc = GetCurFunc();
+  if (!curFunc->is_strict() && __is_js_object(&v0)) {
+    __jsobject *obj = __jsval_to_object(&v0);
+    if (obj == (__jsobject *)curFunc->argumentsObj) {
+      __jstype jstp = (__jstype) GetJSTag(mv1);
+      if (jstp == JSTYPE_NUMBER) {
+        uint32_t index = mv1.x.u32;
+        uint32_t numArgs = curFunc->header->upFormalSize/sizeof(void *);
+        if (index < numArgs - 1 && !curFunc->IsIndexDeleted(index)) {
+          EmulateStoreGC((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *), mv2, mv2.ptyp);
+        }
+      }
+    }
+  }
+}
+
 uint64_t InterSource::JSopNewIterator(MValue &mv0, MValue &mv1) {
   __jsvalue v0 = MValueToJsval(mv0);
   MValue retMv;
@@ -1690,8 +1717,8 @@ MValue InterSource::JSopDelProp (MValue &mv0, MValue &mv1, bool throw_p) {
 
 void InterSource::JSopInitPropByName(MValue &mv0, MValue &mv1, MValue &mv2) {
   __jsvalue v0 = MValueToJsval(mv0);
-  __jsstring *v1 = (__jsstring *) mv1.x.a64;
   __jsvalue v2 = MValueToJsval(mv2);
+  __jsstring *v1 = (__jsstring *) mv1.x.a64;
   __jsop_initprop_by_name(&v0, v1, &v2);
 }
 
@@ -1813,106 +1840,111 @@ bool InterSource::JSopSwitchCmp(MValue &mv0, MValue &mv1, MValue &mv2) {
   return JSopPrimCmp(cmpOp, mv1, mv2, PTY_i32);
 }
 
-MValue InterSource::JSopUnary(MValue &mval, Opcode op, PrimType pty) {
-  int32 val = mval.x.i32;
-  switch (op) {
-    case OP_lnot: {
-      switch (pty) {
-        case PTY_u1:
-          val = (val == 0);
-          break;
-        default:
-          MIR_FATAL("InterpreteUnary: NYI");
+MValue InterSource::JSopUnaryLnot(MValue &mval) {
+  __jsvalue jsVal = MValueToJsval(mval);
+  int32_t xval = 0;
+  bool ok2convert = false;
+    switch (__jsval_typeof(&jsVal)) {
+      case JSTYPE_BOOLEAN:
+      case JSTYPE_DOUBLE:
+      case JSTYPE_NUMBER:
+      case JSTYPE_INFINITY:
+        return JsvalToMValue(__boolean_value(!__js_ToBoolean(&jsVal)));
+      case JSTYPE_OBJECT:
+      case JSTYPE_STRING:
+        return JsvalToMValue(__boolean_value(false));
+      case JSTYPE_NAN:
+      case JSTYPE_NULL:
+      case JSTYPE_UNDEFINED:
+        return JsvalToMValue(__boolean_value(true));
+      default: {
+        MIR_FATAL("wrong type");
       }
-      break;
     }
-    case OP_bnot: {
-      switch (pty) {
-        case PTY_i32:
-        case PTY_u32:
-        case PTY_a32:
-          val = ~val;
-          break;
-        default:
-          MIR_FATAL("InterpreteUnary: NYI");
-      }
-      break;
-    }
-    case OP_neg: {
-      if (mval.ptyp == maple::PTY_simplestr || mval.ptyp == PTY_a64) {
-        bool isConvertible = false;
-        //__jsvalue v = MValueToJsval(mval);
-        __jsstring *str = (__jsstring *)mval.x.a64;
-        __jsvalue v = __string_value(str);
-        __jsvalue Mval = __js_ToNumberSlow2(&v, isConvertible);
-        if (__is_infinity((&Mval))) {
-          if (__is_neg_infinity((&Mval)))
-            return JsvalToMValue(__number_infinity());
-          else
-            return JsvalToMValue(__number_neg_infinity());
-        }
-        if (__is_nan(&Mval)) {
-          return JsvalToMValue(__nan_value());
-        }
-        MValue mmval = JsvalToMValue(Mval);
-        MValue v0 = JsvalToMValue(__number_value(0));
-        return JSopSub(v0, mmval, pty, op);
-      } else if (mval.ptyp == maple::PTY_simpleobj) {
-        __jsobject *obj = (__jsobject *)(mval.x.a64);
-        __jsvalue xval = __object_internal_DefaultValue(obj, JSTYPE_NUMBER);
-        if (__is_string(&xval)) {
-          MValue mmval;
-          mmval.x.a64 = (uint8_t *)__jsval_to_string(&xval);
-          mmval.ptyp = maple::PTY_simplestr;
-          return JSopUnary(mmval, op, pty);
-        } else {
-          MValue mmval = JsvalToMValue(xval);
-          MValue v0 = JsvalToMValue(__number_value(0));
-          return JSopSub(v0, mmval, pty, op);
-        }
-      }
-      switch (pty) {
-        case PTY_i32:
-        case PTY_u32:
-        case PTY_a32:
-          val = -val;
-          break;
-        case PTY_dynany: {
-          __jsvalue jsv = MValueToJsval(mval);
-          if (__is_number(&jsv)) {
-            int32_t value = jsv.s.payload.i32;
-            if (value == 0) {
-              return JsvalToMValue(__double_value(-0));
-            } else {
-              return JsvalToMValue(__number_value(-value));
-            }
-          } else if (__is_double(&jsv)) {
-            double dv = __jsval_to_double(&jsv);
-            if (fabs(dv - 0.0f) < NumberMinValue) {
-              return JsvalToMValue(__number_value(0));
-            } else {
-              return JsvalToMValue(__double_value(-dv));
-            }
-          }
-          MValue v0 = JsvalToMValue(__number_value(0));
-          return JSopSub(v0, mval, pty, op);
-        }
-        default:
-          MIR_FATAL("InterpreteUnary: NYI");
-      }
-      break;
-    }
-    case OP_abs:
-    case OP_extractbits:
-    case OP_recip:
-    case OP_sqrt:
-    default:
-      MIR_FATAL("InterpreteUnary: NYI");
-  }
-  MValue res;
-  res.x.i32 = val;
-  return res;
 }
+
+MValue InterSource::JSopUnaryBnot(MValue &mval) {
+  __jsvalue jsVal = MValueToJsval(mval);
+  int32_t xval = 0;
+  bool ok2convert = false;
+  jsVal =__js_ToNumber2(&jsVal, ok2convert);
+  if (ok2convert) {
+    switch (__jsval_typeof(&jsVal)) {
+      case JSTYPE_NAN:
+        return JsvalToMValue(__number_value(-1));
+      case JSTYPE_DOUBLE:
+      case JSTYPE_NUMBER:
+      case JSTYPE_INFINITY: {
+        return JsvalToMValue(__number_value(~__js_ToNumber(&jsVal)));
+      }
+      default:
+        MIR_FATAL("wrong type");
+    }
+  } else {
+    switch (__jsval_typeof(&jsVal)) {
+      case JSTYPE_NAN:
+          return JsvalToMValue(__number_value(~0));
+      default: {
+        MValue mvVal = JsvalToMValue(jsVal);
+        return JSopUnaryBnot(mvVal);
+      }
+    }
+  }
+}
+
+MValue InterSource::JSopUnaryNeg(MValue &mval) {
+  __jsvalue jsVal = MValueToJsval(mval);
+  switch (__jsval_typeof(&jsVal)) {
+    case JSTYPE_BOOLEAN: {
+      bool isBoo =  __jsval_to_boolean(&jsVal);
+      return JsvalToMValue(__number_value(isBoo ? -1 : 0));
+    }
+    case JSTYPE_NUMBER: {
+      int32_t xx = __jsval_to_number(&jsVal);
+      if (xx == 0) {
+         return JsvalToMValue(__double_value(-0));
+      } else {
+            return JsvalToMValue(__number_value(-xx));
+      }
+    }
+    case JSTYPE_DOUBLE: {
+      double dv = __jsval_to_double(&jsVal);
+      if (fabs(dv - 0.0f) < NumberMinValue) {
+            return JsvalToMValue(__number_value(0));
+      } else {
+            return JsvalToMValue(__double_value(-dv));
+      }
+    }
+    case JSTYPE_STRING: {
+      bool isConvertible = false;
+        //__jsvalue v = MValueToJsval(mval);
+      __jsvalue strval = __js_ToNumberSlow2(&jsVal, isConvertible);
+      MValue mVal = JsvalToMValue(strval);
+      return JSopUnaryNeg(mVal);
+    }
+    case JSTYPE_INFINITY: {
+      return JsvalToMValue(__is_neg_infinity(&jsVal) ? __number_infinity() : __number_neg_infinity());
+    }
+    case JSTYPE_UNDEFINED:
+    case JSTYPE_NAN:
+      return JsvalToMValue(__nan_value());
+    case JSTYPE_NULL:
+      return JsvalToMValue(__number_value(0));
+    case JSTYPE_OBJECT: {
+      __jsobject *obj = __jsval_to_object(&jsVal);
+      __jsvalue xval = __object_internal_DefaultValue(obj, JSTYPE_NUMBER);
+      MValue mVal = JsvalToMValue(xval);
+      return JSopUnaryNeg(mVal);
+    }
+    default:
+     MIR_FATAL("InterpreteUnary: NYI");
+  }
+}
+
+MValue InterSource::JSopUnary(MValue &mval, Opcode op, PrimType pty) {
+  MIR_FATAL("InterpreteUnary: NYI");
+}
+
 
 MValue InterSource::JSIsNan(MValue &mval) {
   __jstype tag = (__jstype)GetMValueTag(mval);
@@ -2050,9 +2082,10 @@ MValue InterSource::NativeFuncCall(MIRIntrinsicID id, MValue *args, int numArgs)
             __jsvalue idxJs = __number_value(index);
             MValue mv2 = args[2 + 2];
             __jsvalue arg2 = jsArgs[2];
+            bool isOldWritable = __jsPropertyIsWritable(obj, index);
             __jsobj_defineProperty(&thisNode, &arg0, &idxJs, &arg2);
             __jsvalue idxValue = __jsobj_GetValueFromPropertyByValue(obj, index);
-            if (!__is_undefined(&idxValue)) {
+            if (!__is_undefined(&idxValue) && isOldWritable) {
               EmulateStoreGC((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *),
                               JsvalToMValue(idxValue), mv2.ptyp);
             }

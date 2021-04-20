@@ -19,6 +19,7 @@
 #include "jsstring.h"
 #include "jsfunction.h"
 #include "jscontext.h"
+#include "jsintl.h"
 
 #define JSPROP_HAS_GET 0x01
 #define JSPROP_HAS_SET 0x02
@@ -54,6 +55,10 @@
 #define JSPROP_DESC_HAS_VWUEUC                                                                     \
   (uint32_t)(JSPROP_HAS_VALUE << 24 | JSPROP_DESC_ATTR_FALSE << 16 | JSPROP_DESC_ATTR_FALSE << 8 | \
              JSPROP_DESC_ATTR_TRUE)
+// NO VALUE, WRITABLE FALSE,  ENUMERRABLE FALSE, CONFIGURABLE TRUE
+#define JSPROP_DESC_HAS_UVUWUEC  \
+  (uint32_t)(JSPROP_DESC_ATTR_TRUE << 16 | JSPROP_DESC_ATTR_FALSE << 8)
+
 // HAS GET, ENUMERABLE TRUE, CONFIGURABLE TRUE.
 #define JSPROP_DESC_HAS_GEC (uint32_t)(JSPROP_HAS_GET << 24 | JSPROP_DESC_ATTR_TRUE << 16 | JSPROP_DESC_ATTR_TRUE << 8)
 // HAS SET, ENUMERABLE TRUE, CONFIGURABLE FALSE.
@@ -114,6 +119,7 @@ enum __jsobj_class : uint8_t {
   JSON,
   JSERROR,
   JSARGUMENTS,
+  JSINTL,
   JSOBJ_CLASS_LAST,
   JSDOUBLE,
 };
@@ -177,6 +183,8 @@ struct __jsobject {
     __jsvalue *array_props;
     // For function objects.
     __jsfunction *fun;
+    // For Intl objects.
+    __jsintl *intl;
     // Primitive Value for string-object.
     __jsstring *prim_string;
     // Primitive Value for number-object.
@@ -313,12 +321,20 @@ __jsvalue __jsobj_pt_isPrototypeOf(__jsvalue *this_object, __jsvalue *v);
 // ecma 15.2.4.7
 __jsvalue __jsobj_pt_propertyIsEnumerable(__jsvalue *this_object, __jsvalue *v);
 void __jsop_initprop_by_name(__jsvalue *o, __jsstring *p, __jsvalue *v);
+void __jsop_initprop(__jsvalue *o, __jsvalue *p, __jsvalue *v);
 void __jsop_setprop(__jsvalue *object, __jsvalue *prop_name, __jsvalue *v);
 void __jsop_initprop_getter(__jsvalue *object, __jsvalue *prop_name, __jsvalue *v);
 __jsvalue __jsop_getprop(__jsvalue *object, __jsvalue *prop_name);
 __jsvalue __jsop_delprop(__jsvalue *o, __jsvalue *nameIndex, bool throw_p = false);
 __jsvalue __jserror_pt_toString(__jsvalue *this_object);
+__jsvalue __js_rangeerror_pt_toString(__jsvalue *this_object);
+__jsvalue __js_evalerror_pt_toString(__jsvalue *this_object);
+__jsvalue __js_referenceerror_pt_toString(__jsvalue *this_object);
+__jsvalue __js_typeerror_pt_toString(__jsvalue *this_object);
+__jsvalue __js_urierror_pt_toString(__jsvalue *this_object);
+__jsvalue __js_syntaxerror_pt_toString(__jsvalue *this_object);
 void __jsobj_initprop_fromString(__jsobject *obj, __jsstring *str);
 __jsprop *__jsobj_helper_init_value_propertyByValue(__jsobject *, uint32_t, __jsvalue *, uint32_t);
 __jsvalue __jsobj_GetValueFromPropertyByValue(__jsobject *, uint32_t);
+bool __jsPropertyIsWritable(__jsobject *, uint32_t);
 #endif

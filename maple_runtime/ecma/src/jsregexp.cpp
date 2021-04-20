@@ -566,3 +566,23 @@ int RegExpExecute(const dart::jscre::JSRegExp *re, __jsstring *js_subject,
 
   return res;
 }
+
+// Getter for 'source' accessor property.
+__jsvalue __jsregexp_Source(__jsvalue *this_arg) {
+  return __jsop_getprop_by_name(this_arg, __jsstr_get_builtin(JSBUILTIN_STRING_SOURCE));
+}
+
+// Getter for 'global' accessor property.
+__jsvalue __jsregexp_Global(__jsvalue *this_arg) {
+  return __jsop_getprop_by_name(this_arg, __jsstr_get_builtin(JSBUILTIN_STRING_GLOBAL));
+}
+
+// Getter for 'ignoreCase' accessor property.
+__jsvalue __jsregexp_Ignorecase(__jsvalue *this_arg) {
+  return __jsop_getprop_by_name(this_arg, __jsstr_get_builtin(JSBUILTIN_STRING_IGNORECASE_UL));
+}
+
+// Getter for 'multiline' accessor property.
+__jsvalue __jsregexp_Multiline(__jsvalue *this_arg) {
+  return __jsop_getprop_by_name(this_arg, __jsstr_get_builtin(JSBUILTIN_STRING_MULTILINE));
+}

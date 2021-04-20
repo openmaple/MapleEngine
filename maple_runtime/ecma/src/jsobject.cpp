@@ -30,6 +30,7 @@
 #include "jsdate.h"
 #include "jsregexp.h"
 #include "jsglobal.h"
+#include "jsintl.h"
 
 #if __clang_major__ >= 4
 #pragma clang diagnostic ignored "-Waddress-of-packed-member"
@@ -312,6 +313,37 @@ __jsprop *__add_builtin_value_property2(__jsbuiltin_string_id id, __jsbuiltin_ob
   }
 }
 
+__jsprop *add_builtin_accessor_property(__jsbuiltin_string_id id, __jsbuiltin_object_id builtin_obj_id,
+                                       void* getter, uint32_t get_attr,
+                                       void* setter, uint32_t set_attr,
+                                       uint32_t attrs,
+                                       bool create_all) {
+  __jsobject *obj = bi_obj;
+  __jsstring *name = bi_name;
+  __jsobject *getObj = NULL;
+  __jsobject *setObj = NULL;
+
+  if (__jsstr_equal_to_builtin(name, id)) {
+    // init property
+    __jsprop *prop = __jsobj_helper_create_property(obj, __jsstr_get_builtin(id));
+    prop->desc.attrs = attrs; // set user defined attrs
+    MAPLE_JS_ASSERT(!__has_value(prop->desc) && !__has_writable(prop->desc)); // not have value
+
+    __jsvalue f;
+    if (getter) {
+      f = __js_new_function((void *)getter, NULL, get_attr);
+      __jsobject *fobj = __jsval_to_object(&f);
+      __set_get(&(prop->desc), fobj);
+    }
+    if (setter) {
+      f = __js_new_function((void *)setter, NULL, set_attr);
+      __jsobject *fobj = __jsval_to_object(&f);
+      __set_set(&(prop->desc), fobj);
+    }
+    return prop;
+  }
+  return NULL;
+}
 
 // check obj is global this
 bool __is_globalthis(__jsobject *obj) {
@@ -345,6 +377,14 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
     if (prop)                                                                                            \
       return prop;                                                                                       \
   } while (0)
+
+#define ADD_ACCESSOR_PROPERTY(builtin_property_name_id, builtin_obj_id, getter, get_attrs, setter, set_attrs, attrs) \
+  do {                                                         \
+    __jsprop *prop = add_builtin_accessor_property(builtin_property_name_id, builtin_obj_id, (void *)getter,   \
+                                                   get_attrs, (void *)setter, set_attrs, attrs, create_all);          \
+    if (prop) \
+      return prop;                                               \
+  } while (0)                 \
 
   bi_obj = obj;
   bi_name = name;
@@ -513,6 +553,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       break;
     case JSBUILTIN_REFERENCEERRORPROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_REFERENCEERRORCONSTRUCTOR));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_referenceerror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_ERROR_CONSTRUCTOR:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_ERROR_PROTOTYPE));
@@ -528,12 +569,14 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       break;
     case JSBUILTIN_EVALERROR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_EVALERROR_CONSTRUCTOR));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_evalerror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_RANGEERROR_CONSTRUCTOR:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_RANGEERROR_PROTOTYPE));
       break;
     case JSBUILTIN_RANGEERROR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_RANGEERROR_CONSTRUCTOR));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_rangeerror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_SYNTAXERROR_CONSTRUCTOR:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_SYNTAXERROR_PROTOTYPE));
@@ -541,13 +584,14 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
     case JSBUILTIN_SYNTAXERROR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_SYNTAXERROR_CONSTRUCTOR));
       ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NAME, (JSBUILTIN_SYNTAXERROR_CONSTRUCTOR), __string_value(__jsstr_get_builtin(JSBUILTIN_STRING_SYNTAX_ERROR_UL)));
-      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __jserror_pt_toString, ATTRS(0, 0));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_syntaxerror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_URIERROR_CONSTRUCTOR:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_URIERROR_PROTOTYPE));
       break;
     case JSBUILTIN_URIERROR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_URIERROR_CONSTRUCTOR));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_urierror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_TYPEERROR_CONSTRUCTOR:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_TYPEERROR_PROTOTYPE));
@@ -555,17 +599,17 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
     case JSBUILTIN_TYPEERROR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_TYPEERROR_CONSTRUCTOR));
       ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NAME, (JSBUILTIN_TYPEERROR_CONSTRUCTOR), __string_value(__jsstr_get_builtin(JSBUILTIN_STRING_TYPE_ERROR_UL)));
-      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __jserror_pt_toString, ATTRS(0, 0));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_typeerror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_REGEXPCONSTRUCTOR:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_REGEXPPROTOTYPE));
       break;
     case JSBUILTIN_REGEXPPROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_REGEXPCONSTRUCTOR));
-      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_SOURCE, (JSBUILTIN_REGEXPPROTOTYPE));
-      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_GLOBAL, (JSBUILTIN_REGEXPPROTOTYPE));
-      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_IGNORECASE_UL, (JSBUILTIN_REGEXPPROTOTYPE));
-      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_MULTILINE, (JSBUILTIN_REGEXPPROTOTYPE));
+      ADD_ACCESSOR_PROPERTY(JSBUILTIN_STRING_SOURCE, JSBUILTIN_REGEXPPROTOTYPE, __jsregexp_Source, ATTRS(0, 0), NULL, ATTRS(0,0), JSPROP_DESC_HAS_UVUWUEC);
+      ADD_ACCESSOR_PROPERTY(JSBUILTIN_STRING_GLOBAL, JSBUILTIN_REGEXPPROTOTYPE, __jsregexp_Global, ATTRS(0, 0), NULL, ATTRS(0,0), JSPROP_DESC_HAS_UVUWUEC);
+      ADD_ACCESSOR_PROPERTY(JSBUILTIN_STRING_IGNORECASE_UL, JSBUILTIN_REGEXPPROTOTYPE, __jsregexp_Ignorecase, ATTRS(0, 0), NULL, ATTRS(0,0), JSPROP_DESC_HAS_UVUWUEC);
+      ADD_ACCESSOR_PROPERTY(JSBUILTIN_STRING_MULTILINE, JSBUILTIN_REGEXPPROTOTYPE, __jsregexp_Multiline, ATTRS(0, 0), NULL, ATTRS(0,0), JSPROP_DESC_HAS_UVUWUEC);
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_EXEC, __jsregexp_Exec, ATTRS(1, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TEST, __jsregexp_Test, ATTRS(1, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __jsregexp_ToString, ATTRS(0, 0));
@@ -631,8 +675,65 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
         ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NAN, (JSBUILTIN_NAN), __nan_value());
         ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_INFINITY_UL, (JSBUILTIN_INFINITY),  __number_infinity());
         ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_UNDEFINED, (JSBUILTIN_UNDEFINED), __undefined_value());
+        // 15.1.2 and 15.1.3  URI Handling and Function Properties of the Global Object
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_EVAL, __js_eval, ATTRS(0, 0));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_PARSE_INT, __js_parseint, ATTRS(UNCERTAIN_NARGS, 2));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_PARSE_FLOAT, __js_parsefloat, ATTRS(UNCERTAIN_NARGS, 0));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_IS_NAN, __is_nan, ATTRS(1, 0));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_IS_FINITE, __is_infinity, ATTRS(1, 0));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_DECODE_URI, __js_decodeuri, ATTRS(UNCERTAIN_NARGS, 0));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_DECODE_URI_COMPONENT, __js_decodeuricomponent, ATTRS(UNCERTAIN_NARGS, 0));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_ENCODE_URI, __js_encodeuri, ATTRS(UNCERTAIN_NARGS, 0));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_ENCODE_URI_COMPONENT, __js_encodeuricomponent, ATTRS(UNCERTAIN_NARGS, 1));
+        // 15.1.4 Constructor Properties of the Global Object
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_OBJECT_UL, __js_new_obj, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_FUNCTION_UL, __js_new_functionN, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_ARRAY_UL, __js_new_arr, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_STRING_UL, __js_new_stringconstructor, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_BOOLEAN_UL, __js_new_booleanconstructor, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_NUMBER_UL, __js_new_numberconstructor, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_DATE_UL, __js_new_dateconstructor, ATTRS(UNCERTAIN_NARGS, 2));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_REGEXP_UL, __js_new_regexp_obj, ATTRS(UNCERTAIN_NARGS, 7));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_ERROR_UL, __js_new_error_obj, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_EVAL_ERROR_UL, __js_new_evalerror_obj, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RANGE_ERROR_UL, __js_new_rangeerror_obj, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_REFERENCE_ERROR_UL, __js_new_reference_error_obj, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SYNTAX_ERROR_UL, __js_new_syntaxerror_obj, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TYPE_ERROR_UL, __js_new_type_error_obj, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_URI_ERROR_UL, __js_new_urierror_obj, ATTRS(UNCERTAIN_NARGS, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_MATH_UL, __js_new_math_obj, ATTRS(0, 1));
+        ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_JSON_U, __js_new_json_obj, ATTRS(0, 1));
         ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_ESCAPE, __js_escape, ATTRS(1, 1));
       }
+      break;
+    case JSBUILTIN_INTL:
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_COLLATOR_UL, (JSBUILTIN_INTL_COLLATOR_CONSTRUCTOR));
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_NUMBERFORMAT_UL, (JSBUILTIN_INTL_NUMBERFORMAT_CONSTRUCTOR));
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_DATETIMEFORMAT_UL, (JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR));
+      break;
+    case JSBUILTIN_INTL_COLLATOR_CONSTRUCTOR:
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_INTL_COLLATOR_PROTOTYPE));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUPPORTED_LOCALES_OF, __jsintl_CollatorSupportedLocalesOf, ATTRS(UNCERTAIN_NARGS, 2));
+      break;
+    case JSBUILTIN_INTL_COLLATOR_PROTOTYPE:
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_COMPARE, __jsintl_CollatorCompare, ATTRS(2, 2));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_CollatorResolvedOptions, ATTRS(0, 0));
+      break;
+    case JSBUILTIN_INTL_NUMBERFORMAT_CONSTRUCTOR:
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUPPORTED_LOCALES_OF, __jsintl_NumberFormatSupportedLocalesOf, ATTRS(UNCERTAIN_NARGS, 2));
+      break;
+    case JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE:
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_FORMAT, __jsintl_NumberFormatFormat, ATTRS(1, 1));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_NumberFormatResolvedOptions, ATTRS(0, 0));
+      break;
+    case JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR:
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUPPORTED_LOCALES_OF, __jsintl_DateTimeFormatSupportedLocalesOf, ATTRS(UNCERTAIN_NARGS, 2));
+      break;
+    case JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE:
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_FORMAT, __jsintl_DateTimeFormatFormat, ATTRS(1, 1));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_DateTimeFormatResolvedOptions, ATTRS(0, 0));
       break;
     default:
       break;
@@ -719,7 +820,7 @@ static inline __jsvalue __jsprop_desc_FromPropertyDescriptor(__jsprop_desc desc)
   return __object_value(obj);
 }
 
-static __jsvalue __jsobj_internal_get_by_desc(__jsobject *obj, __jsprop_desc desc) {
+static __jsvalue __jsobj_internal_get_by_desc(__jsobject *obj, __jsprop_desc desc, __jsvalue *orgVal = NULL) {
   // ecma 8.12.3 step 2.
   if (__is_undefined_desc(desc)) {
     return __undefined_value();
@@ -736,7 +837,7 @@ static __jsvalue __jsobj_internal_get_by_desc(__jsobject *obj, __jsprop_desc des
         return __undefined_value();
       }
       __jsvalue this_arg = __object_value(obj);
-      return __jsfun_internal_call(getter, &this_arg, NULL, 0);
+      return __jsfun_internal_call(getter, &this_arg, NULL, 0, orgVal);
     } else { /* ecma 8.12.3 step 5/6. */
       return __undefined_value();
     }
@@ -1917,9 +2018,13 @@ bool __jsobj_walk_defineProperties(__jsvalue *this_val, __jsprop *prop, void *re
      desc = __jsprop_desc_ToPropertyDescriptor(&desc_obj);
     } else {
       // ecma 15.2.3.7.5.a
-      MAPLE_JS_ASSERT(__has_get(desc));
-      __jsobject* getter = __get_get(desc);
-      __jsvalue desc_obj = getter ? __jsfun_internal_call(getter, this_val, NULL, 0) : __undefined_value();
+      __jsvalue desc_obj;
+      if (!__has_get(desc)) {
+        desc_obj = __undefined_value();
+      } else {
+        __jsobject* getter = __get_get(desc);
+        desc_obj = getter ? __jsfun_internal_call(getter, this_val, NULL, 0) : __undefined_value();
+      }
       desc = __jsprop_desc_ToPropertyDescriptor(&desc_obj);
     }
     if (prop->isIndex) {
@@ -2353,6 +2458,20 @@ void __jsop_setprop(__jsvalue *o, __jsvalue *p, __jsvalue *v) {
   }
 }
 
+void __jsop_initprop(__jsvalue *o, __jsvalue *p, __jsvalue *v) {
+  MAPLE_JS_ASSERT(__is_js_object(o));
+  __jsobject *obj = __jsval_to_object(o);
+  if((__is_number(p) && __jsval_to_number(p) >= 0) ||
+     (__is_double(p) && (__jsval_to_double(p) <= UINT32_MAX) && (__jsval_to_double(p) >= 0))) {
+    uint32_t pIdx = __is_number(p) ? __jsval_to_number(p) : __jsval_to_double(p);
+    __jsobj_helper_init_value_propertyByValue(obj, pIdx, v, JSPROP_DESC_HAS_VWEC);
+  } else {
+    __jsstring *pstr = __js_ToString(p);
+    __jsobj_helper_init_value_property(obj, pstr, v, JSPROP_DESC_HAS_VWEC);
+  }
+  return;
+}
+
 void __jsop_initprop_by_name(__jsvalue *o, __jsstring *p, __jsvalue *v) {
   MAPLE_JS_ASSERT(__is_js_object(o));
   __jsobject *obj = __jsval_to_object(o);
@@ -2417,17 +2536,24 @@ __jsvalue __jsop_delprop(__jsvalue *o, __jsvalue *p, bool throw_p) {
   return __boolean_value(res);
 }
 
+__jsvalue __jsobj_getprop_by_scalar(__jsvalue *o, __jsstring *p) {
+  __jsobject *obj = __js_ToObject(o);
+  __jsprop_desc desc = __jsobj_internal_GetProperty(obj, p);
+  __jsvalue ret = __jsobj_internal_get_by_desc(obj, desc, o);
+  memory_manager->ManageObject(obj, RECALL);
+  return ret;
+}
+
 __jsvalue __jsop_getprop_by_name(__jsvalue *o, __jsstring *p) {
   if (__is_undefined(o))
     return *o;
-  __jsobject *obj = __is_js_object(o) ? __jsval_to_object(o) : __js_ToObject(o);
-  // check property of function object is valid
-  __jsop_check_func_nameprop(obj, p);
-  __jsvalue ret = __jsobj_internal_Get(obj, p);
-  if (!__is_js_object(o)) {
-    memory_manager->ManageObject(obj, RECALL);
+  if (__is_js_object(o)) {
+    __jsobject *obj = __jsval_to_object(o);
+    __jsop_check_func_nameprop(obj, p);
+    return __jsobj_internal_Get(obj, p);
+  } else {
+    return __jsobj_getprop_by_scalar(o, p);
   }
-  return ret;
 }
 
 static __jsprop * __jsop_get_prop_jsobject(__jsobject *obj, __jsstring *name) {
@@ -2525,14 +2651,14 @@ __jsvalue __jsop_delprop_by_name(__jsvalue *o, __jsstring *nameIndex) {
 }
 
 // ecma 15.11.4.4
-__jsvalue __jserror_pt_toString(__jsvalue *this_object) {
+__jsvalue __jserror_pt_toString_base(__jsvalue *this_object, __jsbuiltin_string_id id) {
   if (!__is_js_object(this_object)) {
     MAPLE_JS_TYPEERROR_EXCEPTION();
   }
   __jsobject *obj = __jsval_to_object(this_object);
   __jsvalue name = __jsobj_internal_Get(obj, JSBUILTIN_STRING_NAME);
   if (__is_undefined(&name)) {
-    name = __string_value(__jsstr_get_builtin(JSBUILTIN_STRING_ERROR_UL));
+    name = __string_value(__jsstr_get_builtin(id));
   } else {
     name = __string_value(__js_ToString(&name));
   }
@@ -2555,6 +2681,35 @@ __jsvalue __jserror_pt_toString(__jsvalue *this_object) {
   return __string_value(__jsstr_concat_3(nameStr, __jsstr_new_from_char(": "), msgStr));
 }
 
+
+__jsvalue __jserror_pt_toString(__jsvalue *this_object) {
+  return __jserror_pt_toString_base(this_object, JSBUILTIN_STRING_ERROR_UL);
+}
+
+__jsvalue __js_rangeerror_pt_toString(__jsvalue *this_object) {
+  return __jserror_pt_toString_base(this_object, JSBUILTIN_STRING_RANGE_ERROR_UL);
+}
+
+__jsvalue __js_evalerror_pt_toString(__jsvalue *this_object) {
+  return __jserror_pt_toString_base(this_object, JSBUILTIN_STRING_EVAL_ERROR_UL);
+}
+
+__jsvalue __js_referenceerror_pt_toString(__jsvalue *this_object) {
+  return __jserror_pt_toString_base(this_object, JSBUILTIN_STRING_REFERENCE_ERROR_UL);
+}
+
+__jsvalue __js_typeerror_pt_toString(__jsvalue *this_object) {
+  return __jserror_pt_toString_base(this_object, JSBUILTIN_STRING_TYPE_ERROR_UL);
+}
+
+__jsvalue __js_urierror_pt_toString(__jsvalue *this_object) {
+  return __jserror_pt_toString_base(this_object, JSBUILTIN_STRING_URI_ERROR_UL);
+}
+
+__jsvalue __js_syntaxerror_pt_toString(__jsvalue *this_object) {
+  return __jserror_pt_toString_base(this_object, JSBUILTIN_STRING_SYNTAX_ERROR_UL);
+}
+
 // string is array-like objecti, set its property by its string character
 void __jsobj_initprop_fromString(__jsobject *obj, __jsstring *str) {
   uint32_t len = __jsstr_get_length(str);
@@ -2575,4 +2730,9 @@ __jsvalue __jsobj_GetValueFromPropertyByValue(__jsobject *obj, uint32_t index) {
   }else {
     return __get_value(desc);
   }
+}
+
+bool __jsPropertyIsWritable(__jsobject *obj, uint32_t index) {
+  __jsprop_desc desc = __jsobj_internal_GetPropertyByValue(obj, index);
+  return __has_and_writable(desc);
 }

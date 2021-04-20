@@ -1542,6 +1542,13 @@ label_OP_intrinsiccall:
       CATCHINTRINSICOP();
       break;
     }
+    case INTRN_JSOP_INITPROP: {
+      MValue v2 = MPOP();
+      MValue v1 = MPOP();
+      MValue v0 = MPOP();
+      gInterSource->JSopInitProp(v0, v1, v2);
+      break;
+    }
     case INTRN_JSOP_INITPROP_BY_NAME: {
       MIR_ASSERT(argnums == 3);
       MValue &v2 = MPOP();
@@ -2009,16 +2016,6 @@ label_OP_abs:
     goto *(labels[*func.pc]);
   }
 
-label_OP_bnot:
-  {
-    // Handle expression node: bnot
-    DEBUGOPCODE(bnot, Expr);
-    mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
-    JSUNARY();
-    func.pc += sizeof(mre_instr_t);
-    goto *(labels[*func.pc]);
-  }
-
 label_OP_recip:
   {
     // Handle expression node: recip
@@ -2031,14 +2028,38 @@ label_OP_recip:
 
 label_OP_lnot:
   {
-    // Handle expression node: lnot
+    // Handle expression node: neg
     DEBUGOPCODE(lnot, Expr);
     mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
-    JSUNARY();
-    func.pc += sizeof(mre_instr_t);
-    goto *(labels[*func.pc]);
+    MValue mv0 = MPOP();
+    if(IsPrimitiveDyn(mv0.ptyp)) {
+      CHECKREFERENCEMVALUE(mv0);
+    }
+    bool isEhHappend = false;
+    void *newPc = nullptr;
+    MValue res;
+    try {
+      res = gInterSource->JSopUnaryLnot(mv0);
+    }
+    OPCATCHANDGOON(mre_instr_t);
   }
-
+label_OP_bnot:
+  {
+    // Handle expression node: neg
+    DEBUGOPCODE(bnot, Expr);
+    mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
+    MValue mv0 = MPOP();
+    if(IsPrimitiveDyn(mv0.ptyp)) {
+      CHECKREFERENCEMVALUE(mv0);
+    }
+    bool isEhHappend = false;
+    void *newPc = nullptr;
+    MValue res;
+    try {
+      res = gInterSource->JSopUnaryBnot(mv0);
+    }
+    OPCATCHANDGOON(mre_instr_t);
+  }
 label_OP_neg:
   {
     // Handle expression node: neg
@@ -2052,7 +2073,7 @@ label_OP_neg:
     void *newPc = nullptr;
     MValue res;
     try {
-      res = gInterSource->JSopUnary(mv0, (Opcode)expr.op, expr.GetPtyp());
+      res = gInterSource->JSopUnaryNeg(mv0);
     }
     OPCATCHANDGOON(mre_instr_t);
   }
@@ -2201,6 +2222,14 @@ label_OP_intrinsicop:
            MIR_ASSERT(argnums == 1);
            MValue &v0 = MPOP();
            retMv = gInterSource->JSopGetThisPropByName(v0);
+           break;
+         }
+         case INTRN_JSOP_GETPROP: {
+           MIR_ASSERT(argnums == 2);
+           MValue &v1 = MPOP();
+           MValue &v0 = MPOP();
+           // CHECKREFERENCEMVALUE(v0);
+           retMv = gInterSource->JSopGetProp(v0, v1);
            break;
          }
          case INTRN_JS_GET_ARGUMENTOBJECT: {

@@ -114,7 +114,7 @@ void __js_exit_function(__jsvalue *this_arg, __jsvalue old_this, bool strict_p) 
 
 // ecma 13.2.1
 // ??? To be finished, see 13.2.1
-__jsvalue __jsfun_internal_call(__jsobject *f, __jsvalue *this_arg, __jsvalue *arg_list, uint32_t arg_count) {
+__jsvalue __jsfun_internal_call(__jsobject *f, __jsvalue *this_arg, __jsvalue *arg_list, uint32_t arg_count, __jsvalue *origArg) {
   MIR_ASSERT(f != NULL);
   __jsfunction *fun = f->shared.fun;
   MIR_ASSERT(fun != NULL);
@@ -125,7 +125,8 @@ __jsvalue __jsfun_internal_call(__jsobject *f, __jsvalue *this_arg, __jsvalue *a
   __jsvalue return_value;
 
   // MIR_ASSERT(nargs >= 0);
-  __jsvalue old_this = __js_entry_function(this_arg, flag & JSFUNCPROP_STRICT);
+  bool isCalleeStrict = flag & JSFUNCPROP_STRICT;
+  __jsvalue old_this = __js_entry_function((isCalleeStrict && origArg) ? origArg : this_arg, isCalleeStrict);
   // user function calls need to be interpreted
   if (flag & JSFUNCPROP_USERFUNC) {
      MValue ret = gInterSource->FuncCall_JS(f, this_arg, fun->env, arg_list, (int32_t)arg_count);

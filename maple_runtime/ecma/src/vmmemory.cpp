@@ -1083,6 +1083,7 @@ void MemoryManager::ManageObject(__jsobject *obj, ManageType flag) {
     case JSDOUBLE:
     case JSREGEXP:
     case JSDATE:
+    case JSINTL:
       break;
     default:
       MIR_FATAL("manage unknown js object class");

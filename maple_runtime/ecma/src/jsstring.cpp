@@ -47,6 +47,29 @@ static inline bool __jsstr_is_builtin(__jsstring *str) {
   return (((uint8_t *)str)[0] & JSSTRING_BUILTIN) != 0;
 }
 
+static std::wstring __jsstr_to_wstring(__jsstring *s, int offset = 0) {
+  int len = __jsstr_get_length(s) - offset;
+  if (len <= 0) {
+    std::wstring str32;
+    return str32;
+  }
+  if (__jsstr_is_ascii(s)) {
+    std::string str8;
+    str8.assign(s->x.ascii + offset, len);
+    std::wstring_convert<std::codecvt_utf8<wchar_t>,wchar_t> cv;
+    return cv.from_bytes(str8);
+  } else {
+    wchar_t buf[len + 1];
+    for (uint32_t i = 0; i < len; i++) {
+      buf[i] = (wchar_t)((uint16_t *)s)[2 + i + offset];
+    }
+    buf[len] = 0;
+    std::wstring str32;
+    str32.assign(buf, (size_t)len);
+    return str32;
+  }
+}
+
 std::wstring whitespaces = L"\u0009\u000C\u0020\u00A0\u000B\u000A\u000D\u2028\u2029\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\uFEFF";
 bool __is_UnicodeSpace(wchar_t c) {
   if (whitespaces.find(c) != std::wstring::npos)
@@ -596,14 +619,7 @@ static inline bool __is_regexp(__jsvalue *val) {
   return __is_js_object(val) && (__jsval_to_object(val))->object_class == JSREGEXP;
 }
 
-static inline void __jsstr_get_regexp_patten(std::regex &pattern, __jsvalue *regexp, bool &global) {
-/*
-  if (!__is_js_object(regexp))
-    return;
-
-  __jsobject *obj = __jsval_to_object(regexp);
-  if (obj->object_class == JSREGEXP) {
-*/
+static inline void __jsstr_get_regexp_patten(std::wregex &pattern, __jsvalue *regexp, bool &global) {
   if (__is_regexp(regexp)) {
     __jsvalue val = __jsop_getprop_by_name(regexp, __jsstr_get_builtin(JSBUILTIN_STRING_SOURCE));
     __jsstring *pattern_str = __js_ToString(&val);
@@ -617,7 +633,7 @@ static inline void __jsstr_get_regexp_patten(std::regex &pattern, __jsvalue *reg
     std::regex::flag_type flags = std::regex::ECMAScript;
     if (ignore_case)
       flags |= std::regex::icase;
-    pattern.assign(pattern_str->x.ascii, __jsstr_get_length(pattern_str), flags);
+    pattern.assign((__jsstr_to_wstring(pattern_str)).c_str(), __jsstr_get_length(pattern_str), flags);
   }
 }
 
@@ -629,16 +645,15 @@ bool __jsstr_splitMatch(__jsstring *s, uint32_t *q, __jsvalue *separator, uint32
     __jsobject *obj = __jsval_to_object(separator);
     if (obj->object_class == JSREGEXP) {
       // step 2:
-      std::regex pattern;
+      std::wregex pattern;
       bool global;
       __jsstr_get_regexp_patten(pattern, separator, global);
 
       if (*q > __jsstr_get_length(s))
         return false;
-      std::string str;
-      str.assign(s->x.ascii + *q, __jsstr_get_length(s) - *q);
+      std::wstring str = __jsstr_to_wstring(s, *q);
 
-      std::smatch sm;
+      std::wsmatch sm;
       std::regex_search (str, sm, pattern);
       if (sm.size() > 0) {
         *ret = *q + sm.position(0) + sm.length(0);
@@ -909,7 +924,7 @@ __jsvalue __jsstr_trim(__jsvalue *this_string) {
   return __string_value(str);
 }
 
-static inline void __jsstr_get_match_pattern(std::regex &pattern, __jsvalue *regexp, bool &global) {
+static inline void __jsstr_get_match_pattern(std::wregex &pattern, __jsvalue *regexp, bool &global) {
   __jsstring *pattern_str;
   if (__is_js_object(regexp)) {
     __jsobject *obj = __jsval_to_object(regexp);
@@ -927,7 +942,7 @@ static inline void __jsstr_get_match_pattern(std::regex &pattern, __jsvalue *reg
   } else {
      pattern_str = __js_ToString(regexp);
   }
-  pattern.assign(pattern_str->x.ascii, __jsstr_get_length(pattern_str), std::regex::ECMAScript);
+  pattern.assign((__jsstr_to_wstring(pattern_str)).c_str(), __jsstr_get_length(pattern_str), std::regex::ECMAScript);
   return;
 }
 
@@ -941,13 +956,12 @@ __jsvalue __jsstr_search(__jsvalue *this_string, __jsvalue *regexp) {
     return __number_value(0);
 
   int32_t ret = -1;
-  std::regex pattern;
+  std::wregex pattern;
   bool global;
   __jsstr_get_match_pattern(pattern, regexp, global);
-  std::string str;
-  str.assign(s->x.ascii, __jsstr_get_length(s));
+  std::wstring str = __jsstr_to_wstring(s);
 
-  std::smatch sm;
+  std::wsmatch sm;
   std::regex_search (str, sm, pattern);
   if (sm.size() > 0) {
     ret = sm.position(0);
@@ -955,14 +969,14 @@ __jsvalue __jsstr_search(__jsvalue *this_string, __jsvalue *regexp) {
   return __number_value(ret);
 }
 
-static inline __jsvalue __jsstr_stdstr_to_value(std::string stdstr) {
+static inline __jsvalue __jsstr_stdstr_to_value(std::wstring stdstr) {
     int32_t len = stdstr.length();
     if (len == 0)
-      return __null_value();
+      return __string_value(__jsstr_get_builtin(JSBUILTIN_STRING_EMPTY));
 
-    __jsstring *str = __js_new_string_internal(len, false);
+    __jsstring *str = __js_new_string_internal(len, true);
     for (uint32_t i = 0; i < len; i++) {
-      __jsstr_set_char(str, i, stdstr.at(i));
+      __jsstr_set_char(str, i, (uint16_t)stdstr.at(i));
     }
     return __string_value(str);
 }
@@ -1129,6 +1143,103 @@ __jsvalue __jsstr_match(__jsvalue *this_string, __jsvalue *regexp) {
   return __object_value(array_obj);
 }
 
+static inline void __jsstr_get_replace_value(__jsvalue *func, __jsvalue *this_string, std::vector<std::pair<int,int>> &vres_ret, __jsvalue &val) {
+  int j = 0;
+  __jsvalue match_start;
+  __jsvalue args[vres_ret.size() + 2];
+  for (int i = 0; i < vres_ret.size(); i++) {
+    int start = vres_ret[i].first;
+    int end = vres_ret[i].second;
+    if (i == 0) {
+      match_start = __number_value(start);
+    }
+    // Argument 1 is the substring that matched
+    __jsvalue subject_val = *this_string;
+    __jsvalue start_val = __number_value(start);
+    __jsvalue end_val = __number_value(end);
+    __jsvalue str_val = __jsstr_substring(&subject_val, &start_val, &end_val);
+    args[j++] = str_val;
+  }
+  // Argument m + 2 is the offset within string where the match occurred
+  args[j++] = match_start;
+  // Argument m + 3 is string
+  args[j++] = *this_string;
+
+  __jsobject *f = __jsval_to_object(func);
+  __jsfunction *fun = f->shared.fun;
+  if (fun == NULL || fun->attrs == 0) {
+    val = __undefined_value();
+  } else {
+    val = __jsfun_val_call(func, this_string, &args[0], j);
+  }
+}
+
+static inline bool __jsstr_get_replace_substitution(std::wstring &source, std::wstring &rep, std::vector<std::pair<int,int>> &vres_ret) {
+  bool has_substitution = false;
+  int start = vres_ret[0].first;
+  int end = vres_ret[vres_ret.size() - 1].second;
+  int i = 0;
+  while (i < rep.size()) {
+    if (rep[i] == L'$' && rep.size() - i >= 2) {
+      switch (rep[i + 1]) {
+        case L'$':
+          rep = rep.substr(0, i) + rep.substr(i + 1, rep.size() - i - 1);
+          i += 1;
+          has_substitution = true;
+          break;
+        case L'&':
+          // The matched substing
+          rep = rep.substr(0, i) +
+                source.substr(start, end - start) +
+                rep.substr(i + 2, rep.size() - i - 2);
+          i += end - start;
+          has_substitution = true;
+          break;
+        case L'`':
+          // The portion of string that precedes the matched substring
+          rep = rep.substr(0, i) +
+                source.substr(0, start) +
+                rep.substr(i + 2, rep.size() - i - 2);
+          i += start;
+          has_substitution = true;
+          break;
+        case L'\'':
+          // The portion of string that follows the matched substring
+          rep = rep.substr(0, i) +
+                source.substr(end, source.size() - end) +
+                rep.substr(i + 2, rep.size() - i - 2);
+          i += source.size() - end;
+          has_substitution = true;
+          break;
+        default:
+          if (rep[i + 1] > L'0' && rep[i + 1] <='9') {
+            // $n
+            int l = rep[i + 1] - L'0';
+            int offset = 2;
+            if (rep.size() - i >= 3 && rep[i + 2] >= L'0' && rep[i + 2] <='9' && vres_ret.size() > 9) {
+              // $nn
+              l = l * 10 + (rep[i + 2] - L'0');
+              offset = 3;
+            }
+            if (l <= vres_ret.size()) {
+              rep = rep.substr(0, i) +
+                    source.substr(vres_ret[l].first, vres_ret[l].second - vres_ret[l].first) +
+                    rep.substr(i + offset, rep.size() - i - offset);
+              i += vres_ret[l].second - vres_ret[l].first;
+            } else {
+              rep = rep.substr(0, i) + rep.substr(i + offset, rep.size() - i - offset);
+            }
+            has_substitution = true;
+          }
+          break;
+      }
+    } else {
+      i++;
+    }
+  }
+  return has_substitution;
+}
+
 // Ecma 15.5.4.11 String.prototype.replace ( )
 __jsvalue __jsstr_replace(__jsvalue *this_string, __jsvalue *search, __jsvalue *replace) {
   // step 1:
@@ -1137,78 +1248,10 @@ __jsvalue __jsstr_replace(__jsvalue *this_string, __jsvalue *search, __jsvalue *
   __jsstring *s = __js_ToString(this_string);
 
   __jsstring *replace_str;
-  std::regex pattern;
-  bool global = false;
-
-  std::string source;
-  source.assign(s->x.ascii, __jsstr_get_length(s));
-
-  if (__is_regexp(search) && __js_IsCallable(replace)) {
-    std::vector<std::pair<int,int>> vres_ret;
-    __jsvalue match_start;
-    std::string result;
-    result.assign(s->x.ascii, __jsstr_get_length(s));
-    int distance = 0;
-    int r;
-    __jsstring *js_pattern = NULL;
-    bool ignorecase, multiline; 
-    unsigned num_captures;
-    int last_index = 0;
-    __jsstr_get_regexp_property(search, js_pattern, global, ignorecase, multiline, num_captures);
-    do  {
-      r = __jsstr_regexp_exec(s, js_pattern, global, ignorecase, multiline, num_captures, last_index, &vres_ret);
-      if (vres_ret.size() > 0) {
-        int j = 0;
-        __jsvalue args[vres_ret.size() + 2];
-        for (int i = 0; i < vres_ret.size(); i++) {
-          int start = vres_ret[i].first, end = vres_ret[i].second;
-          if (i == 0) { 
-            match_start = __number_value(start);
-          }
-          // Argument 1 is the substring that matched
-          __jsvalue subject_val = __string_value(s);
-          __jsvalue start_val = __number_value(start);
-          __jsvalue end_val = __number_value(end);
-          __jsvalue str_val = __jsstr_substring(&subject_val, &start_val, &end_val);
-          args[j++] = str_val;
-        }
-        // Argument m + 2 is the offset within string where the match occurred
-        args[j++] = match_start;
-        // Argument m + 3 is string
-        args[j++] = *this_string;
-        __jsvalue val = __jsfun_val_call(replace, this_string, &args[0], j);
-        replace_str = __js_ToString(&val);
-        std::string rep;
-        rep.assign(replace_str->x.ascii, __jsstr_get_length(replace_str));
-        result.replace(vres_ret[0].first + distance, vres_ret[0].second - vres_ret[0].first, rep);
-        distance = rep.length() - (vres_ret[0].second - vres_ret[0].first);
-
-        vres_ret.clear();
-      }
-    } while (r == 1 && global);
-    return __jsstr_stdstr_to_value(result);
-  }
-
-  __jsstr_get_match_pattern(pattern, search, global);
-
   if (__is_js_object(replace)) {
     __jsobject *obj = __jsval_to_object(replace);
     if (obj->object_class == JSSTRING) {
       replace_str = obj->shared.prim_string;
-    } else if (__js_IsCallable(replace)) {
-      std::smatch sm;
-      std::regex_search(source,sm,pattern);
-      __jsvalue args[3];
-      if (sm.size() > 0)
-        args[0] = __jsstr_stdstr_to_value(sm[0]);
-      else
-        args[0] = __null_value();
-      args[1] = __number_value(sm.position(0));
-      args[2] = *this_string; 
-      __jsvalue val = __jsfun_val_call(replace, this_string, &args[0], 3);
-      if (__is_null(&val))
-        val = __undefined_value();
-      replace_str = __js_ToString(&val);
     } else {
       __jsvalue val;
       val = __object_internal_DefaultValue(obj, JSTYPE_STRING);
@@ -1223,24 +1266,63 @@ __jsvalue __jsstr_replace(__jsvalue *this_string, __jsvalue *search, __jsvalue *
     replace_str = __js_ToString(replace);
   }
 
-  std::string rep;
-  rep.assign(replace_str->x.ascii, __jsstr_get_length(replace_str));
-
-  std::string result;
-  std::regex_constants::match_flag_type flags = std::regex_constants::match_default;
-  if (!global)
-    flags = std::regex_constants::format_first_only;
-  std::regex_replace(std::back_inserter(result), source.begin(), source.end(), pattern, rep, flags);
-
-  int32_t len = result.length();
-  if (len == 0)
-    return __null_value();
-
-  __jsstring *str = __js_new_string_internal(len, true);
-  for (uint32_t i = 0; i < len; i++) {
-    __jsstr_set_char(str, i, result.at(i));
+  if (!__is_regexp(search)) {
+    __jsstring *pattern_str;
+    __jsvalue v;
+    if (__is_js_object(search)) {
+      __jsobject *obj = __jsval_to_object(search);
+      v = __object_internal_DefaultValue(obj, JSTYPE_STRING);
+      if (!__is_string(&v)) {
+        pattern_str = __js_ToString(&v);
+        v = __string_value(pattern_str);
+      }
+    } else {
+      pattern_str = __js_ToString(search);
+      v = __string_value(pattern_str);
+    }
+    __jsvalue val = __js_new_regexp_obj(NULL, &v, 1);
+    search = &val;
   }
-  return __string_value(str);
+
+  std::vector<std::pair<int,int>> vres_ret;
+  __jsvalue match_start;
+  std::wstring result = __jsstr_to_wstring(s);
+  __jsstring *js_pattern = NULL;
+  bool ignorecase, multiline;
+  unsigned num_captures;
+  bool global = false;
+  bool need_substitute = true;
+  int last_index = 0;
+  int distance = 0;
+  int r;
+  __jsstr_get_regexp_property(search, js_pattern, global, ignorecase, multiline, num_captures);
+  do  {
+    r = __jsstr_regexp_exec(s, js_pattern, global, ignorecase, multiline, num_captures, last_index, &vres_ret);
+    if (vres_ret.size() > 0) {
+      if (__js_IsCallable(replace)) {
+        __jsvalue val;
+        __jsstr_get_replace_value(replace, this_string, vres_ret, val);
+        replace_str = __js_ToString(&val);
+      }
+
+      std::wstring rep = __jsstr_to_wstring(replace_str);
+      std::wstring source = __jsstr_to_wstring(s);
+      if (need_substitute)
+        need_substitute = __jsstr_get_replace_substitution(source, rep, vres_ret);
+      result.replace(vres_ret[0].first + distance, vres_ret[0].second - vres_ret[0].first, rep);
+      distance += rep.size() - (vres_ret[0].second - vres_ret[0].first);
+      last_index = vres_ret[vres_ret.size() - 1].second + 1;
+
+      // when 'search' is an empty string, put 'rep' to the end as well
+      if (vres_ret[0].first == last_index - 1 && last_index >= __jsstr_get_length(s)) {
+        result.replace(last_index + distance, 0, rep);
+      }
+
+      vres_ret.clear();
+    }
+  } while (r == 1 && global && last_index <= __jsstr_get_length(s));
+
+  return __jsstr_stdstr_to_value(result);
 }
 
 uint32_t __jsstr_is_number(__jsstring *jsstr) {

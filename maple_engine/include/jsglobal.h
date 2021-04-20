@@ -60,4 +60,6 @@ __jsvalue __js_new_numberconstructor(__jsvalue *, __jsvalue *, uint32_t);
 __jsvalue __js_new_booleanconstructor(__jsvalue *, __jsvalue *, uint32_t);
 // 15.5.1 The String Constructor Called as a Function
 __jsvalue __js_new_stringconstructor(__jsvalue *, __jsvalue *, uint32_t);
+__jsvalue __js_new_math_obj(__jsvalue *);
+__jsvalue __js_new_json_obj(__jsvalue *);
 #endif

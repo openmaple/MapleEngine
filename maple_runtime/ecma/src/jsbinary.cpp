@@ -21,6 +21,7 @@
 #include "jsfunction.h"
 #include "vmmemory.h"
 #include "stdio.h"
+#include "jsdate.h"
 
 
 static __jsvalue __jsop_add_double(double dx, double dy) {
@@ -76,11 +77,12 @@ __jsvalue __jsop_add(__jsvalue *x, __jsvalue *y) {
       return *y;
     }
   }
-  if ((__is_null(x) && __is_undefined(y)) ||
-      (__is_null(y) && __is_undefined(x)) ||
+  if (((__is_null(x) || __is_number(x)) && __is_undefined(y)) ||
+      ((__is_null(y) || __is_number(y)) && __is_undefined(x)) ||
       (__is_undefined(y) && __is_undefined(x))) {
     return __nan_value();
   }
+
   if (__is_number(x) && __is_number(y)) {
     return __number_value(__jsval_to_number(x) + __jsval_to_number(y));
   } else if (__is_number(x) && __is_double(y)) {
@@ -91,8 +93,24 @@ __jsvalue __jsop_add(__jsvalue *x, __jsvalue *y) {
     return __jsop_add_double(__jsval_to_double(x), (double)__jsval_to_number(y));
   }
 
-  __jsvalue lprim = __js_ToPrimitive(x, JSTYPE_UNDEFINED /* ??? */);
-  __jsvalue rprim = __js_ToPrimitive(y, JSTYPE_UNDEFINED);
+  __jsvalue lprim;
+  __jsvalue rprim;
+  if (__is_primitive(x)) {
+    lprim = *x;
+  } else {
+    __jsobject *objX = __jsval_to_object(x);
+    lprim = (objX->object_class == __jsobj_class::JSDATE) ?
+               __jsdate_ToString_Obj(objX):
+               __object_internal_DefaultValue(objX, JSTYPE_UNDEFINED);
+  }
+  if (__is_primitive(y)) {
+    rprim = *y;
+  } else {
+    __jsobject *objY = __jsval_to_object(y);
+    rprim = (objY->object_class == __jsobj_class::JSDATE) ?
+               __jsdate_ToString_Obj(objY):
+               __object_internal_DefaultValue(objY, JSTYPE_UNDEFINED);
+  }
   if (__is_string(&lprim) || __is_string(&rprim)) {
     __jsstring *lstr = __js_ToString(&lprim);
     __jsstring *rstr = __js_ToString(&rprim);
@@ -101,6 +119,9 @@ __jsvalue __jsop_add(__jsvalue *x, __jsvalue *y) {
     memory_manager->RecallString(rstr);
     return ret;
   } else {
+    if (__is_undefined(x) || __is_undefined(y)) {
+      return __nan_value();
+    }
     // ??? Overflow
     return __number_value(__js_ToNumber(&lprim) + __js_ToNumber(&rprim));
   }

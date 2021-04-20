@@ -25,9 +25,9 @@ __jsvalue __js_new_regexp_obj(__jsvalue *this_value, __jsvalue *arg_list,
                               uint32_t nargs);
 
 __jsvalue __jsregexp_Exec(__jsvalue *this_value, __jsvalue *value,
-                          uint32_t nargs);
+                          uint32_t nargs = 1);
 __jsvalue __jsregexp_Test(__jsvalue *this_value, __jsvalue *value,
-                          uint32_t nargs);
+                          uint32_t nargs = 1);
 __jsvalue __jsregexp_ToString(__jsvalue *this_value);
 
 void CheckAndSetFlagOptions(__jsstring *s, __jsstring *js_pattern,
@@ -46,5 +46,10 @@ int RegExpExecute(const dart::jscre::JSRegExp *re, __jsstring *js_subject,
 
 static void* RegExpAlloc(size_t size);
 static void RegExpFree(void *ptr);
+
+__jsvalue __jsregexp_Source(__jsvalue *this_arg);
+__jsvalue __jsregexp_Global(__jsvalue *this_arg);
+__jsvalue __jsregexp_Ignorecase(__jsvalue *this_arg);
+__jsvalue __jsregexp_Multiline(__jsvalue *this_arg);
 
 #endif // JSREGEXP_H

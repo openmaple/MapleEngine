@@ -39,7 +39,7 @@ struct __jsfunction {
 // ecma 13.2
 __jsvalue __js_new_function(void *fp, void *env, uint32_t attrs, int32_t idx = -1, bool needpt = true);
 // ecma 13.2.1
-__jsvalue __jsfun_internal_call(__jsobject *f, __jsvalue *this_arg, __jsvalue *arg_list, uint32_t arg_count);
+__jsvalue __jsfun_internal_call(__jsobject *f, __jsvalue *this_arg, __jsvalue *arg_list, uint32_t arg_count, __jsvalue *orig_arg = NULL);
 // Helper function for internal use.
 __jsvalue __jsfun_val_call(__jsvalue *function, __jsvalue *this_arg, __jsvalue *arg_list, uint32_t arg_count);
 // ecma 13.2.2

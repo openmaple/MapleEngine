@@ -70,6 +70,7 @@ __jsvalue __jsdate_ToLocaleDateString(__jsvalue *this_date);
 __jsvalue __jsdate_ToLocaleString(__jsvalue *this_date);
 __jsvalue __jsdate_ToLocaleTimeString(__jsvalue *this_date);
 __jsvalue __jsdate_ToString(__jsvalue *this_date);
+__jsvalue __jsdate_ToString_Obj(__jsobject *obj);
 __jsvalue __jsdate_ToTimeString(__jsvalue *this_date);
 __jsvalue __jsdate_ToUTCString(__jsvalue *this_date);
 __jsvalue __jsdate_ValueOf(__jsvalue *this_date);

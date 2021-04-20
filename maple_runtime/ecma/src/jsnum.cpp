@@ -243,8 +243,8 @@ __jsvalue __js_str2double(__jsstring *str, bool &isNum) {
     isNum = (endcur == cur) ? false : true;
     return __double_value(n);
   }
-
-  n = wcstod(chars, NULL);
+  wchar_t* endptr = NULL;
+  n = wcstod(chars, &endptr);
   if (n == 0.0 || std::isnan(n)) {
     isNum = false;
     return __nan_value();
@@ -253,7 +253,11 @@ __jsvalue __js_str2double(__jsstring *str, bool &isNum) {
       return __number_infinity();
     else
       return __number_neg_infinity();
-  } else
+  } else if (__jsstr_is_ascii(str) && (endptr != NULL) && ((*endptr) != '\0')) {
+    // string like "123abc123", is not a number
+    isNum = false;
+    return __double_value(0);
+  }
   return __double_value(n);
 }
 

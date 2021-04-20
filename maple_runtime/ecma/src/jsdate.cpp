@@ -564,10 +564,9 @@ __jsvalue __jsdate_ToGMTString(__jsvalue *this_date) {
 
 const char *WeekDays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 const char *Months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-// ES5 15.9.5.2 Date.prototype.toString()
-__jsvalue __jsdate_ToString(__jsvalue *this_date) {
-  __jsobject *obj = __jsdata_value_to_obj(this_date);
 
+
+__jsvalue __jsdate_ToString_Obj(__jsobject *obj) {
   int64_t time = (int64_t) obj->shared.primDouble + LocalTime((int64_t)obj->shared.primDouble);
   if (time < -9007199254740992 || time > 9007199254740992)
     MAPLE_JS_RANGEERROR_EXCEPTION();
@@ -589,6 +588,11 @@ __jsvalue __jsdate_ToString(__jsvalue *this_date) {
            time_zone_minutes > 0 ? time_zone_minutes % 60 : -time_zone_minutes % 60);
 
   return __string_value(__jsstr_new_from_char(buf));
+}
+// ES5 15.9.5.2 Date.prototype.toString()
+__jsvalue __jsdate_ToString(__jsvalue *this_date) {
+  __jsobject *obj = __jsdata_value_to_obj(this_date);
+  return __jsdate_ToString_Obj(obj);
 }
 
 // ES5 15.9.5.4 Date.prototype.toTimeString()

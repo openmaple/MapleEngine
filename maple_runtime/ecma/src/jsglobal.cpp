@@ -152,90 +152,47 @@ __jsvalue __js_empty(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs
   return __undefined_value();
 }
 
-__jsvalue __js_new_reference_error_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(nargs == 0);
+__jsvalue __js_new_error_obj_base(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs, __jsbuiltin_object_id protoid) {
   __jsobject *obj = __create_object();
-  __jsobj_set_prototype(obj, JSBUILTIN_REFERENCEERRORPROTOTYPE);
-  obj->object_class = JSOBJECT;
-  obj->extensible = true;
-  obj->shared.prim_number = 0;
-  return __object_value(obj);
-}
-
-__jsvalue __js_new_error_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(nargs == 0 || nargs == 1);
-  __jsobject *obj = __create_object();
-  __jsobj_set_prototype(obj, JSBUILTIN_ERROR_PROTOTYPE);
-  obj->object_class = JSERROR;
+  __jsobj_set_prototype(obj, protoid);
+  obj->object_class = (JSBUILTIN_ERROR_PROTOTYPE == protoid) ? JSERROR: JSOBJECT;
   obj->object_type = JSREGULAR_OBJECT;
   obj->extensible = true;
-  // obj->shared.prim_string = primstring;
-  if (nargs == 1) {
+  if (nargs >= 1) {
     __jsvalue length_value = __number_value(__jsstr_get_length(__js_ToString(arg_list)));
     __jsobj_helper_init_value_property(obj, JSBUILTIN_STRING_LENGTH, &length_value, JSPROP_DESC_HAS_VUWUEUC);
     __jsobj_helper_init_value_property(obj, JSBUILTIN_STRING_MESSAGE, arg_list, JSPROP_DESC_HAS_VUWUEUC);
   }
+  obj->shared.prim_number = 0;
   return __object_value(obj);
+}
+
+__jsvalue __js_new_reference_error_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
+  return __js_new_error_obj_base(this_object, arg_list, nargs, JSBUILTIN_REFERENCEERRORPROTOTYPE);
+}
+
+__jsvalue __js_new_error_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
+  return __js_new_error_obj_base(this_object, arg_list, nargs, JSBUILTIN_ERROR_PROTOTYPE);
 }
 
 __jsvalue __js_new_evalerror_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(nargs == 0);
-  __jsobject *obj = __create_object();
-  __jsobj_set_prototype(obj, JSBUILTIN_EVALERROR_PROTOTYPE);
-  obj->object_class = JSOBJECT;
-  obj->extensible = true;
-  obj->shared.prim_number = 0;
-  return __object_value(obj);
+  return __js_new_error_obj_base(this_object, arg_list, nargs, JSBUILTIN_EVALERROR_PROTOTYPE);
 }
 
 __jsvalue __js_new_rangeerror_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(nargs == 0 || nargs == 1);
-  // TODO: Handle the argument
-  __jsobject *obj = __create_object();
-  __jsobj_set_prototype(obj, JSBUILTIN_RANGEERROR_PROTOTYPE);
-  obj->object_class = JSOBJECT;
-  obj->extensible = true;
-  obj->shared.prim_number = 0;
-  return __object_value(obj);
+  return __js_new_error_obj_base(this_object, arg_list, nargs, JSBUILTIN_RANGEERROR_PROTOTYPE);
 }
 
 __jsvalue __js_new_syntaxerror_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(nargs == 0);
-  __jsobject *obj = __create_object();
-  __jsobj_set_prototype(obj, JSBUILTIN_SYNTAXERROR_PROTOTYPE);
-  obj->object_class = JSOBJECT;
-  obj->extensible = true;
-  obj->shared.prim_number = 0;
-  return __object_value(obj);
+  return __js_new_error_obj_base(this_object, arg_list, nargs, JSBUILTIN_SYNTAXERROR_PROTOTYPE);
 }
 
 __jsvalue __js_new_urierror_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(nargs == 0);
-  __jsobject *obj = __create_object();
-  __jsobj_set_prototype(obj, JSBUILTIN_URIERROR_PROTOTYPE);
-  obj->object_class = JSOBJECT;
-  obj->extensible = true;
-  obj->shared.prim_number = 0;
-  return __object_value(obj);
+  return __js_new_error_obj_base(this_object, arg_list, nargs, JSBUILTIN_URIERROR_PROTOTYPE);
 }
 
 __jsvalue __js_new_type_error_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(nargs == 0 || nargs == 1);
-  __jsobject *obj = __create_object();
-  __jsobj_set_prototype(obj, JSBUILTIN_TYPEERROR_PROTOTYPE);
-  obj->object_class = JSOBJECT;
-  obj->extensible = true;
-  __jsstring *primstring;
-  if (nargs == 0) {
-    primstring = __jsstr_get_builtin(JSBUILTIN_STRING_EMPTY);
-  } else {
-    primstring = __js_ToString(arg_list);
-  }
-  obj->shared.prim_string = primstring;
-  GCIncRf(primstring);
-  __jsvalue length_value = __number_value(__jsstr_get_length(primstring));
-  __jsobj_helper_init_value_property(obj, JSBUILTIN_STRING_LENGTH, &length_value, JSPROP_DESC_HAS_VUWUEUC);
-  return __object_value(obj);
+  return __js_new_error_obj_base(this_object, arg_list, nargs, JSBUILTIN_TYPEERROR_PROTOTYPE);
 }
 
 __jsvalue __js_isnan(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
@@ -486,6 +443,18 @@ __jsvalue __js_new_stringconstructor(__jsvalue *this_object, __jsvalue *arg_list
   __jsstring *primstring = (nargs == 0) ? __jsstr_get_builtin(JSBUILTIN_STRING_EMPTY) : __js_ToString(arg_list);
   __set_string(&ret, primstring);
   return ret;
+}
+
+// 15.8 Math Object
+__jsvalue __js_new_math_obj(__jsvalue *this_object) {
+  __jsobject *obj = __jsobj_get_or_create_builtin(JSBUILTIN_MATH);
+  return __object_value(obj);
+}
+
+// 15.12 Json Object
+__jsvalue __js_new_json_obj(__jsvalue *this_object) {
+  __jsobject *obj = __jsobj_get_or_create_builtin(JSBUILTIN_JSON);
+  return __object_value(obj);
 }
 
 // B.2.1

@@ -56,7 +56,7 @@ include_directories (AFTER PUBLIC
 SET(JSRT ../../maple_runtime/ecma/src)
 
 add_library (mplre SHARED invoke_method.cpp mdebug.cpp mfunction.cpp mloadstore.cpp shimfunction.cpp )
-add_library (mplre-dyn SHARED invoke_dyn_method.cpp mdebug.cpp shimdynfunction.cpp mloadstore.cpp ${JSRT}/vmmmap.cpp ${JSRT}/ccall.cpp ${JSRT}/vmmemory.cpp ${JSRT}/jseh.cpp ${JSRT}/jsarray.cpp ${JSRT}/jsbinary.cpp ${JSRT}/jsboolean.cpp ${JSRT}/jscontext.cpp ${JSRT}/jsencode.cpp ${JSRT}/jsfunction.cpp ${JSRT}/jsglobal.cpp ${JSRT}/jsiter.cpp ${JSRT}/jsmath.cpp ${JSRT}/jsutil.cpp ${JSRT}/jsnum.cpp ${JSRT}/jsobject.cpp ${JSRT}/json.cpp ${JSRT}/jsop.cpp ${JSRT}/jsplugin.cpp ${JSRT}/jsstring.cpp ${JSRT}/jstyconv.cpp ${JSRT}/jsunary.cpp ${JSRT}/jsvalue.cpp ${JSRT}/jsregexp.cpp ${JSRT}/jsdate.cpp)
+add_library (mplre-dyn SHARED invoke_dyn_method.cpp mdebug.cpp shimdynfunction.cpp mloadstore.cpp ${JSRT}/vmmmap.cpp ${JSRT}/ccall.cpp ${JSRT}/vmmemory.cpp ${JSRT}/jseh.cpp ${JSRT}/jsarray.cpp ${JSRT}/jsbinary.cpp ${JSRT}/jsboolean.cpp ${JSRT}/jscontext.cpp ${JSRT}/jsencode.cpp ${JSRT}/jsfunction.cpp ${JSRT}/jsglobal.cpp ${JSRT}/jsiter.cpp ${JSRT}/jsmath.cpp ${JSRT}/jsutil.cpp ${JSRT}/jsnum.cpp ${JSRT}/jsobject.cpp ${JSRT}/json.cpp ${JSRT}/jsop.cpp ${JSRT}/jsplugin.cpp ${JSRT}/jsstring.cpp ${JSRT}/jstyconv.cpp ${JSRT}/jsunary.cpp ${JSRT}/jsvalue.cpp ${JSRT}/jsregexp.cpp ${JSRT}/jsdate.cpp ${JSRT}/jsintl.cpp)
 
 find_library( PBmpl_LIB mpl-rt "${CMAKE_CURRENT_SOURCE_DIR}/../lib/*" )
 find_library( PBcorea_LIB core-all "${CMAKE_CURRENT_SOURCE_DIR}/../lib/*" )
