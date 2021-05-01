@@ -260,7 +260,7 @@ def lookup_next_src_file_info(asm_path, asm_line, asm_offset):
 def look_up_next_opcode(asm_path, asm_line, asm_offset):
     """
       for a given asm file and asm line number and offset of the asm line number, return whether next opcode
-      is going to jump to different source code line (e.g. Java code). If True, return next opcode's short 
+      is going to jump to different source code line (e.g. Java code). If True, return next opcode's short
       source file name and line.
 
       params:
@@ -608,3 +608,81 @@ def lookup_src_file_info_dync(asm_path, symbol_name, func_pc_offset):
             line_num += 1
         #f.close()
         return None
+
+def get_js_func_formals_locals(asm_path, symbol_name):
+
+    '''
+    Input:
+        asm_path: asm file path. String
+        symbol_name: the symbol name (function name) in .s file. String
+    Return:
+        func_argus_locals_dict: function local/argument data in dict or None if anything is wrong
+            {
+                'locals_type': a list of local variable type in string, e.g. ['dynany', 'dynany'],
+                'locals_name': a list of local variable name in string. e.g. ['%var1', '%var2'],
+                'formals_type': a list of argument type in string, e.g. ['dynany', 'dynany'],
+                'formals_name': a list of argument name in string, e.g. ['%par1', '%par2']
+            }
+    Description:
+        for a given asm file and a symbol name (func name), find out the section of this symbol.
+        In there, find out the upFormalSize and frameSize so that we know how many arguments we
+        have for the function, and how many local variables inside of the functions.
+        Note: for JS support in Maple Compiler, we do NOT know parameter or local variable's exact
+        name at asm level, so there is no way for Maple Debugger to trace back from assembly level
+        back to the JS source code level. Therefore, function arguments will be named as '%par1',
+        '%par2' while local variables will be named as '%var1', '%var2'
+    '''
+    if m_debug.Debug: m_debug.dbg_print("asm_path=", asm_path, "symbol_name=", symbol_name)
+
+    asm_tuple = m_datastore.mgdb_rdata.get_one_label_mirbin_info_cache(asm_path, symbol_name)
+    if not asm_tuple:
+        return None
+
+    if m_debug.Debug: m_debug.dbg_print("asm_tuple=", asm_tuple)
+    offset = asm_tuple[1]
+    line_num = asm_tuple[0]
+
+    # look for this pattern first ".long Add__59a58481_mirbin_code - ."
+    match_pattern = ".long " + symbol_name[:-12] + "_mirbin_code - ."
+    match_found = False
+    end_section = ".cfi_endproc"
+    func_argus_locals_dict = {}
+
+    with open(asm_path) as f:
+        f.seek(offset)
+        for line in f:
+            offset += len(line)
+            if end_section in line.rstrip():
+                print("reached to end of section")
+                if m_debug.Debug: m_debug.dbg_print("reached to end of section")
+                return None
+            if match_found == True:
+                line = line.rstrip()
+                if "// upFormalSize, frameSize, evalStackDepth, funcAttrs" in line:
+                    formal_num_str = line.split()[1][:-1]
+                    local_num_str = line.split()[2][:-1]
+                    stack_depth_str = line.split()[3][:-1]
+                    if formal_num_str.isdigit() and local_num_str.isdigit() and stack_depth_str.isdigit():
+                        formal_num = int(formal_num_str) // 8 - 1
+                        local_num = int(local_num_str) // 8 - 1
+                        stack_depth = int(stack_depth_str)
+
+                        func_argus_locals_dict["formals_name"] = []
+                        func_argus_locals_dict["formals_type"] = []
+                        func_argus_locals_dict["locals_name"] = []
+                        func_argus_locals_dict["locals_type"] = []
+                        for i in range(formal_num):
+                            func_argus_locals_dict["formals_name"].append("%par"+ str(i+1))
+                            func_argus_locals_dict["formals_type"].append("dynany")
+                        for i in range(local_num):
+                            func_argus_locals_dict["locals_name"].append("%var"+ str(i+1))
+                            func_argus_locals_dict["locals_type"].append("dynany")
+                        return func_argus_locals_dict
+                    else:
+                        if m_debug.Debug: m_debug.dbg_print("upFormalSize not found after match pattern")
+                        return None
+            elif match_pattern in line.rstrip():
+                if m_debug.Debug: m_debug.dbg_print("match_pattern found")
+                match_found = True
+
+    return None

@@ -16,7 +16,6 @@
 #ifndef JSINTL_H
 #define JSINTL_H
 
-#include <unordered_map>
 #include "jsvalue.h"
 #include "jsstring.h"
 
@@ -28,9 +27,6 @@ enum __jsintl_type : uint8_t {
 
 typedef struct {
   __jsintl_type kind  : 8;
-  bool initialized_intl_object;
-  bool initialized_number_format;
-  std::unordered_map<std::string, __jsvalue> map;
 } __jsintl;
 
 __jsvalue __js_IntlConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
@@ -42,20 +38,20 @@ __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
 __jsvalue __js_DateTimeFormatConstructor(__jsvalue *this_arg,
                                          __jsvalue *arg_list, uint32_t nargs);
 
-void InitializeCollator(__jsobject *obj, __jsvalue *locales, __jsvalue *options);
-void InitializeNumberFormat(__jsobject *obj, __jsvalue *locales,
+void InitializeCollator(__jsvalue *collator, __jsvalue *locales, __jsvalue *options);
+void InitializeNumberFormat(__jsvalue *number_format, __jsvalue *locales,
                             __jsvalue *options);
 __jsvalue CurrencyDigits(__jsvalue *currency);
-void InitializeDateTimeFormat(__jsobject *obj, __jsvalue *locales,
+void InitializeDateTimeFormat(__jsvalue *date_time_format, __jsvalue *locales,
                               __jsvalue *options);
 __jsvalue CanonicalizeLanguageTag(__jsstring *tag);
-bool IsStructurallyValidLanguageTag(__jsstring *tag);
+bool IsStructurallyValidLanguageTag(__jsstring *locale);
 bool IsWellFormedCurrencyCode(__jsvalue *currency);
 __jsvalue BestAvailableLocale(__jsvalue *available_locales, __jsvalue *locale);
 __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_locales);
 __jsvalue BestFitMatcher(__jsvalue *available_locales, __jsvalue *requested_locales);
 __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_locales,
-                        std::unordered_map<std::string,__jsvalue>& options, __jsvalue *relevant_extension_keys,
+                        __jsvalue *options, __jsvalue *relevant_extension_keys,
                         __jsvalue *locale_data);
 __jsvalue LookupSupportedLocales(__jsvalue *available_locales,
                                 __jsvalue *requested_locales);
@@ -63,8 +59,8 @@ __jsvalue BestFitSupportedLocales(__jsvalue *available_locales,
                                   __jsvalue *requested_locales);
 __jsvalue SupportedLocales(__jsvalue *available_locales,
                            __jsvalue *requested_locales, __jsvalue *options);
-__jsvalue GetOption(__jsvalue *options, std::string property, std::string type,
-                    __jsvalue *values, __jsvalue *fallback); 
+__jsvalue GetOption(__jsvalue *options, __jsvalue *property, __jsvalue *type,
+                    __jsvalue *values, __jsvalue *fallback);
 __jsvalue GetNumberOption(__jsvalue *options, __jsvalue *property,
                           __jsvalue *minimum, __jsvalue *maximum,
                                                     __jsvalue *fallback);
@@ -92,5 +88,9 @@ __jsvalue __jsintl_DateTimeFormatFormat(__jsvalue *this_arg,
 __jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *this_arg,
                                                  __jsvalue *arg_list,
                                                  uint32_t nargs);
+__jsvalue DefaultLocale();
+__jsvalue ToDateTimeOptions(__jsvalue *options, __jsvalue *required, __jsvalue *defaults);
+__jsvalue BasicFormatMatcher(__jsvalue *options, __jsvalue *formats);
+__jsvalue BestFitFormatMatcher(__jsvalue *options, __jsvalue *formats);
 
 #endif // JSINTL_H

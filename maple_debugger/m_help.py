@@ -85,6 +85,7 @@ maple_commands_detail_info = {
 
     'mtype' :   'mtype: Given a regex, searches and prints all matching class names if multiple are found, or\n'\
                 'prints detailed information of class inheritance hierarchy if a single match is found\n'\
+                'mtype: Also searches and prints all dynamic language property names and details\n'\
                 'mtype <regular-express>: e.g. mtype _2Fjava \n',
 
     'msymbol' : 'msymbol: Given a regex, searches and prints all matching symbol names if multiple are found, or\n'\

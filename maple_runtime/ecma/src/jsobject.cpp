@@ -43,6 +43,23 @@ void __jsobj_set_prototype(__jsobject *obj, __jsobject *proto_obj) {
 }
 
 static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, bool createBuiltin = true) {
+#ifdef USE_PROP_MAP
+  if (obj->prop_string_map != NULL) {
+    std::map<std::wstring, __jsprop *>::iterator it;
+    it = obj->prop_string_map->find(__jsstr_to_wstring(name));
+    if (it != obj->prop_string_map->end()) {
+      __jsprop *p = it->second;
+        if (__is_undefined_desc(p->desc)) {
+          return NULL;
+        }
+        return p;
+    }
+  }
+  if (obj->is_builtin && createBuiltin) {
+    __jsprop *p = __create_builtin_property(obj, name);
+    return p;
+  }
+#else
   __jsprop *p = obj->prop_list;
   while (p && p->isIndex)
     p = p->next;
@@ -58,10 +75,30 @@ static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, 
   if (obj->is_builtin && createBuiltin) {
     return __create_builtin_property(obj, name);
   }
+#endif
   return NULL;
+
 }
 
 static __jsprop *__jsobj_helper_get_propertyByValue(__jsobject *obj, uint32_t index, bool createBuiltin = true) {
+#ifdef USE_PROP_MAP
+  if (obj->prop_index_map != NULL) {
+    std::map<uint32_t, __jsprop *>::iterator it;
+    it = obj->prop_index_map->find(index);
+    if (it != obj->prop_index_map->end()) {
+      __jsprop *p = it->second;
+      if (__is_undefined_desc(p->desc)) {
+        return NULL;
+      }
+      return p;
+    }
+    if (obj->is_builtin && createBuiltin) {
+      __jsprop *p = __create_builtin_property(obj, __js_NumberToString(index));
+      return p;
+    }
+  }
+  return NULL;
+#else
   __jsprop *p = obj->prop_list;
   if (!p || !p->isIndex || p->n.index > index) {
     // the minimun index is greater than what is looking for, return null
@@ -81,10 +118,114 @@ static __jsprop *__jsobj_helper_get_propertyByValue(__jsobject *obj, uint32_t in
     return obj->is_builtin ?  __create_builtin_property(obj,__js_NumberToString(index)) : NULL;
   else
     return NULL;
+#endif
 }
 
 // insert prop into propList by increasing order
-static void InsertIndexProp(__jsprop *prop, __jsprop **propList) {
+static void InsertIndexProp(__jsprop *prop, __jsprop **propList, __jsobject *obj = NULL) {
+#ifdef USE_PROP_MAP
+  if (obj) {
+    if (!*propList) {
+      // very first entry
+      (*propList) = prop;
+      if (prop->isIndex) {
+        if (obj->prop_index_map == NULL)
+          obj->prop_index_map = new std::map<uint32_t, __jsprop *>();
+        else
+          assert(obj->prop_index_map->empty() && "prop_index_map should be empty at this time");
+        (*(obj->prop_index_map))[prop->n.index] = prop;
+      } else {
+        if (obj->prop_string_map == NULL)
+          obj->prop_string_map = new std::map<std::wstring, __jsprop *>();
+        else
+          assert(obj->prop_string_map->empty() && "prop_string_map should be empty at this time");
+        (*(obj->prop_string_map))[__jsstr_to_wstring(prop->n.name)] = prop;
+      }
+      // The first entry's prev points to the list entry. The last entry's next is NULL
+      prop->prev = prop;
+      prop->next = nullptr;
+      return;
+    }
+
+    if (prop->isIndex) {
+      if (obj->prop_index_map == NULL || obj->prop_index_map->empty()) {
+        if (obj->prop_index_map == NULL)
+          obj->prop_index_map = new std::map<uint32_t, __jsprop *>();
+        // make it first entry
+        (*(obj->prop_index_map))[prop->n.index] = prop;
+        prop->next = *propList;
+        prop->prev = (*propList)->prev;
+        (*propList)->prev = prop;
+        *propList = prop;
+        return;
+      }
+      std::map<uint32_t, __jsprop *>::iterator left, right;
+      right = (*(obj->prop_index_map)).lower_bound(prop->n.index); // larger neighbor
+      if (right == (*(obj->prop_index_map)).end()) { // no larger one in the list
+        left = std::prev(right);
+        prop->next = left->second->next;
+        left->second->next = prop;
+        prop->prev = left->second;
+        if (prop->next)
+          prop->next->prev = prop;
+        else
+          (*propList)->prev = prop; // last one
+      } else {
+        prop->next = right->second;
+        prop->prev = right->second->prev;
+        right->second->prev = prop;
+        if (right == (*(obj->prop_index_map)).begin()) { //make as the first
+          assert(*propList == right->second && "prop_list should be the first entry");
+          *propList = prop;
+        } else {
+          prop->prev->next = prop;
+        }
+      }
+      (*(obj->prop_index_map))[prop->n.index] = prop;
+    } else { // !isIndex
+      if (obj->prop_string_map == NULL || (*obj->prop_string_map).empty()) {
+        if (obj->prop_string_map == NULL)
+          obj->prop_string_map = new std::map<std::wstring, __jsprop *>();
+        (*(obj->prop_string_map))[__jsstr_to_wstring(prop->n.name)] = prop;
+        prop->prev = (*propList)->prev;
+        (*propList)->prev->next = prop;
+        (*propList)->prev = prop;
+        return;
+      }
+
+      std::map<std::wstring, __jsprop *>::iterator it, left, right;
+
+      it = obj->prop_string_map->find(__jsstr_to_wstring(prop->n.name));
+      if (it != obj->prop_string_map->end()) {
+        // old property may be marked as deleted, replace it
+        __jsprop *old_prop = it->second;
+        prop->next = old_prop->next;
+        prop->prev = old_prop->prev;
+        if (old_prop->next) // old_prop is not the last one
+          old_prop->next->prev = prop;
+        if (*propList == old_prop)
+          *propList = prop;
+        else {
+          assert(old_prop->prev->next != nullptr && "prev should not be the last one");
+          old_prop->prev->next = prop;
+        }
+        memory_manager->ManageProp(old_prop, RECALL);
+        it->second = prop;
+        return;
+      }
+
+      //append to the last
+      __jsprop *prev_prop = (*propList)->prev;
+      prev_prop->next = prop;
+      prop->prev = prev_prop;
+      (*propList)->prev = prop;
+      prop->next = nullptr;
+
+      (*(obj->prop_string_map))[__jsstr_to_wstring(prop->n.name)] = prop;
+    }
+  }
+  return;
+#else
   __jsprop **prop_p = propList;
   if (!*prop_p) {
     (*prop_p) = prop;
@@ -137,27 +278,29 @@ static void InsertIndexProp(__jsprop *prop, __jsprop **propList) {
     return;
   }
   // *prop_p's value less than prop's value, then move to find the proper address
+
   while ((*prop_p)->n.index < prop->n.index && (*prop_p)->next && (*prop_p)->next->isIndex) {
     prop_p = &((*prop_p)->next);
   }
+
   prop->next = (*prop_p)->next;
   (*prop_p)->next = prop;
+#endif
 }
 
 static __jsprop *__jsobj_helper_create_propertyByValue(__jsobject *obj, uint32_t index) {
   __jsprop *prop = (__jsprop *)VMMallocGC(sizeof(__jsprop), MemHeadJSProp, false);
-  InitProp(prop, nullptr, __new_empty_desc(), index);
+  InitProp(prop, __new_empty_desc(), index);
   // assert(obj->object_class != JSARRAY && "shouldn't be a regular jsarray");
-  InsertIndexProp(prop, &obj->prop_list);
+  InsertIndexProp(prop, &obj->prop_list, obj);
   return prop;
 }
 
 static __jsprop *__jsobj_helper_create_property(__jsobject *obj, __jsstring *name) {
   __jsprop *prop = (__jsprop *)VMMallocGC(sizeof(__jsprop), MemHeadJSProp, false);
-  __jsprop **prop_p = &obj->prop_list;
-  InitProp(prop, nullptr, __new_empty_desc(), name);
+  InitProp(prop, __new_empty_desc(), name);
   GCIncRf(prop->n.name);
-  InsertIndexProp(prop, &obj->prop_list);
+  InsertIndexProp(prop, &obj->prop_list, obj);
   return prop;
 }
 
@@ -724,6 +867,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUPPORTED_LOCALES_OF, __jsintl_NumberFormatSupportedLocalesOf, ATTRS(UNCERTAIN_NARGS, 2));
       break;
     case JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE:
+      ADD_ACCESSOR_PROPERTY(JSBUILTIN_STRING_FORMAT, JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE, __jsintl_NumberFormatFormat, ATTRS(0, 0), NULL, ATTRS(0,0), JSPROP_DESC_HAS_UVUWUEC);
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_FORMAT, __jsintl_NumberFormatFormat, ATTRS(1, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_NumberFormatResolvedOptions, ATTRS(0, 0));
       break;
@@ -738,6 +882,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
     default:
       break;
   }
+
 #undef ADD_FUNCTION_PROPERTY
 #undef ADD_VALUE_PROPERTY
 #undef ADD_VALUE2_PROPERTY
@@ -1402,6 +1547,43 @@ bool __jsobj_internal_HasProperty(__jsobject *o, __jsstring *p) {
 bool __jsobj_internal_DeleteByValue(__jsobject *o, uint32 index, bool mark_as_deleted = false,
                                     bool throw_p = false) {
   __jsobj_helper_convert_to_generic(o);
+#ifdef USE_PROP_MAP
+  if (!o->prop_index_map)
+    return true;
+  std::map<uint32_t, __jsprop *>::iterator it, prev;
+  it = o->prop_index_map->find(index);
+  if (it != o->prop_index_map->end()) {
+    __jsprop *prop = it->second;
+    __jsprop_desc desc = prop->desc;
+    if (__has_and_configurable(desc)) {
+      if (mark_as_deleted) {
+        prop->desc = __undefined_desc();
+      } else {
+        if (it != o->prop_index_map->begin()) {
+          prop->prev->next = prop->next;
+          if (prop->next) // not the last one
+            prop->next->prev = prop->prev;
+          else // last one
+            o->prop_list->prev = prop->prev;
+          o->prop_index_map->erase(it);
+        } else {
+          // very first one
+          o->prop_list = prop->next;
+          if (o->prop_list) {
+            o->prop_list->prev = prop->prev;
+          }
+          o->prop_index_map->erase(it);
+        }
+        memory_manager->ManageProp(prop, RECALL);
+      }
+      return true;
+    } else if (throw_p) {
+      MAPLE_JS_TYPEERROR_EXCEPTION();
+    }
+    return false;
+  }
+  return true;
+#else
   __jsprop **prop_p = &o->prop_list;
   while (*prop_p) {
     __jsprop *prop = *prop_p;
@@ -1423,6 +1605,7 @@ bool __jsobj_internal_DeleteByValue(__jsobject *o, uint32 index, bool mark_as_de
     prop_p = &(prop->next);
   }
   return true;
+#endif
 }
 
 // ecma 8.12.7
@@ -1436,6 +1619,53 @@ bool __jsobj_internal_DeleteByValue(__jsobject *o, uint32 index, bool mark_as_de
 // Combine the step 1 2 3 5.
 bool __jsobj_internal_Delete(__jsobject *o, __jsstring *p, bool mark_as_deleted, bool throw_p) {
   __jsobj_helper_convert_to_generic(o);
+#ifdef USE_PROP_MAP
+  bool property_created = false;
+  for (;;) {
+    if (o->prop_string_map) {
+      std::map<std::wstring, __jsprop *>::iterator it, prev;
+      it = o->prop_string_map->find(__jsstr_to_wstring(p));
+      if (it != o->prop_string_map->end()) {
+        __jsprop *prop = it->second;
+        __jsprop_desc desc = prop->desc;
+        if (__has_and_configurable(desc)) {
+          if (mark_as_deleted) {
+            prop->desc = __undefined_desc();
+          } else {
+            if (o->prop_list == prop) {
+              // very first one
+              o->prop_list = prop->next;
+              if (o->prop_list)
+                o->prop_list->prev = prop->prev;
+            } else {
+              prop->prev->next = prop->next;
+              if (prop->next) {
+                prop->next->prev = prop->prev;
+              }
+              else {
+                o->prop_list->prev = prop->prev; // the last one
+              }
+            }
+            o->prop_string_map->erase(it);
+            memory_manager->ManageProp(prop, RECALL);
+          }
+          return true;
+        } else if (throw_p) {
+          MAPLE_JS_TYPEERROR_EXCEPTION();
+        }
+        return false;
+      }
+    }
+    // may not have created yet, create the property
+    if (!property_created) {
+      __create_builtin_property(o, p);
+      property_created = true;
+    } else {
+      break;
+    }
+  }
+  return true;
+#else
   __jsprop **prop_p = &o->prop_list;
   // skip the index
   while ((*prop_p) && (*prop_p)->isIndex)
@@ -1471,6 +1701,7 @@ bool __jsobj_internal_Delete(__jsobject *o, __jsstring *p, bool mark_as_deleted,
     }
   }
   return true;
+#endif
 }
 
 // ecma 8.12.7
@@ -2049,11 +2280,24 @@ __jsvalue __jsobj_defineProperties(__jsvalue *this_object, __jsvalue *o, __jsval
   // ecma 15.2.3.7 step 3, 4, 5, 6
   __jsobj_helper_convert_to_generic(props);
   {
+#ifdef NOT_NEEDED
+ if (props->prop_index_map)
+  for (std::map<std::uint32_t, __jsprop *>::iterator it = props->prop_index_map->begin(); it != props->prop_index_map->end(); ++it) {
+    __jsprop *p = it->second;
+    __jsobj_walk_defineProperties(properties, p, obj);
+  }
+ if (props->prop_string_map)
+  for (std::map<std::wstring, __jsprop *>::iterator it = props->prop_string_map->begin(); it != props->prop_string_map->end(); ++it) {
+    __jsprop *p = it->second;
+    __jsobj_walk_defineProperties(properties, p, obj);
+  }
+#else
     __jsprop *p = props->prop_list;
     while (p) {
       __jsobj_walk_defineProperties(properties, p, obj);
       p = p->next;
     }
+#endif
   }
 
   GCDecRf(props);

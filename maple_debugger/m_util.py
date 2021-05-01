@@ -62,6 +62,8 @@ class MColors:
         # Maple Colors used for mtype prints
         MColors.TP_CNAME = MColors.BBLUE if colored else '' # class name
         MColors.TP_MNAME = MColors.NM_SYMBOL  # method name
+        MColors.TP_ANAME = MColors.DYELLOW if colored else '' # property attribute name
+        MColors.TP_STR_V = MColors.BGREEN if colored else ''
 
         # Maple Colors used for msymbol prints
         MColors.SP_SNAME = MColors.NM_SYMBOL  # symbol name

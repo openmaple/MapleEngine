@@ -16,6 +16,7 @@
 #ifndef JSSTRING_H
 #define JSSTRING_H
 #include "jsvalue.h"
+#include <string>
 enum __jsbuiltin_string_id {
 #define JSBUILTIN_STRING_DEF(id, length, builtin_string) id,
 #include "jsbuiltinstrings.inc.h"
@@ -95,6 +96,7 @@ __jsvalue __jsstr_match(__jsvalue *this_string, __jsvalue *regexp);
 __jsvalue __jsstr_search(__jsvalue *this_string, __jsvalue *regexp);
 __jsvalue __jsstr_replace(__jsvalue *this_string, __jsvalue *search, __jsvalue *replace);
 __jsstring *__jsstr_extract(__jsstring *from, uint32_t from_index, uint32_t length);
+std::wstring __jsstr_to_wstring(__jsstring *s, int offset = 0);
 uint32_t __jsstr_is_number(__jsstring *);
 uint32_t __jsstr_is_numidx(__jsstring *p, bool &isNum);
 bool __jsstr_throw_typeerror(__jsstring *);

@@ -56,7 +56,8 @@ class MaplePrintCmd(gdb.Command):
             # if address: x[0] is list 0x123456
             # if variable: x[0] must not be a number character
             if not x[0][0].isdigit(): # x[0] is a variable
-                self.mprint_func_dync(x[0])
+                ### mprint <variable> is only supported for dyncmic language frames
+                self.mprint_func_dync_by_property_name(x[0])
                 return
             else:
                 try:
@@ -68,6 +69,23 @@ class MaplePrintCmd(gdb.Command):
             self.usage()
             return
 
+        # determine if we are running in a dynamic language program or not
+        is_dync, frame = m_frame.is_closest_older_maple_frame_dync()
+        if is_dync:
+            return self.mprint_func_dync_by_addr(addr)
+        else:
+            return self.mprint_func_static(addr)
+
+    def mprint_func_static(self, addr):
+        '''
+        Input:
+            addr: address in memory. Int
+        Output:
+            None
+        Decription:
+            look up all the data at the address, print them
+        '''
+        ### From here, it is the code for static language frames
         class_name, full_syntax, type_size  = self.get_class_name_syntax(addr)
         if not full_syntax:
             return
@@ -525,8 +543,21 @@ class MaplePrintCmd(gdb.Command):
             if m_debug.Debug: m_debug.dbg_print()
             return None
 
-    def mprint_func_dync(self, var):
-        #input 'var': is a variable name
+    #########################################################
+    ### APIs for JS support                               ###
+    #########################################################
+    def mprint_func_dync_by_property_name(self, var):
+        '''
+        input:
+            var: a property name (e.g a variable name). String
+        output:
+            None
+        return:
+            None
+        description:
+            for a given property name, look up its real address in memory, and then get the data at
+            that real address.
+        '''
 
         is_dync, frame = m_frame.is_closest_older_maple_frame_dync()
         if not is_dync:
@@ -540,20 +571,47 @@ class MaplePrintCmd(gdb.Command):
         if len(data) == 0:
             gdb_print("property data not ready yet")
             return
-        match = [x for x in data if x['ascii_name'] == var]
+        match = [x for x in data if x['name'] == var]
         if not match or len(match) == 0:
             buf = "property " + var + " data not available yet"
             gdb_print(buf)
         else:
-            buf = "property name    : " + var
+            buf = MColors.MP_CNAME + "property name    : " + MColors.ENDC + MColors.MP_STR_V + var + MColors.ENDC
             gdb_print(buf)
-            buf = "  tag            : " + match[0]['tag']
+            buf = MColors.MP_FSYNTAX + "  tag            : " + MColors.ENDC + MColors.MP_STR_V + match[0]['tag'] + MColors.ENDC
             gdb_print(buf)
-            buf = "  value          : " + match[0]['value']
+            buf = MColors.MP_FSYNTAX + "  value          : " + MColors.ENDC + MColors.MP_STR_V + match[0]['value'] + MColors.ENDC
             gdb_print(buf)
-            buf = "  next addr      : " + match[0]['next']
+            buf = MColors.MP_FSYNTAX + "  node addr      : " + MColors.ENDC + MColors.MP_STR_V + match[0]['node_addr'] + MColors.ENDC
             gdb_print(buf)
-            buf = "  parent         : " + "Global Object"
+            buf = MColors.MP_FSYNTAX + "  next addr      : " + MColors.ENDC + MColors.MP_STR_V + match[0]['next'] + MColors.ENDC
             gdb_print(buf)
+            buf = MColors.MP_FSYNTAX + "  parent         : " + MColors.ENDC + MColors.MP_STR_V + "Global Object" + MColors.ENDC
+            gdb_print(buf)
+
+        return
+
+    def mprint_func_dync_by_addr(self, addr):
+        '''
+        input:
+            addr: a memory address. int
+        output:
+            None
+        return:
+            None
+        Description:
+            For a specified memory address, find out the data type and the data type index.
+            For the index, get the data real address, and then we get the jsvalue from the real addrss.
+        '''
+        if m_debug.Debug: m_debug.dbg_print("addr in int =", addr)
+        mtype, v = m_info.get_jstype_value_by_addr(addr)
+        if not v or not mtype:
+            buf = MColors.MP_CNAME + hex(addr) + ": " + MColors.ENDC + "value not valid"
+            gdb_print(buf)
+            return
+
+        buf = MColors.MP_CNAME + hex(addr) + ": " + MColors.ENDC + MColors.MP_FSYNTAX + "type=" + MColors.ENDC + MColors.MP_STR_V + \
+              str(mtype) + MColors.ENDC + ","+ MColors.MP_FSYNTAX + " value=" + MColors.ENDC + MColors.MP_STR_V + str(v) + MColors.ENDC
+        gdb_print(buf)
 
         return

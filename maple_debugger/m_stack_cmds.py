@@ -83,33 +83,38 @@ def print_maple_frame_dync(frame, index, mbt_format):
 
     # buffer format
     # index func_offset func_symbol (type argu=value, ...) at source-file-full-path:line_num
+    func_argus_locals = data['func_argus_locals']
     args_buffer = ""
-    '''
     arg_num = len(func_argus_locals['formals_name'])
-    for i in range(arg_num):
-        arg_value = m_info.get_maple_caller_argument_value(i, arg_num, func_argus_locals['formals_type'][i])
-        if arg_value:
-            if func_argus_locals['formals_type'][i] == 'a64':
-                mtype = m_info.get_maple_a64_pointer_type(arg_value)
-                if not mtype:
+    formals_value, formals_addr = m_info.get_current_js_func_formals(arg_num)
+    if formals_value:
+        for i in range(arg_num):
+            #arg_value = m_info.get_maple_caller_argument_value(i, arg_num, func_argus_locals['formals_type'][i])
+            arg_value = formals_value[i]
+            arg_addr = formals_addr[i]
+            if arg_value:
+                if func_argus_locals['formals_type'][i] == 'a64':
+                    mtype = m_info.get_maple_a64_pointer_type(arg_value)
+                    if not mtype:
+                        mtype = ""
+                else:
                     mtype = ""
             else:
+                arg_value = '...'
                 mtype = ""
-        else:
-            arg_value = '...'
-            mtype = ""
-        args_buffer += func_argus_locals['formals_type'][i]
-        args_buffer += '<' + mtype + '>'
-        args_buffer += ' '
-        args_buffer += MColors.BT_ARGNAME + func_argus_locals['formals_name'][i] + MColors.ENDC
-        #args_buffer += func_argus_locals['formals_name'][i]
-        args_buffer += '='
-        args_buffer += arg_value
-        args_buffer += ', '
-    if arg_num > 0:
-        args_buffer = args_buffer[:-2]
-    if m_debug.Debug: m_debug.dbg_print("arg_num=", arg_num, " args_buffer=", args_buffer)
-    '''
+            args_buffer += func_argus_locals['formals_type'][i]
+            args_buffer += '<' + mtype + '>'
+            args_buffer += ' '
+            args_buffer += MColors.BT_ARGNAME + func_argus_locals['formals_name'][i] + MColors.ENDC
+            #args_buffer += func_argus_locals['formals_name'][i]
+            args_buffer += '='
+            #args_buffer += arg_value
+            args_buffer += hex(arg_addr)
+            args_buffer += ', '
+        if arg_num > 0:
+            args_buffer = args_buffer[:-2]
+        if m_debug.Debug: m_debug.dbg_print("arg_num=", arg_num, " args_buffer=", args_buffer)
+
 
     if mbt_format == MBT_FORMAT_ASM:
         buffer = '#%i %s:%s %s(%s) at %s:%s' % \
@@ -125,7 +130,7 @@ def print_maple_frame_dync(frame, index, mbt_format):
              m_util.color_symbol(MColors.BT_FNNAME, func_name), args_buffer, MColors.BT_SRC + mmpl_path + MColors.ENDC, mmpl_line_num)
     gdb_print(buffer)
 
-def print_maple_frame_static(frame, index, mbt_format):    
+def print_maple_frame_static(frame, index, mbt_format):
     """
     prints one Maple backtrace frame.
 

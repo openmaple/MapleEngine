@@ -55,7 +55,6 @@ __jsiterator *__jsop_valueto_iterator(__jsvalue *value, uint32_t flags) {
   return itr;
 }
 
-
 __jsvalue __jsop_iterator_next(void *_itr_obj) {
   __jsiterator *itr_obj = (__jsiterator *)_itr_obj;
   // handle empty iterator
@@ -90,6 +89,9 @@ __jsvalue __jsop_iterator_next(void *_itr_obj) {
     if (isLastIndex) {
       // that means the next prop of itr_obj will be pointed to itr_obj->obj->prop_list
       itr_obj->prop_flag = true;
+#ifdef USE_PROP_MAP
+      itr_obj->prop_cur.prop = itr_obj->obj->prop_list->prev;
+#else
       __jsprop *skipProp = itr_obj->obj->prop_list;
       itr_obj->prop_cur.prop = NULL;
       while (skipProp) {
@@ -106,6 +108,7 @@ __jsvalue __jsop_iterator_next(void *_itr_obj) {
         itr_obj->prop_cur.prop = skipProp;
         skipProp = skipProp->next;
       }
+#endif
       itr_obj->isNew =  (itr_obj->prop_cur.prop != NULL) ? false : true;
     }
     if (retName)

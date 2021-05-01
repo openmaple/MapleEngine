@@ -525,8 +525,8 @@ def get_uninitialized_dync_maple_func_addrs():
 ####  API section for retrieving Maple frame caller information
 ######################################################################
 """
-use these api calls to get the current frame's caller's information. Due to 
-the fact that at the time we call it the frame is in the stack, it's 
+use these api calls to get the current frame's caller's information. Due to
+the fact that at the time we call it the frame is in the stack, it's
 caller's information must also be available.
 """
 
@@ -824,11 +824,20 @@ jstype_dict = {
   "JSTYPE_INFINITY"
 }
 
-def get_current_thisbinding():
-    cmd = "p __js_ThisBinding"
-    buf = gdb.execute(cmd, to_string=True)
-    # example of output: $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
-    buf = buf.rstrip()
+def get_jsvalue_tag_value(buf):
+    '''
+    Input:
+        buf: output of Maple Engine JS __jsvalue structure. Used in operand_stack[].x or __this_BindObject etc.
+             string example: $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
+    Output:
+        None
+
+    Return:
+        tag (type) if any, or None if not valid
+        index: index value in string for co-responding type, e.g if type == JSTYPE_NUMBER, value should be same to i32. None if type is not valid
+    '''
+    if not buf or len(buf) == 0:
+        return None, None
 
     if buf[0] != '$' or 'tag = JSTYPE' not in buf:
         return None, None
@@ -844,12 +853,37 @@ def get_current_thisbinding():
     else:
         val = None
 
+    return tag, val
+
+def get_current_thisbinding():
+    '''
+    Input: None
+    Output: None
+    Return:
+        for __js_ThisBinding object, return its type and co-responding index, or None if type is not valid
+    '''
+    cmd = "p __js_ThisBinding"
+    buf = m_util.gdb_exec_to_str(cmd)
+    # example of output: $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
+    buf = buf.rstrip()
+
+    tag, val = get_jsvalue_tag_value(buf)
     if m_debug.Debug: m_debug.dbg_print("tag = ", tag, "val = ", val)
     return tag, val
 
 def get_realAddr_by_index(index):
+    '''
+    Input:
+        index: index of one __jsvalue structure instance. In string.
+            e.g $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
+            Index is 1 in this example.
+
+    Return:
+        address in string, that represents an index.
+    '''
+
     cmd = "p memory_manager->GetRealAddr(" + str(index) + ")"
-    buf = gdb.execute(cmd, to_string=True)
+    buf = m_util.gdb_exec_to_str(cmd)
     # example of a command to issue "p memory_manager->GetRealAddr(1)"
     buf = buf.rstrip()
     # example of returning output: "$39 = (void *) 0x7ffff63d4014"
@@ -860,12 +894,25 @@ def get_realAddr_by_index(index):
     return addr
 
 def get_realAddr_data(addr, jstype):
+    '''
+    Input:
+        addr: addr in int.
+        jstype: JS value type. In String
+    '''
     if jstype == "JSTYPE_OBJECT":
         return get_obj_prop_list_head(addr)
     else:
         return None
 
 def get_obj_prop_list_head(addr):
+    '''
+    Input:
+        addr: address that contains head node of the property list, and the data is in struct of __jsobject.
+
+    Return:
+        property list node's address
+    '''
+
     cmd = "p *(struct __jsobject *)" + str(addr)
     # example of output could be:
     # 1. when prop_list is not available meaning nothing should be interpreted.
@@ -877,7 +924,7 @@ def get_obj_prop_list_head(addr):
     #    $85 = {prop_list = 0x7ffff63d4178, prototype = {obj = 0x2, id = JSBUILTIN_OBJECTPROTOTYPE}, extensible = 1 '\001', object_class = JSGLOBAL, object_type = 0 '\000'    #    , is_builtin = 1 '\001', proto_is_builtin = 1 '\001', builtin_id = JSBUILTIN_GLOBALOBJECT, shared = {fast_props = 0x0, array_props = 0x0, fun = 0x0,
     #    prim_string = 0x0, prim_regexp = 0x0, prim_number = 0, prim_bool = 0, arr = 0x0, primDouble = 0}}
 
-    buf = gdb.execute(cmd, to_string = True)
+    buf = m_util.gdb_exec_to_str(cmd)
     buf = buf.rstrip()
     if m_debug.Debug: m_debug.dbg_print("get_obj_prop_list_head buf = ", buf)
 
@@ -895,53 +942,119 @@ def get_obj_prop_list_head(addr):
     else:
         return prop_list
 
-def get_prop_name_value(addr):
+def get_ascii_utf_string_value(start_addr, length, stype):
+    '''
+    input:
+        start_addr: starting address of the string. int
+        length: length of the string to read. int
+        stype: string. either "ascii" or "utf16"
+    return:
+        a buffer that contains string ascii or decoded utf string
+    '''
+    if stype != 'ascii' and stype != 'utf16':
+        return None
+    if length <= 0:
+        return None
+    if not start_addr:
+        return None
+
+    v = ""
+    addr = start_addr
+    for i in range(length):
+        cmd = "x/1hx " + hex(addr) if stype == 'utf16' else "x/1bx " + hex(addr)
+        buf = m_util.gdb_exec_to_str(cmd)
+        if hex(addr) not in buf:
+            return None
+        c = buf.split()[1]
+        if stype == 'utf16':
+            try:
+                c = int(c, 16).to_bytes(2, byteorder='big').decode("utf-16-be")
+            except:
+                return None
+            addr += 2
+        else:
+            try:
+                c = chr(int(c, 16))
+            except:
+                return None
+            addr += 1
+
+        v += c
+
+    return v
+
+def get_js_string_value(addr):
+    '''
+    Input:
+        addr: the address of __jsstring
+    Return:
+        real value of the string, either in ascii or utf16
+    '''
     # input example: 0x55555576d1a8
     cmd = "p *(__jsstring *)" + str(addr)
-    buf = gdb.execute(cmd, to_string = True)
+    buf = m_util.gdb_exec_to_str(cmd)
     buf = buf.rstrip()
     if buf[0] != '$' or 'length = ' not in buf or 'ascii = ' not in buf:
-        return None,None
+        return None
     # example of command output:
     # $87 = {kind = (unknown: 0), builtin = JSBUILTIN_STRING_ARGUMENTS, length = 2, x = {ascii = 0x55555576d1ac "v1", utf16 = 0x55555576d1ac u"ㅶ"}}
-    if m_debug.Debug: m_debug.dbg_print("get_prop_name_value buf=", buf)
+    if m_debug.Debug: m_debug.dbg_print("get_js_string_value buf=", buf)
 
     length_str = buf.split('length = ')[1].split(',')[0]
-    if m_debug.Debug: m_debug.dbg_print("get_prop_name_value length_str=", length_str)
+    if m_debug.Debug: m_debug.dbg_print("get_js_string_value length_str=", length_str)
     try:
         length = int(length_str, 10)
     except:
-        return None,None
+        return None
     if length == 0:
-        return None,None
+        return None
 
-    ascii_name = buf.split('x = {ascii = ')[1].split(',')[0].split()[1][1:-1]
-    utf16_name = buf.split('utf16 = ')[1].split()[1][2:-3]
-    return ascii_name, utf16_name
+    kind_str = buf.split(',')[0].split('kind = ')[1]
+    if '__jsstring_type::JSSTRING_UNICODE' in kind_str and not 'unknown' in kind_str:
+        utf16_addr = buf.split('utf16 = ')[1].split()[0]
+        try:
+            utf16_addr = int(utf16_addr, 16)
+        except:
+            return None
+        string_value = get_ascii_utf_string_value(utf16_addr, length, "utf16")
+    else:
+        ascii_addr = buf.split('x = {ascii = ')[1].split()[0]
+        try:
+            ascii_addr = int(ascii_addr, 16)
+        except:
+            return None
+        string_value = get_ascii_utf_string_value(ascii_addr, length, "ascii")
+
+    return string_value
 
 def get_string_value_from_index(index):
+    '''
+        for a given js string index, return its real value in ascii or utf16
+    '''
     addr = get_realAddr_by_index(str(index))
     if not addr:
-        return None, None
-    return get_prop_name_value(addr)
+        return None
+    return get_js_string_value(addr)
 
 def get_prop_list_node_data(node_addr):
-    # input: node_addr is the address of node, a pointer value to 'struct __jsprop'
-    # output: return node data in dict format.
-    # dict:
-    # {'tag': 'JSTYPE_NUMBER'
-    #  'ascii_name': 'var'
-    #  'utf16_name : 'ㅶ'
-    #  'next': 0x12323434
-    #  'name_addr': 0x55555576d1a8
-    #  'value':  6 (if tag JSTYPE_NUMBER)
-    #         :  hello world (if tag = JSTYPE_STRING
-    #         :  index (if tag = JSTYPE_OBJECT)
-    #         :  None: if tag = JSTYPE_UNDEFINED or JSTYPE_NONE or JSTYPE_NULL
-    #
+    '''
+    input: node_addr is the address of node, a pointer value to 'struct __jsprop'
+    output: return node data in dict format.
+    dict:
+    {'tag': 'JSTYPE_NUMBER'
+     'name': 'var'
+     'next': 0x12323434
+     'name_addr': 0x55555576d1a8
+     'node_addr': this node's address.
+     'value':  6 (if tag JSTYPE_NUMBER)
+            :  hello world (if tag = JSTYPE_STRING
+            :  index (if tag = JSTYPE_OBJECT)
+            :  None: if tag = JSTYPE_UNDEFINED or JSTYPE_NONE or JSTYPE_NULL
+    '''
+
     cmd = "p *(struct __jsprop *)" + node_addr
     if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
-    buf = gdb.execute(cmd, to_string = True)
+    buf = m_util.gdb_exec_to_str(cmd)
     buf = buf.rstrip()
     if m_debug.Debug: m_debug.dbg_print("get_prop_list_data buf=", buf)
 
@@ -954,18 +1067,18 @@ def get_prop_list_node_data(node_addr):
     tag = buf.split("tag = ")[1].split('}}}')[0]
 
     if m_debug.Debug: m_debug.dbg_print("prop_next=", prop_next, "prop_name_addr=", prop_name_addr, "tag=", tag)
-    ascii_name, utf16_name = get_prop_name_value(prop_name_addr)
-    if m_debug.Debug: m_debug.dbg_print("ascii_name=", ascii_name, "utf16_name=", utf16_name)
+    name = get_js_string_value(prop_name_addr)
+    if m_debug.Debug: m_debug.dbg_print("name=", name)
     element = {}
     element['tag'] = tag
-    element['ascii_name'] = ascii_name
-    element['utf16_name'] = utf16_name
+    element['name'] = name
     element['next'] = prop_next
     element['name_addr'] = prop_name_addr
+    element['node_addr'] = node_addr
 
 
     if tag == 'JSTYPE_UNDEFINED' or tag == 'JSTYPE_NONE' or tag == 'JSTYPE_NULL':
-        element['value'] = ""
+        element['value'] = "undefined"
     elif tag == 'JSTYPE_NUMBER':
         value = buf.split('payload = {i32 = ')[1].split(',')[0]
         element['value'] = value
@@ -974,8 +1087,8 @@ def get_prop_list_node_data(node_addr):
         element['value'] = value
     elif tag == 'JSTYPE_STRING':
         index = buf.split('str = ')[1].split(',')[0]
-        ascii_v, utf16_v = get_string_value_from_index(index)
-        element['value'] = ascii_v
+        str_v = get_string_value_from_index(index)
+        element['value'] = str_v
     else:
         element['value'] = ""
 
@@ -983,20 +1096,21 @@ def get_prop_list_node_data(node_addr):
     return element
 
 def get_prop_list_data(prop_list_head):
-    # input: prop_list_head is the address of the head node address in struct __jsprop
-    #
-    # output: a list contains each property's data in dict format
-    # dict:
-    # {'tag': 'JSTYPE_NUMBER'
-    #  'ascii_name': 'var'
-    #  'utf16_name : 'ㅶ'
-    #  'next': 0x12323434
-    #  'name_addr': 0x55555576d1a8
-    #  'value':  6 (if tag JSTYPE_NUMBER)
-    #         :  hello world (if tag = JSTYPE_STRING
-    #         :  index (if tag = JSTYPE_OBJECT)
-    #         :  None: if tag = JSTYPE_UNDEFINED or JSTYPE_NONE or JSTYPE_NULL
-    #
+    '''
+    input: prop_list_head is the address of the head node address in struct __jsprop
+
+    output: a list contains each property's data in dict format
+    dict:
+    {'tag': 'JSTYPE_NUMBER'
+     'name': 'var'
+     'next': 0x12323434
+     'name_addr': 0x55555576d1a8
+     'node_addr': this node's address.
+     'value':  6 (if tag JSTYPE_NUMBER)
+            :  hello world (if tag = JSTYPE_STRING
+            :  index (if tag = JSTYPE_OBJECT)
+            :  None: if tag = JSTYPE_UNDEFINED or JSTYPE_NONE or JSTYPE_NULL
+    '''
     data = []
 
     node_addr = prop_list_head
@@ -1018,7 +1132,11 @@ def get_prop_list_data(prop_list_head):
     return data
 
 def get_all_dync_properties_data():
-    #output: a list contains elements, each element is a dict representing one node of property list
+    '''
+    Get a list that contains elements, each elment is a dict represenfing one list node of property list.
+
+    Call this function to get all the properties for a specified object.
+    '''
     tag,val = get_current_thisbinding()
     if m_debug.Debug: m_debug.dbg_print("tag=", tag, "val=", val)
     if tag and val:
@@ -1040,3 +1158,151 @@ def get_all_dync_properties_data():
             data =  get_prop_list_data(prop_list_head)
             if m_debug.Debug: m_debug.dbg_print("data=", data)
             return data
+
+def get_current_intersource_fp_addr():
+    '''
+    Get current stack frame's gInterSource FP Address
+    '''
+    cmd = "p gInterSource->GetFPAddr()"
+    buf = m_util.gdb_exec_to_str(cmd)
+    buf = buf.rstrip()
+    if buf[0] != '$' or ' = ' not in buf:
+        return None
+
+    # example of command output:
+    # $113 = (void *) 0x7ffff610cfc0
+    if m_debug.Debug: m_debug.dbg_print("p gInterSource->GetFPAddr() buf=", buf)
+    addr_str = buf.split()[-1]
+    if addr_str[0] != '0' and addr_str[1] != 'x':
+        return None
+    return addr_str
+
+def get_current_js_func_formals(formals_num):
+    '''
+    Get the current JS stack frame's function arguments' values
+    '''
+    fpaddr = get_current_intersource_fp_addr()
+    if not fpaddr:
+        return None,None
+
+    formals_value = []
+    formals_addr = []
+    for i in range(formals_num):
+        addr = int(fpaddr,16) + 8 * (i+1)
+        cmd = "x/1x " + hex(addr)
+        buf = gdb.execute(cmd, to_string = True)
+        buf = buf.rstrip()
+        if "Cannot access memory at address" in buf or "No symbol" in buf:
+            return None,None
+
+        # example of command output:
+        # 0x7ffff610cfc8: 0x00000001
+        if m_debug.Debug: m_debug.dbg_print("x/x formal address buf=", buf)
+        v = buf.split()[-1]
+        formals_value.append(v)
+        formals_addr.append(addr)
+
+    return formals_value, formals_addr
+
+def get_current_js_func_locals(locals_num):
+    '''
+    Get the current JS stack frame's function local variables' values
+    '''
+    fpaddr = get_current_intersource_fp_addr()
+    if not fpaddr:
+        return None,None
+
+    locals_value = []
+    locals_addr = []
+    for i in range(locals_num):
+        addr = int(fpaddr, 16) - ( 8 + 8 * (i + 1))
+        cmd = "x/x " + hex(addr)
+        buf = m_util.gdb_exec_to_str(cmd)
+        buf = buf.rstrip()
+        if "Cannot access memory at address" in buf or "No symbol" in buf:
+            return None, None
+
+        # example of command output:
+        # 0x7ffff610cfc8: 0x00000001
+        if m_debug.Debug: m_debug.dbg_print("x/x local address buf=", buf)
+        v = buf.split()[-1]
+        locals_value.append(v)
+        locals_addr.append(addr)
+
+    if m_debug.Debug: m_debug.dbg_print("get_current_js_func_locals returns value:", locals_value)
+    if m_debug.Debug: m_debug.dbg_print("get_current_js_func_locals returns addr:", locals_addr)
+    return locals_value, locals_addr
+
+def get_one_js_frame_stack_dynamic(sp, idx):
+    """
+    for a given sp and index number in a dynamic caller operand_stack data, return its
+    data type and value.
+
+    Note, at runtime, caller.operand_stack is dynamic, sp, idx, types and values are all
+    changing during the run time.
+    """
+    if idx > sp:
+        return None, None
+
+    # get the caller.operand_stack length
+    length = None
+    try:
+        buffer = m_util.gdb_exec_to_str('p func.operand_stack.size()')
+    except:
+        return None, None
+
+    if buffer[0] != '$':
+        return None, None
+    if ' = ' in buffer:
+        try:
+            length = int(buffer.split(' = ')[1])
+        except:
+            return None, None
+    else:
+        return None, None
+    if m_debug.Debug: m_debug.dbg_print("length=", length)
+
+
+    if length <= sp or length < idx:
+        return None, None
+
+    cmd = "p (__jsvalue)func.operand_stack[" + str(idx) + "].x"
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None, None
+    buf = buf.rstrip()
+    # output sample: $174 = {asbits = 17179869186, s = {payload = {i32 = 2, u32 = 2, boo = 2, str = 2, obj = 2, ptr = 2}, tag = JSTYPE_NUMBER}}
+    # or a bad output sample: $194 = {asbits = 14627392582107119343, s = {payload = {i32 = -559038737, u32 = 3735928559, boo = 3735928559, str = 3735928559, obj = 3735928559, ptr = 3735928559}, tag = 3405705229}}
+    maple_type, v = get_jsvalue_tag_value(buf)
+    if not v or maple_type not in jstype_dict:
+        return None, None
+
+    if m_debug.Debug: m_debug.dbg_print("return maple_type=", maple_type, "v=", v)
+    return maple_type, v
+
+def get_jstype_value_by_addr(addr):
+    ''' addr is the address in int. This address is the one shown in mbt output for parameter's address '''
+
+    # first, to get the jsvalue type (string or number or boolean or object), and get its corresponding index
+    cmd = "p *(__jsvalue *)" + hex(addr)
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None, None
+    buf = buf.rstrip()
+    # output sample: $174 = {asbits = 17179869186, s = {payload = {i32 = 2, u32 = 2, boo = 2, str = 2, obj = 2, ptr = 2}, tag = JSTYPE_NUMBER}}
+    # or a bad output sample: $194 = {asbits = 14627392582107119343, s = {payload = {i32 = -559038737, u32 = 3735928559, boo = 3735928559, str = 3735928559, obj = 3735928559, ptr = 3735928559}, tag = 3405705229}}
+    maple_type, v = get_jsvalue_tag_value(buf)
+    if m_debug.Debug: m_debug.dbg_print("return maple_type=", maple_type, "v=", v)
+    if not v or maple_type not in jstype_dict:
+        return None, None
+
+    # second, for string type and object type, need additional steps to get the value
+    if maple_type == "JSTYPE_NUMBER" or maple_type == "JSTYPE_BOOLEAN":
+        return maple_type, v
+    elif maple_type == "JSTYPE_STRING":
+        ret_str = get_string_value_from_index(v)
+        return  maple_type, ret_str
+    else:
+        return None, None

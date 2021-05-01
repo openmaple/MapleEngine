@@ -26,7 +26,7 @@
 #include <map>
 using namespace maple;
 
-#define MEMHASHTABLESIZE 0x8
+#define MEMHASHTABLESIZE 0x100
 
 enum MemHeadTag {
   MemHeadAny,

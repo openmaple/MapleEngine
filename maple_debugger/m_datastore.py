@@ -625,10 +625,17 @@ def get_stack_frame_data_dync(frame):
 
     rdata['frame_func_src_info'] = d
 
+    ### Get JS function formals and locals
+    func_argus_locals_dict = m_asm.get_js_func_formals_locals(asm_path, func_header_name)
+    if not func_argus_locals_dict:
+        rdata['func_argus_locals'] = None
+    else:
+        rdata['func_argus_locals'] = func_argus_locals_dict
+
     #print ("rdata dync", rdata)
     return rdata
 
- 
+
 
 def get_stack_frame_data_static(frame):
     """

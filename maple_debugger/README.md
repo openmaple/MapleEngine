@@ -90,7 +90,7 @@ $ "$MAPLE_BUILD_TOOLS"/run-app.sh -gdb -classpath ./HelloWorld.so HelloWorld
 ```
 
 ## Launching a JavaScript language based program
-To launch the Maple Debugger along with your user JavaScript application code using the HelloWorld example, do the following:
+To launch the Maple Debugger along with your user JavaScript application code using the add.js example, do the following:
 ```
 $ cd ~/gitee/maple_engine/maple_build/examples/JavaScript/add/
 $ source ~/gitee/maple_engine/envsetup.sh
@@ -106,7 +106,6 @@ $ "$MAPLE_BUILD_TOOLS"/run-js-app.sh -gdb add.so
 * **File**      : _mlist_, _msrcpath_
 * **Control**   : _mstepi_, _mnexti_, _mfinish_
 * **Misc**      : _mset_, _mhelp_
-**Note, command _mlocal_, _mtype_, _msymbol_ don't have JavaScript support yet in Maple Debugger version 2.0**
 
 ## Summary of Commands
 

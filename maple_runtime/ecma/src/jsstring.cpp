@@ -47,7 +47,7 @@ static inline bool __jsstr_is_builtin(__jsstring *str) {
   return (((uint8_t *)str)[0] & JSSTRING_BUILTIN) != 0;
 }
 
-static std::wstring __jsstr_to_wstring(__jsstring *s, int offset = 0) {
+std::wstring __jsstr_to_wstring(__jsstring *s, int offset) {
   int len = __jsstr_get_length(s) - offset;
   if (len <= 0) {
     std::wstring str32;

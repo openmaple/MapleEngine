@@ -13,14 +13,63 @@
  * See the MulanPSL - 2.0 for more details.
  */
 
+#include <unordered_map>
+#include <regex>
 #include "jsintl.h"
 #include "jsvalueinline.h"
 #include "jsvalue.h"
 #include "jsobject.h"
 #include "jsobjectinline.h"
 #include "jsarray.h"
-#include "jsregexp.h"
 #include "jsmath.h"
+
+std::string kUnicodeLocaleExtensionSequence = "-u(-[a-z0-9]{2,8})+";
+
+// TODO
+std::unordered_map<std::string,std::string> kTagMappings = {
+  {"art-lojban", "jbo"},
+};
+
+// TODO
+std::unordered_map<std::string,std::vector<std::string>> kExtLangMappings = {
+  {"aao", {"aao", "ar"}},
+};
+
+std::unordered_map<std::string,std::vector<std::string>> kDateTimeFormatComponents = {
+  {"weekday", {"narrow", "short", "long"}},
+  {"era", {"narrow", "short", "long"}},
+  {"year", {"2-digit", "numeric"}},
+  {"month", {"2-digit", "numeric", "narrow", "short", "long"}},
+  {"day", {"2-digit", "numeric"}},
+  {"hour", {"2-digit", "numeric"}},
+  {"minute", {"2-digit", "numeric"}},
+  {"second", {"2-digit", "numeric"}},
+  {"timeZoneName", {"short", "long"}},
+};
+
+static inline __jsvalue StrToVal(std::string str) {
+  __jsstring *jsstr = __jsstr_new_from_char(str.c_str());
+  int len = __jsstr_get_length(jsstr);
+  return __string_value(jsstr);
+}
+
+static inline __jsvalue StrVecToVal(std::vector<std::string> strs) {
+  int size = strs.size();
+  __jsvalue items[size];
+  for (int i = 0; i < strs.size(); i++) {
+    items[i] = StrToVal(strs[i]);
+
+  }
+  __jsobject *arr_obj = __js_new_arr_elems(items, size);
+  return __object_value(arr_obj);
+}
+
+static inline std::string ValToStr(__jsvalue *value) {
+  __jsstring *jsstr = __jsval_to_string(value);
+  int len = __jsstr_get_length(jsstr);
+  std::string res(jsstr->x.ascii, len);
+  return res;
+}
 
 // ECMA-402 1.0 8 The Intl Object
 __jsvalue __js_IntlConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
@@ -40,6 +89,7 @@ __jsvalue __js_CollatorConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
   obj->object_class = JSINTL;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
+  __jsvalue obj_val = __object_value(obj);
 
   __jsvalue locales = __undefined_value();
   __jsvalue options = __undefined_value();
@@ -53,9 +103,9 @@ __jsvalue __js_CollatorConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
   } else {
     MAPLE_JS_SYNTAXERROR_EXCEPTION();
   }
-  InitializeCollator(obj, &locales, &options);
+  InitializeCollator(&obj_val, &locales, &options);
 
-  return __object_value(obj);
+  return obj_val;
 }
 
 // ECMA-402 1.0 11.1 The Intl.NumberFormat Constructor
@@ -66,8 +116,11 @@ __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
   obj->shared.intl = (__jsintl*) VMMallocGC(sizeof(__jsintl));
+  __jsvalue obj_val = __object_value(obj);
 
-  obj->shared.intl->initialized_intl_object = false;
+  __jsvalue prop = StrToVal("InitializedIntlObject");
+  __jsvalue value = __boolean_value(false);
+  __jsop_setprop(&obj_val, &prop, &value);
 
   __jsvalue locales = __undefined_value();
   __jsvalue options = __undefined_value();
@@ -81,7 +134,7 @@ __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
   } else {
     MAPLE_JS_SYNTAXERROR_EXCEPTION();
   }
-  InitializeNumberFormat(obj, &locales, &options);
+  InitializeNumberFormat(&obj_val, &locales, &options);
 
   return __object_value(obj);
 }
@@ -93,6 +146,7 @@ __jsvalue __js_DateTimeFormatConstructor(__jsvalue *this_arg,
   obj->object_class = JSINTL;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
+  __jsvalue obj_val = __object_value(obj);
 
   __jsvalue locales = __undefined_value();
   __jsvalue options = __undefined_value();
@@ -106,16 +160,104 @@ __jsvalue __js_DateTimeFormatConstructor(__jsvalue *this_arg,
   } else {
     MAPLE_JS_SYNTAXERROR_EXCEPTION();
   }
-  InitializeDateTimeFormat(obj, &locales, &options);
+  InitializeDateTimeFormat(&obj_val, &locales, &options);
 
-  return __object_value(obj);
+  return obj_val;
 }
 
 // ECMA-402 1.0 6.2.3
 // CanonicalizeLanguageTag(locale)
-__jsvalue CanonicalizeLanguageTag(__jsstring *tag) {
-  // TODO: not implemented yet.
-  return __null_value();
+__jsvalue CanonicalizeLanguageTag(__jsstring *locale) {
+  std::string loc;
+  if (__jsstr_is_ascii(locale)) {
+    loc = std::string(locale->x.ascii, __jsstr_get_length(locale));
+  }
+  // Start with lower case for easier processing.
+  std::transform(loc.begin(), loc.end(), loc.begin(), ::tolower);
+  // Handle mappings for complete tags.
+  if (kTagMappings.count(loc)) {
+    //return kTagMappings[loc];
+    __jsstring *str = __jsstr_new_from_char(kTagMappings[loc].c_str());
+    return __string_value(str);
+  }
+  std::vector<std::string> subtags;
+  std::stringstream ss(loc);
+  std::string token;
+  while (std::getline(ss, token, '-')) {
+    subtags.push_back(token);
+  }
+  // Handle standard part: all subtags before first singleton or "x".
+  int i = 0;
+  while (i < subtags.size()) {
+    std::string subtag = subtags[i];
+    if (subtag.length() == 1 && (i > 0 || subtag == "x") ) {
+      break;
+    } else if (i != 0 && subtag.length() == 2) {
+      std::transform(subtag.begin(), subtag.end(), subtag.begin(), ::toupper);
+    } else if (subtag.length() == 4) {
+      subtag[0] = toupper(subtag[0]);
+    } else if (kExtLangMappings.count(subtag)) {
+      subtag = kExtLangMappings[subtag][0];
+      if (i == 1 && kExtLangMappings[subtag][1] == subtags[0]) {
+        subtags.erase(subtags.begin());
+        i--;
+      }
+    }
+    subtags[i] = subtag;
+    i++;
+  }
+  std::string normal;
+  for (int j = 0; j < i; j++) {
+    normal += subtags[j];
+    if (j >= 0 && j != i-1)
+      normal += "-";
+  }
+  // Handle extensions.
+  std::vector<std::string> extensions;
+  while (i < subtags.size() && subtags[i] != "x") {
+    int extension_start = i;
+    i++;
+    while (i < subtags.size() && subtags[i].length() > 1) {
+      i++;
+    }
+    std::string extension;
+    for (int j = extension_start; j < i; j++) {
+      extension += subtags[j];
+      if (j >= extension_start && j < i-1) {
+        extension += "-";
+      }
+    }
+    extensions.push_back(extension);
+  }
+  std::sort(extensions.begin(), extensions.end());
+
+  // Handle private use.
+  std::string private_use;
+  if (i < subtags.size()) {
+    for (int j = i; j < subtags.size(); j++) {
+      private_use += subtags[i];
+      if (j >= i && j < subtags.size()-1)
+        private_use += "-";
+    }
+  }
+
+  // Put everyting back together.
+  std::string canonical = normal;
+  if (extensions.size() > 0) {
+    for (int i = 0; i < extensions.size(); i++) {
+      canonical += "-" + extensions[i];
+    }
+  }
+  if (!private_use.empty()) {
+    if (canonical.length() > 0) {
+      canonical += "-" + private_use;
+    } else {
+      canonical = private_use;
+    }
+  }
+
+  __jsstring *str = __jsstr_new_from_char(canonical.c_str());
+  return __string_value(str);
 }
 
 // ECMA-402 1.0 6.2.2
@@ -156,26 +298,27 @@ bool IsStructurallyValidLanguageTag(__jsstring *tag) {
   // For duplicate variant.
   std::string duplicate_variant = "(" + alpha_num + "{2,8}-)+" + variant + "-("
                                   + alpha_num + "{2,8}-)*\\3(?!" + alpha_num + ")";
-  __jsstring *duplicate_variant_str = __jsstr_new_from_char(duplicate_variant.c_str());
-  __jsvalue duplicate_variant_re = __string_value(duplicate_variant_str);
+  std::string tag_str;
+  int len = __jsstr_get_length(tag);
+  tag_str.assign(tag->x.ascii, len);
 
-  __jsvalue res = __jsregexp_Test(&language_tag_re, &tag_val);
-  if (__jsval_to_boolean(&res) == false)
+  std::smatch sm;
+  std::regex re(language_tag);
+  if (std::regex_search(tag_str, sm, re) == false) {
+    return false;
+  }
+
+  std::string separator = "-x-";
+  std::string tag0 = tag_str.substr(0, tag_str.find(separator));
+
+  re = (duplicate_singleton);
+  if (std::regex_search(tag0, sm, re) == true)
+    return false;
+  re = (duplicate_variant);
+  if (std::regex_search(tag0, sm, re) == true)
     return false;
 
-  std::string separator = "/-x-/";
-  __jsstring *separator_str = __jsstr_new_from_char(separator.c_str());
-  __jsvalue separator_val = __string_value(separator_str);
-  __jsvalue undefined_val = __undefined_value();
-  res = __jsstr_split(&tag_val, &separator_val, &undefined_val);
-  __jsobject *res_obj = __jsval_to_object(&res);
-  __jsvalue res0 = __jsarr_GetElem(res_obj, 0);
-  
-  __jsvalue duplicate_singleton_res = __jsregexp_Test(&duplicate_singleton_re, &res0);
-  __jsvalue duplicate_variant_res = __jsregexp_Test(&duplicate_variant_re, &res0);
-
-  return !__jsval_to_boolean(&duplicate_singleton_res) 
-         && !__jsval_to_boolean(&duplicate_variant_res);
+  return true;
 }
 
 // ECMA-402 1.0 6.3.1
@@ -272,77 +415,398 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
 // ECMA-402 1.0 9.2.2
 // BestAvailableLocale(availableLocales, locale)
 __jsvalue BestAvailableLocale(__jsvalue *available_locales, __jsvalue *locale) {
-  // TODO: not implemented yet.
+  // Step 1.
+  __jsvalue candidate = *locale;
+  // Step 2.
+  while (true) {
+    // Step 2a.
+    __jsvalue idx = __jsarr_pt_indexOf(available_locales, &candidate, 0);
+    if (__jsval_to_number(&idx) != -1) {
+      return candidate;
+    }
+    // Step 2b.
+    __jsvalue search_element = StrToVal("-");
+    __jsvalue from_index = __number_value(0);
+    __jsvalue pos = __jsstr_lastIndexOf(&candidate, &search_element, &from_index);
+    if (__jsval_to_number(&pos) == -1) {
+      return __undefined_value();
+    }
+    // Step 2c.
+    __jsstring *candidate_str = __jsval_to_string(&candidate);
+    int p = __jsval_to_number(&pos);
+    if (__jsval_to_number(&pos) >= 2 && __jsstr_get_char(candidate_str, p - 2) == '-') {
+      pos  = __number_value(p - 2);
+    }
+    // Step 2d.
+    __jsvalue start = __number_value(0);
+    __jsvalue end = pos;
+    candidate = __jsstr_substring(&candidate, &start, &end);
+  }
   return __undefined_value();
+}
+
+// Used for ECMA-402 1.0 9.2.3
+__jsvalue RemoveUnicodeExtensions(__jsvalue *locale) {
+  std::string loc;
+  __jsstring *loc_str = __jsval_to_string(locale);
+  int len = __jsstr_get_length(loc_str);
+  loc.assign(loc_str->x.ascii, len);
+
+  // "Unicode locale extension sequence" defined as:
+  // "any substring of a langauge tag that starts with a separator '-' and
+  // the singleton 'u' and includes the maximum sequence of following
+  // non-singleton subtags and their preceding '-' separators."
+  std::regex re(kUnicodeLocaleExtensionSequence);
+  std::smatch sm;
+  std::string res;
+  std::regex_search(loc, sm, re);
+  if (sm.ready()) {
+    res = sm.prefix().str(); // TODO: double-check!
+  }
+  __jsstring *js_res = __jsstr_new_from_char(res.c_str());
+  return __string_value(js_res);
 }
 
 // ECMA-402 1.0 9.2.3
 // LookupMatcher(availableLocales, requestedLocales)
 __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_locales) {
-  // TODO: not implemented yet.
-  return __undefined_value();
-}
+  // Step 1.
+  int i = 0;
+  // Step 2.
+  int len = __jsarr_getIndex(available_locales);
+  // Step 3.
+  __jsvalue available_locale = __undefined_value();
+  // Step 4.
+  __jsvalue locale;
+  __jsvalue no_extension_locale;
+  while (i < len && __is_undefined(&available_locale)) {
+    // Step 4a.
+    __jsobject *o = __jsval_to_object(requested_locales);
+    locale = __jsarr_GetElem(o, i);
+    // Step 4b.
+    no_extension_locale = RemoveUnicodeExtensions(&locale);
+    // Step 4c.
+    __jsvalue available_locale = BestAvailableLocale(available_locales, &no_extension_locale);
+    // Step 4d.
+    i--;
+  }
+  // Step 5.
+  __jsobject *result_obj = __js_new_obj_obj_0();
+  __jsvalue result = __object_value(result_obj);
 
+  // Step 6.
+  __jsvalue prop;
+  if (!__is_undefined(&available_locale)) {
+    // Step 6a.
+    prop = StrToVal("locale");
+    __jsop_setprop(&result, &prop, available_locales);
+    // Step 6b.
+    __jsstring *locale_str = __jsval_to_string(&locale);
+    __jsstring *no_extension_locale_str = __jsval_to_string(&no_extension_locale);
+    if (!__jsstr_equal(locale_str, no_extension_locale_str)) {
+      // Step 6b i.
+      std::string loc;
+      int len = __jsstr_get_length(locale_str);
+      loc.assign(locale_str->x.ascii, len);
+
+      // Step 6b ii.
+      std::regex re(kUnicodeLocaleExtensionSequence);
+      std::smatch sm;
+      std::string extension;
+      int extension_index;
+      std::regex_search(loc, sm, re);
+      extension = sm[0].str();
+      extension_index = sm.position(0);
+
+      // Step 6b iii.
+      prop = StrToVal("extension");
+      __jsstring *v_str = __jsstr_new_from_char(extension.c_str());
+      __jsvalue value = __string_value(v_str);
+      __jsop_setprop(&result, &prop, &value);
+
+      // Step 6b iv.
+      prop = StrToVal("extensionIndex");
+      value = __number_value(extension_index);
+      __jsop_setprop(&result, &prop, &value);
+    }
+  } else {
+    // Step 7.
+    prop = StrToVal("locale");
+    __jsvalue default_locale = DefaultLocale();
+    __jsop_setprop(&result, &prop, &default_locale);
+  }
+  // Step 8.
+  return result;
+}
 // ECMA-402 1.0 9.2.4
 // BestFitMatcher(availableLocales, requestedLocales)
 __jsvalue BestFitMatcher(__jsvalue *available_locales, __jsvalue *requested_locales) {
-  // TODO: not impemented yet.
-  return __null_value();
+  return LookupMatcher(available_locales, requested_locales);
 }
 
 // ECMA-402 1.0 9.2.5
 // ResolveLocale(availableLocales, requestedLocales, options, relevantExtensionKeys,
 //               localeData)
 __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_locales,
-                        std::map<std::string,__jsvalue>& options, __jsvalue *relevant_extension_keys,
+                        __jsvalue *options, __jsvalue *relevant_extension_keys,
                         __jsvalue *locale_data) {
-  // TODO: not implemented yet.
-  return __null_value();
+  // Step 1.
+  __jsvalue prop = StrToVal("localeMatcher");
+  __jsvalue matcher_val = __jsop_getprop(options, &prop);
+  std::string matcher = ValToStr(&matcher_val);
+  // Step 2.
+  __jsobject *r_obj = __js_new_obj_obj_0();
+  __jsvalue r = __object_value(r_obj);
+  if (matcher == "lookup") {
+    r = LookupMatcher(available_locales, requested_locales);
+  } else {
+    // Step 3a.
+    r = BestFitMatcher(available_locales, requested_locales);
+  }
+  // Step 4.
+  prop = StrToVal("locale");
+  __jsvalue found_locale = __jsop_getprop(&r, &prop);
+  // Step 5a.
+  prop = StrToVal("extension");
+  __jsvalue extension = __jsop_getprop(&r, &prop);
+  __jsvalue extension_subtags;
+  __jsvalue extension_subtags_length;
+  __jsvalue extension_index;
+  if (!__is_undefined(&extension)) {
+    // Step 5b.
+    prop = StrToVal("extensionIndex");
+    extension_index = __jsop_getprop(&r, &prop);
+    // Step 5c-5d.
+    __jsvalue separator = StrToVal("-");
+    __jsvalue limit = __undefined_value();
+    extension_subtags = __jsstr_split(&extension, &separator, &limit);
+    prop = StrToVal("length");
+    extension_subtags = __jsop_getprop(&extension_subtags, &prop);
+    // Step 5e.
+    prop = StrToVal("length");
+    extension_subtags_length = __jsop_getprop(&extension_subtags, &prop);
+  }
+  // Step 6.
+  __jsobject *result_obj = __js_new_obj_obj_0();
+  __jsvalue result = __object_value(result_obj);
+  // Step 7.
+  prop = StrToVal("dataLocale");
+  __jsop_setprop(&result, &prop, &found_locale);
+  // Step 8.
+  __jsvalue supported_extension = StrToVal("-u");
+  // Step 9.
+  int i = 0;
+  // Step 10.
+  int len;
+  __jsvalue len_val;
+  if (!__is_undefined(relevant_extension_keys)) {
+    prop = StrToVal("length");
+    len_val = __jsop_getprop(relevant_extension_keys, &prop);
+    len = __jsval_to_number(&len_val);
+  } else {
+    len = 0;
+  }
+  // Step 11.
+  while (i < len) {
+    // Step 11a.
+    prop = StrToVal(std::to_string(i));
+    __jsvalue key = __jsop_getprop(relevant_extension_keys, &prop);
+    // Step 11b.
+    prop = StrToVal("localeData");
+    __jsvalue found_locale_data = __jsop_getprop(locale_data, &prop);
+    // Step 11c.
+    prop = StrToVal("foundLocaleData");
+    __jsvalue key_locale_data = __jsop_getprop(&found_locale_data, &prop);
+    // Step 11d.
+    prop = StrToVal("0");
+    __jsvalue value = __jsop_getprop(&key_locale_data, &prop);
+    // Step 11e.
+    __jsvalue supported_extension_addition = StrToVal("");
+    // Step 11g.
+    if (!__is_undefined(&extension_subtags)) {
+      // Step 11g i.
+      __jsvalue key_pos = __jsstr_indexOf(&extension_subtags, &key, 0);
+      // Step 11g ii.
+      int pos = __jsval_to_number(&key_pos);
+      if (pos != -1) {
+        // Step 11g ii 1.
+        prop = StrToVal(std::to_string(pos+1));
+        __jsvalue cond = __jsop_getprop(&extension_subtags, &prop);
+        if ((pos + 1 < __jsval_to_number(&extension_subtags_length)) &&
+            (__jsval_to_number(&cond) > 2)) {
+            // Step 11g ii 1a.
+            __jsvalue requested_value = __jsop_getprop(&extension_subtags, &prop);
+            // Step 11g ii 1b.
+            __jsvalue value_pos = __jsstr_indexOf(&key_locale_data, &requested_value, 0);
+            // Step 11g ii 1c.
+            if (__jsval_to_number(&value_pos) != -1) {
+              // Step 11g ii 1c i.
+              value = requested_value;
+              // Step 11g ii 1c ii.
+              std::string d = "-";
+              __jsstring *dash = __jsstr_new_from_char(d.c_str());
+              __jsstring *dash_key = __jsstr_concat_2(dash, __jsval_to_string(&key));
+              __jsstring *dash_value = __jsstr_concat_2(dash, __jsval_to_string(&value));
+              __jsstring *addition = __jsstr_concat_2(dash_key, dash_value);
+              supported_extension_addition = __string_value(addition);
+            }
+        } else {
+          // Step 11g ii 2a.
+          prop = StrToVal("true");
+          __jsvalue value_pos = __jsstr_indexOf(&key_locale_data, &prop, 0);
+          // Step 11g ii 2b.
+          if (__jsval_to_number(&value_pos) != -1) {
+            // Step 11g ii 2b i.
+            value = StrToVal("true");
+          }
+        }
+      }
+    }
+    // Step 11h i.
+    prop = StrToVal("key");
+    __jsvalue options_value = __jsop_getprop(options, &prop);
+    if (!__is_undefined(&options_value)) {
+      // Step 11h ii.
+      __jsvalue idx = __jsstr_indexOf(&key_locale_data, &options_value, 0);
+      if (__jsval_to_number(&idx) != -1) {
+        // Step 11h ii 1.
+        __jsstring *options_value_str = __jsval_to_string(&options_value);
+        __jsstring *value_str = __jsval_to_string(&value);
+        if (__jsstr_ne(options_value_str, value_str)) {
+          // Step 11h ii 1a.
+          value = options_value;
+          supported_extension_addition = StrToVal("");
+        }
+      }
+    }
+    // Step 11h j.
+    __jsstr_concat(&supported_extension_addition, &supported_extension, 1);
+    // Step 11h k.
+    i++;
+  }
+  // Step 12.
+  if (__jsstr_get_length(__jsval_to_string(&supported_extension)) > 2) {
+    // Step 12a.
+    __jsvalue zero = __number_value(0);
+    __jsvalue pre_extension = __jsstr_split(&found_locale, &zero, &extension_index);
+    // Step 12b.
+    __jsvalue undefined = __undefined_value();
+    __jsvalue post_extension = __jsstr_split(&found_locale, &extension_index, &undefined);
+    found_locale = __jsstr_concat(&pre_extension, &post_extension, 1);
+
+  }
+  // Step 13.
+  prop = StrToVal("locale");
+  __jsop_setprop(&result, &prop, &found_locale);
+  // Step 14.
+  return result;
 }
 
 // ECMA-402 1.0 9.2.6
 // LookupSupportedLocales(availableLocales, requestedLocales)
 __jsvalue LookupSupportedLocales(__jsvalue *available_locales,
                                 __jsvalue *requested_locales) {
-  // TODO: not implemented yet.
-  return __null_value();
+  // Step 1.
+  int len = __jsarr_getIndex(requested_locales);
+  // Step 2.
+  __jsvalue subset = __object_value(__js_new_arr_internal(0));
+  // Step 3.
+  int k = 0;
+  // Step 4.
+  while (k < len) {
+    // Step 4a.
+    __jsobject *o = __jsval_to_object(requested_locales);
+    __jsvalue locale = __jsarr_GetElem(o, 0);
+    // Step 4b.
+    __jsvalue no_extensions_locale = RemoveUnicodeExtensions(&locale);
+    // Step 4c.
+    __jsvalue available_locale = BestAvailableLocale(available_locales, &no_extensions_locale);
+    // Step 4d.
+    if (!__is_undefined(&available_locale)) {
+      __jsarr_pt_concat(&subset, &locale, 1);
+    }
+    // Step 4e.
+    k++;
+  }
+  // Step 5.
+  __jsvalue subset_array = subset; // TODO: double-check!
+  // Step 6.
+  return subset_array;
 }
 
 // ECMA-402 1.0 9.2.7
 // BestFitSupportedLocales(availableLocales, requestedLocales)
 __jsvalue BestFitSupportedLocales(__jsvalue *available_locales,
                                   __jsvalue *requested_locales) {
-  // TODO: not implemented yet.
-  return __null_value();
+  return LookupSupportedLocales(available_locales, requested_locales);
 }
 
 // ECMA-402 1.0 9.2.8
 // SupportedLocales(availableLocales, requestedLocales, options)
 __jsvalue SupportedLocales(__jsvalue *available_locales,
                            __jsvalue *requested_locales, __jsvalue *options) {
-  // TODO: not implemented yet.
-  return __null_value();
+  // Step 1.
+  __jsvalue prop;
+  __jsvalue matcher;
+  std::string matcher_str;
+  if (!__is_undefined(options)) {
+    // Step 1a-1b.
+    prop = StrToVal("localeMatcher");
+    matcher = __jsop_getprop(options, &prop);
+    // Step 1c.
+    if (!__is_undefined(&matcher)) {
+      // Step 1c i.
+      matcher_str = ValToStr(&matcher);
+      // Step 1c ii.
+      if (matcher_str != "lookup" && matcher_str != "best fit") {
+        MAPLE_JS_RANGEERROR_EXCEPTION();
+      }
+    }
+  }
+  // Step 2.
+  __jsvalue subset;
+  if (__is_undefined(&matcher) || matcher_str == "best fit") {
+    // Step 2a.
+    subset = BestFitSupportedLocales(available_locales, requested_locales);
+  } else {
+    // Step 3.
+    subset = LookupSupportedLocales(available_locales, requested_locales);
+  }
+  // Step 4.
+  __jsvalue list = __jsobj_getOwnPropertyNames(&subset, &subset); // 1st arguement not used.
+  int size = __jsarr_getIndex(&list);
+  for (int i = 0; i < size; i++) {
+    // Step 4a.
+    __jsobject *o = __jsval_to_object(&subset);
+    __jsvalue p = __jsarr_GetElem(o, i);
+    //__jsprop_desc d = __jsobj_internal_GetProperty(o, &p);
+    // Step 4b-4c.
+    __jsvalue attrs = __number_value(JSPROP_DESC_HAS_VWUEUC); // TODO: check!
+    // Step 4d.
+    __jsobj_defineProperty(&subset, &subset, &p, &attrs); // 1st argument not used.
+  }
+  // Step 5.
+  return subset;
 }
 
 // ECMA-402 1.0 9.2.9
 // GetOption(options, property, type, values, fallback)
-__jsvalue GetOption(__jsvalue *options, std::string property, std::string type,
+__jsvalue GetOption(__jsvalue *options, __jsvalue *property, __jsvalue *type,
                     __jsvalue *values, __jsvalue *fallback) {
   // Step 1.
-  __jsobject *obj = __jsval_to_object(options);
-  __jsvalue value = obj->shared.intl->map[property];
+  __jsvalue prop = StrToVal("property");
+  __jsvalue value;
+  if (!__is_null_or_undefined(options)) {
+    value = __jsop_getprop(options, &prop);
+  } else {
+    return *fallback;
+  }
   // Step 2.
   if (!__is_undefined(&value)) {
     // Step 2a.
-    MAPLE_JS_ASSERT(type == "boolean" || type == "string");
-    // Step 2b/2c.
-    /*
-    if (type == "boolean") {
-      value = __jsval_to_boolean(&value);
-    } else if (type == "string") {
-      value = __jsval_to_string(&value);
-    }
-    */
+    __jsstring *jsstr_type = __jsval_to_string(type);
+    char *str_type = jsstr_type->x.ascii;
+    MAPLE_JS_ASSERT(str_type == "boolean" || str_type == "string");
     // Step 2d.
     if (!__is_undefined(values)) {
       __jsvalue idx = __jsarr_pt_indexOf(values, &value, 0);
@@ -361,13 +825,26 @@ __jsvalue GetOption(__jsvalue *options, std::string property, std::string type,
 __jsvalue GetNumberOption(__jsvalue *options, __jsvalue *property,
                           __jsvalue *minimum, __jsvalue *maximum,
                           __jsvalue *fallback) {
-  // TODO: not implemented yet.
-  return __null_value();
+  // Step 1.
+  __jsvalue value = __jsop_getprop(options, property);
+  // Step 2.
+  if (!__is_undefined(&value)) {
+    // Step 2a.
+    if (__is_nan(&value) ||
+        __jsval_to_number(&value) < __jsval_to_number(minimum) ||
+        __jsval_to_number(&value) > __jsval_to_number(maximum)) {
+      MAPLE_JS_RANGEERROR_EXCEPTION();
+    }
+    int v = floor(__jsval_to_double(&value));
+    return __number_value(v);
+  }
+  // Step 3.
+  return *fallback;
 }
 
 // ECMA-402 1.0 10.1.1.1
 // InitializeCollator(collator, locales, options)
-void InitializeCollator(__jsobject *obj, __jsvalue *locales,
+void InitializeCollator(__jsvalue *collator, __jsvalue *locales,
                         __jsvalue *options) {
   // TODO: not implemented yet.
 }
@@ -399,18 +876,247 @@ __jsvalue __jsintl_CollatorResolvedOptions(__jsvalue *this_arg,
 
 // ECMA-402 1.0 11.1.1.1
 // InitializeNumberFormat(numberFormat, locales, options)
-void InitializeNumberFormat(__jsobject *obj, __jsvalue *locales,
+void InitializeNumberFormat(__jsvalue *number_format, __jsvalue *locales,
                             __jsvalue *options) {
   // Step 1.
-  if (obj->shared.intl->initialized_intl_object == true)
-    MAPLE_JS_TYPEERROR_EXCEPTION();
+  __jsvalue prop = StrToVal("initializedIntlObject");
+  if (!__is_undefined(number_format)) {
+    __jsvalue init = __jsop_getprop(number_format, &prop);
+    if (__is_boolean(&init) && __jsval_to_boolean(&init) == true) {
+      MAPLE_JS_TYPEERROR_EXCEPTION();
+    }
+  }
   // Step 2.
-  obj->shared.intl->initialized_intl_object = true;
+  __jsvalue value = __boolean_value(true);
+  __jsop_setprop(number_format, &prop, &value);
   // Step 3.
-  //__jsvalue requested_locales = CanonicalizeLocaleList(locales);
+  __jsvalue requested_locales = CanonicalizeLocaleList(locales);
+  // Step 4.
+  __jsobject *options_obj;
+  if (__is_undefined(options)) {
+    options_obj = __js_new_obj_obj_0();
+    *options = __object_value(options_obj);
+  }
+  // Step 6.
+  __jsobject *opt_obj = __js_new_obj_obj_0();
+  __jsvalue opt = __object_value(opt_obj);
+  // Step 7.
+  __jsvalue property = StrToVal("property");
+  __jsvalue type = StrToVal("string");
+  __jsvalue values = StrVecToVal({"lookup", "best fit"});
+  __jsvalue fallback = StrToVal("best fit");
+  __jsvalue matcher = GetOption(options, &property, &type, &values, &fallback);
+  // Step 8.
+  prop = StrToVal("localeMatcher");
+  __jsop_setprop(&opt, &prop, &matcher);
+  // Step 9.
+  __jsobject *number_format_obj = __create_object();
+  number_format_obj->object_class = JSINTL;
+  number_format_obj->extensible = true;
+  number_format_obj->object_type = JSREGULAR_OBJECT;
+  __jsvalue number_format_init = __object_value(number_format_obj);
+  // TODO: any other properties to initialize?
+  // Step 10.
+  prop = StrToVal("localeData");
+  __jsvalue locale_data = __jsop_getprop(&number_format_init, &prop);
+  // Step 11.
+  prop = StrToVal("availableLocales");
+  __jsvalue available_locales = __jsop_getprop(&number_format_init, &prop);
+  prop = StrToVal("relevantExtensionKeys");
+  __jsvalue relevant_extension_keys = __jsop_getprop(&number_format_init, &prop);
+  __jsvalue r = ResolveLocale(&available_locales, &requested_locales,
+                              &opt, &relevant_extension_keys, &locale_data);
+  // Step 12.
+  prop = StrToVal("locale");
+  value = __jsop_getprop(&r, &prop);
+  __jsop_setprop(number_format, &prop, &value);
+  // Step 13.
+  prop = StrToVal("nu");
+  value = __jsop_getprop(&r, &prop);
+  prop = StrToVal("numberingSystem");
+  __jsop_setprop(number_format, &prop, &value);
+  // Step 14.
+  prop = StrToVal("dataLocale");
+  __jsvalue data_locale = __jsop_getprop(&r, &prop);
+  // Step 15.
+  property = StrToVal("style");
+  type = StrToVal("string");
+  values = StrVecToVal({"decimal", "percent", "currency"});
+  fallback = StrToVal("decimal");
+  __jsvalue s = GetOption(options, &property, &type, &values, &fallback);
+  // Step 16.
+  prop = StrToVal("style");
+  __jsop_setprop(number_format, &prop, &s);
+  // Step 17.
+  property = StrToVal("currency");
+  type = StrToVal("string");
+  values = __undefined_value();
+  fallback = __undefined_value();
+  __jsvalue c = GetOption(options, &property, &type, &values, &fallback);
+  // Step 18.
+  if (!__is_undefined(&c) && !IsWellFormedCurrencyCode(&c)) {
+    MAPLE_JS_RANGEERROR_EXCEPTION();
+  }
+  // Step 19.
+  std::string s_str = ValToStr(&s);
+  if (s_str == "currency" && __is_undefined(&c)) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
+  // Step 20.
+  __jsvalue c_digits;
+  if (s_str == "currency") {
+    // Step 20a.
+    c = __jsstr_toUpperCase(&c);
+    // Step 20b.
+    prop = StrToVal("currency");
+    __jsop_setprop(number_format, &prop, &c);
+    // Step 20c.
+    c_digits = CurrencyDigits(&c);
+  }
+  // Step 21.
+  property = StrToVal("currencyDisplay");
+  type = StrToVal("string");
+  values = StrVecToVal({"code", "symbol", "name"});
+  fallback = StrToVal("symbol");
+  __jsvalue cd = GetOption(options, &property, &type, &values, &fallback);
+  // Step 22.
+  if (s_str == "currency") {
+    prop = StrToVal("currencyDisplay");
+    __jsop_setprop(number_format, &prop, &cd);
+  }
+  // Step 23.
+  property = StrToVal("minimumIntegerDigits");
+  __jsvalue minimum = __number_value(1);
+  __jsvalue maximum = __number_value(21);
+  fallback = __number_value(1);
+  __jsvalue mnid = GetNumberOption(options, &property, &minimum, &maximum, &fallback);
+  // Step 24.
+  prop = StrToVal("minimumIntegerDigits");
+  __jsop_setprop(number_format, &prop, &mnid);
+  // Step 25.
+  __jsvalue mnfd_default;
+  if (s_str == "currency") {
+    mnfd_default = c_digits;
+  } else {
+    mnfd_default = __number_value(0);
+  }
+  // Step 26.
+  property = StrToVal("minimumFractionDigits");
+  minimum = __number_value(0);
+  maximum = __number_value(20);
+  fallback = mnfd_default;
+  __jsvalue mnfd = GetNumberOption(options, &property, &minimum, &maximum, &fallback);
+  // Step 27.
+  prop = StrToVal("minimumFractionDigits");
+  __jsop_setprop(number_format, &prop, &mnfd);
+  // Step 28.
+  __jsvalue mxfd_default;
+  if (s_str == "currency") {
+    mxfd_default = __jsmath_pt_max(&mnfd, &c_digits, 1);
+  } else if (s_str == "percent") {
+    __jsvalue zero = __number_value(0);
+    mxfd_default = __jsmath_pt_max(&mnfd, &zero, 1);
+  } else {
+    __jsvalue three = __number_value(3);
+    mxfd_default = __jsmath_pt_max(&mnfd, &three, 1);
+  }
+  // Step 29.
+  property = StrToVal("maximumFractionDigits");
+  maximum = mnfd;
+  minimum = __number_value(20);
+  fallback = mxfd_default;
+  __jsvalue mxfd = GetNumberOption(options, &property, &minimum, &maximum, &fallback);
+  // Step 30.
+  prop = StrToVal("maximumFractionDigits");
+  __jsop_setprop(number_format, &prop, &mxfd);
+  // Step 31.
+  prop = StrToVal("minimumSignificantDigits");
+  __jsvalue mnsd = __jsop_getprop(options, &prop);
+  // Step 32.
+  prop = StrToVal("maximumSignificantDigits");
+  __jsvalue mxsd = __jsop_getprop(options, &prop);
+  // Step 33.
+  if (!__is_undefined(&mnsd) || !__is_undefined(&mxsd)) {
+    // Step 33a.
+    property = StrToVal("minimumSignificantDigits");
+    minimum = __number_value(1);
+    maximum = __number_value(21);
+    fallback = __number_value(1);
+    mnsd = GetNumberOption(options, &property, &minimum, &maximum, &fallback);
+    // Step 33b.
+    property = StrToVal("maximumSignificantDigits");
+    minimum = mnsd;
+    maximum = __number_value(21);
+    fallback = __number_value(21);
+    mxsd = GetNumberOption(options, &property, &minimum, &maximum, &fallback);
+    // Step 33c.
+    prop = StrToVal("minimumSignificantDigits");
+    __jsop_setprop(number_format, &prop, &mnsd);
+    prop = StrToVal("maximumSignificantDigits");
+    __jsop_setprop(number_format, &prop, &mxsd);
+  }
+  // Step 34.
+  property = StrToVal("useGrouping");
+  type = StrToVal("boolean");
+  values = __undefined_value();
+  fallback = __boolean_value(true);
+  __jsvalue g = GetOption(options, &property, &type, &values, &fallback);
+  // Step 35.
+  prop = StrToVal("useGrouping");
+  __jsop_setprop(number_format, &prop, &g);
+  // Step 36.
+  prop = StrToVal("dataLocale");
+  __jsvalue data_locale_data;
+  if (!__is_undefined(&locale_data)) {
+    data_locale_data = __jsop_getprop(&locale_data, &prop);
+  } else {
+    data_locale_data = __undefined_value();
+  }
+  // Step 37.
+  prop = StrToVal("patterns");
+  __jsvalue patterns;
+  if (!__is_undefined(&locale_data)) {
+    patterns = __jsop_getprop(&locale_data, &prop);
+  } else {
+    patterns = __undefined_value();
+  }
+  // Step 38.
+  MAPLE_JS_ASSERT(__is_js_object(&patterns)); // TODO: failed here.
+  // Step 39.
+  prop = s;
+  __jsvalue style_patterns;
+  if (!__is_undefined(&patterns)) {
+    style_patterns = __jsop_getprop(&patterns, &prop);
+  } else {
+    style_patterns = __undefined_value();
+  }
+  // Step 40.
+  prop = StrToVal("positivePattern");
+  if (!__is_undefined(&style_patterns)) {
+    value = __jsop_getprop(&style_patterns, &prop);
+  } else {
+    value = __undefined_value();
+  }
+  __jsop_setprop(number_format, &prop, &value);
+  // Step 41.
+  prop = StrToVal("negativePattern");
+  if (!__is_undefined(&style_patterns)) {
+    value = __jsop_getprop(&style_patterns, &prop);
+  } else {
+    value = __undefined_value();
+  }
+  __jsop_setprop(number_format, &prop, &value);
+  // Step 42.
+  prop = StrToVal("boundFormat");
+  value = __undefined_value();
+  __jsop_setprop(number_format, &prop, &value);
+  // Step 43.
+  prop = StrToVal("initializedNumberFormat");
+  value = __boolean_value(true);
+  __jsop_setprop(number_format, &prop, &value);
 }
 
-// ES-402 1.0 11.1.1.1.1
+// ECMA-402 1.0 11.1.1.1
 __jsvalue CurrencyDigits(__jsvalue *currency) {
   // TODO: not implemented yet.
   return __null_value();
@@ -421,16 +1127,34 @@ __jsvalue CurrencyDigits(__jsvalue *currency) {
 __jsvalue __jsintl_NumberFormatSupportedLocalesOf(__jsvalue *this_arg,
                                                   __jsvalue *arg_list,
                                                   uint32_t nargs) {
-  // TODO: not implemented yet.
-  return __null_value();
+  __jsvalue locales = *this_arg;
+  // Step 1.
+  __jsvalue options;
+  if (nargs == 1) {
+    options = __undefined_value();
+  } else {
+    options = arg_list[1];
+  }
+  // Step 2.
+  __jsvalue available_locales; // TODO: initial value of "availableLocales" of Intl.DataTimeFormat.
+  // Step 3.
+  __jsvalue requested_locales = CanonicalizeLocaleList(&locales);
+  // Step 4.
+  return SupportedLocales(&available_locales, &requested_locales, &options);
 }
 
 // ECMA-402 1.0 11.3.2
 // Intl.NumberFormat.prototype.format
-__jsvalue __jsintl_NumberFormatFormat(__jsvalue *this_arg, __jsvalue *arg_list,
+__jsvalue __jsintl_NumberFormatFormat(__jsvalue *number_format, __jsvalue *arg_list,
                                       uint32_t nargs) {
-  // TODO: not implemented yet.
-  return __null_value();
+  // Step 1.
+  __jsvalue prop = StrToVal("boundFormat");
+  __jsvalue bound_format = __jsop_getprop(number_format, &prop);
+  if (__is_undefined(&bound_format)) {
+    // Step 1a.
+    // TODO
+  }
+  return __jsop_getprop(number_format, &prop);
 }
 
 // ECMA-402 1.0 11.3.3
@@ -444,9 +1168,202 @@ __jsvalue __jsintl_NumberFormatResolvedOptions(__jsvalue *this_arg,
 
 // ECMA-402 1.0 12.1.1.1
 // InitializeDateTimeFormat(dateTimeFormat, locales, options)
-void InitializeDateTimeFormat(__jsobject *obj, __jsvalue *locales,
+void InitializeDateTimeFormat(__jsvalue *date_time_format, __jsvalue *locales,
                               __jsvalue *options) {
-  // TODO: not implemented yet.
+  // Step 1.
+  __jsvalue prop = StrToVal("initializedIntlObject");
+  if (!__is_undefined(date_time_format)) {
+    __jsvalue init = __jsop_getprop(date_time_format, &prop);
+    if (__is_boolean(&init) && __jsval_to_boolean(&init) == true) {
+      MAPLE_JS_TYPEERROR_EXCEPTION();
+    }
+  }
+  // Step 2.
+  __jsvalue value = __boolean_value(true);
+  __jsop_setprop(date_time_format, &prop, &value);
+  // Step 3.
+  __jsvalue requested_locales = CanonicalizeLocaleList(locales);
+  // Step 4.
+  __jsvalue required = StrToVal("any");
+  __jsvalue default_val = StrToVal("date");
+  *options = ToDateTimeOptions(options, &required, &default_val);
+  // Step 5.
+  __jsobject *opt_obj = __js_new_obj_obj_0();
+  __jsvalue opt = __object_value(opt_obj);
+  // Step 6.
+  __jsvalue property = StrToVal("localMatcher");
+  __jsvalue type = StrToVal("string");
+  __jsvalue values = StrVecToVal({"lookup", "best fit"});
+  __jsvalue fallback = StrToVal("best fit");
+  __jsvalue matcher = GetOption(options, &property, &type, &values, &fallback);
+  // Step 7.
+  prop = StrToVal("localeMatcher");
+  __jsop_setprop(&opt, &prop, &matcher);
+  // Step 8.
+  __jsvalue date_time_format_init; // TODO
+  // Step 9.
+  prop = StrToVal("localeData");
+  __jsvalue locale_data = __jsop_getprop(&date_time_format_init, &prop);
+  // Step 10.
+  prop = StrToVal("availableLocales");
+  __jsvalue available_locales = __jsop_getprop(&date_time_format_init, &prop);
+  prop = StrToVal("relevantExtensionKeys");
+  __jsvalue relevant_extension_keys = __jsop_getprop(&date_time_format_init, &prop);
+  __jsvalue r = ResolveLocale(&available_locales, &requested_locales,
+                              &opt, &relevant_extension_keys, &locale_data);
+  // Step 11.
+  prop = StrToVal("dateTimeFormat");
+  value = __jsop_getprop(&r, &prop);
+  __jsop_setprop(date_time_format, &prop, &value);
+  // Step 12.
+  prop = StrToVal("ca");
+  value = __jsop_getprop(&r, &prop);
+  prop = StrToVal("calendar");
+  __jsop_setprop(date_time_format, &prop, &value);
+  // Step 13.
+  prop = StrToVal("nu");
+  value = __jsop_getprop(&r, &prop);
+  prop = StrToVal("numberingSystem");
+  __jsop_setprop(date_time_format, &prop, &value);
+  // Step 14.
+  prop = StrToVal("dataLocale");
+  __jsvalue data_locale = __jsop_getprop(&r, &prop);
+  // Step 15.
+  prop = StrToVal("timeZone");
+  __jsvalue tz = __jsop_getprop(options, &prop);
+  // Step 16.
+  if (!__is_undefined(&tz)) {
+    // Step 16a.
+    std::string tz_str = ValToStr(&tz);
+    // Step 16b.
+    std::transform(tz_str.begin(), tz_str.end(), tz_str.begin(), ::toupper);
+    if (tz_str != "UTC") {
+      MAPLE_JS_RANGEERROR_EXCEPTION();
+    }
+  }
+  // Step 17.
+  prop = StrToVal("timeZone");
+  __jsop_setprop(date_time_format, &prop, &tz);
+  // Step 18.
+  opt_obj = __js_new_obj_obj_0();
+  opt = __object_value(opt_obj);
+  // Step 19.
+  auto it = kDateTimeFormatComponents.begin();
+  while (it != kDateTimeFormatComponents.end()) {
+    // Step 19a.
+    std::string p = it->first;
+    prop = StrToVal(p);
+    // Step 19b.
+    std::vector<std::string> v = it->second;
+    __jsvalue type = StrToVal("string");
+    __jsvalue values = StrVecToVal(v);
+    __jsvalue fallback = __undefined_value();
+    value = GetOption(options, &prop, &type, &values, &fallback);
+    // Step 19c.
+    __jsop_setprop(&opt, &prop, &value);
+  }
+  // Step 20.
+  prop = StrToVal("dataLocale");
+  __jsvalue data_locale_data = __jsop_getprop(&locale_data, &prop);
+  // Step 21.
+  prop = StrToVal("formats");
+  __jsvalue formats = __jsop_getprop(&data_locale_data, &prop);
+  // Step 22.
+  property = StrToVal("formatMatcher");
+  type = StrToVal("string");
+  values = StrVecToVal({"basic", "best fit"});
+  fallback = StrToVal("best fit");
+  matcher = GetOption(options, &property, &type, &values, &fallback);
+  // Step 23.
+  std::string matcher_str = ValToStr(&matcher);
+  __jsvalue best_format;
+  if (matcher_str == "basic") {
+    // Step 23a.
+    best_format = BasicFormatMatcher(&opt, &formats);
+  } else {
+    // Step 24.
+    best_format = BestFitFormatMatcher(&opt, &formats);
+  }
+  // Step 25.
+  it = kDateTimeFormatComponents.begin();
+  while (it != kDateTimeFormatComponents.end()) {
+    // Step 25a.
+    std::string p = it->first;
+    prop = StrToVal(p);
+    // Step 25b.
+    __jsvalue p_desc = __jsobj_getOwnPropertyNames(&best_format, &prop);
+    // Step 25c.
+    if (!__is_undefined(&p_desc)) {
+      // Step 25c i.
+      __jsvalue p = __jsop_getprop(&best_format, &prop);
+      // Step 25c ii.
+      __jsop_setprop(date_time_format, &prop, &p);
+    }
+  }
+  // Step 26.
+  property = StrToVal("hour12");
+  type = StrToVal("boolean");
+  values = __undefined_value();
+  fallback = __undefined_value();
+  __jsvalue hr12 = GetOption(options, &property, &type, &values, &fallback);
+  // Step 27.
+  prop = StrToVal("hour");
+  value = __jsop_getprop(date_time_format, &prop);
+  __jsvalue pattern;
+  if (!__is_null_or_undefined(&value)) {
+    // Step 27a.
+    if (__is_undefined(&hr12)) {
+      prop = StrToVal("hour12");
+      hr12 = __jsop_getprop(&data_locale_data, &prop);
+    }
+    // Step 27b.
+    __jsop_setprop(date_time_format, &prop, &hr12);
+    // Step 27c.
+    if (__jsval_to_boolean(&hr12) == true) {
+      // Step 27c i.
+      prop = StrToVal("hourNo0");
+      __jsvalue hour_no_0 = __jsop_getprop(&data_locale_data, &prop);
+      // Step 27c ii.
+      __jsop_setprop(date_time_format, &prop, &hour_no_0);
+      // Step 27c iii.
+      prop = StrToVal("pattern12");
+      pattern = __jsop_getprop(&best_format, &prop);
+    } else {
+      prop = StrToVal("pattern");
+      pattern = __jsop_getprop(&best_format, &prop);
+    }
+  } else {
+    // Step 28.
+    prop = StrToVal("pattern");
+    pattern = __jsop_getprop(&best_format, &prop);
+  }
+  // Step 29.
+  __jsop_setprop(date_time_format, &prop, &pattern);
+  // Step 30.
+  prop = StrToVal("boundFormat");
+  value = __undefined_value();
+  __jsop_setprop(date_time_format, &prop, &value);
+  // Step 31.
+  prop = StrToVal("initializedDateTimeFormat");
+  value = __boolean_value(true);
+  __jsop_setprop(date_time_format, &prop, &value);
+}
+
+// ECMA-402 1.0 12.1.1.1
+__jsvalue ToDateTimeOptions(__jsvalue *options, __jsvalue *required, __jsvalue *defaults) {
+  // TODO
+  return __null_value();
+}
+
+// ECMA-402 1.0 12.1.1.1
+__jsvalue BasicFormatMatcher(__jsvalue *options, __jsvalue *formats) {
+  // TODO
+  return __null_value();
+}
+
+__jsvalue BestFitFormatMatcher(__jsvalue *options, __jsvalue *formats) {
+  // TODO
+  return __null_value();
 }
 
 // ECMA-402 1.0 12.2.2
@@ -471,6 +1388,13 @@ __jsvalue __jsintl_DateTimeFormatFormat(__jsvalue *this_arg,
 __jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *this_arg,
                                                  __jsvalue *arg_list,
                                                  uint32_t nargs) {
+  // TODO: not implemented yet.
+  return __null_value();
+}
+
+// ECMA-402 6,2,4
+// DefaultLocale()
+__jsvalue DefaultLocale() {
   // TODO: not implemented yet.
   return __null_value();
 }

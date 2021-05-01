@@ -20,6 +20,8 @@
 #include "jsfunction.h"
 #include "jscontext.h"
 #include "jsintl.h"
+#include <map>
+#include <string>
 
 #define JSPROP_HAS_GET 0x01
 #define JSPROP_HAS_SET 0x02
@@ -86,11 +88,16 @@ struct __attribute__((packed)) __jsprop_desc {
   };
 };
 
+#define USE_PROP_MAP 1
+
 struct __attribute__((packed)) __jsprop {
   union {
     uint32_t index; // the jsprop can be a integer
     __jsstring *name;
   }n;
+#ifdef USE_PROP_MAP
+  struct __jsprop *prev;
+#endif
   struct __jsprop *next;
   __jsprop_desc desc;
   bool isIndex;
@@ -151,6 +158,10 @@ struct __jsobject {
   // General properties' list.
   // Includes named data or accessor properties as ecma defined.
   __jsprop *prop_list;
+#ifdef USE_PROP_MAP
+  std::map<uint32_t, __jsprop *> *prop_index_map;
+  std::map<std::wstring, __jsprop *> *prop_string_map;
+#endif
   // The prototype of this object.
   // Use id iff proto_is_builtin is true.
   union {
@@ -196,16 +207,22 @@ struct __jsobject {
   } shared;
 };
 
-static inline void InitProp(__jsprop *prop, __jsprop *nextProp,  __jsprop_desc propDesc, uint32_t index) {
+static inline void InitProp(__jsprop *prop, __jsprop_desc propDesc, uint32_t index) {
   prop->isIndex = true;
-  prop->next = nextProp;
+#ifdef USE_PROP_MAP
+  prop->prev = nullptr;
+#endif
+  prop->next = nullptr;
   prop->desc = propDesc;
   prop->n.index = index;
 }
 
-static inline void InitProp(__jsprop *prop, __jsprop *nextProp,  __jsprop_desc propDesc, __jsstring *name) {
+static inline void InitProp(__jsprop *prop, __jsprop_desc propDesc, __jsstring *name) {
   prop->isIndex = false;
-  prop->next = nextProp;
+#ifdef USE_PROP_MAP
+  prop->prev = nullptr;
+#endif
+  prop->next = nullptr;
   prop->desc = propDesc;
   prop->n.name = name;
 }

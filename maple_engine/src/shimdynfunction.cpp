@@ -24,7 +24,7 @@
 #include "jstycnv.h"
 #include "jsiter.h"
 #include "ccall.h"
-#include <string.h>
+#include <string>
 #include "jsarray.h"
 #include "jsregexp.h"
 #include "jsdate.h"

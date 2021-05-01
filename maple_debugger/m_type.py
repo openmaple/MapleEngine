@@ -29,7 +29,7 @@ from m_util import gdb_print
 
 class MapleTypeCmd(gdb.Command):
     """print a matching class and its inheritance hierarchy by a given search expression
-    mtype: given a regex, searches and prints all matching class names if multiple are found, 
+    mtype: given a regex, searches and prints all matching class names if multiple are found,
     or print detailed information of class inheritance hierarchy if a single match is found
     mtype <regular-express>: e.g. mtype _2Fjava
     """
@@ -46,7 +46,7 @@ class MapleTypeCmd(gdb.Command):
 
 
     def usage(self):
-        gdb_print("mtype <regex of a mangled Maple class name>")
+        gdb_print("mtype <regex of a mangled Maple class name or a property name>")
 
 
     def mtype_func(self, args, from_tty):
@@ -55,8 +55,41 @@ class MapleTypeCmd(gdb.Command):
             self.usage()
             return
 
+        is_dync, frame = m_frame.is_closest_older_maple_frame_dync()
+        if not is_dync:
+            return self.mtype_func_static(s[0])
+        else:
+            return self.mtype_func_dync(s[0])
+
+    def mtype_func_dync(self, regex):
+        data = m_info.get_all_dync_properties_data()
+        if not data or len(data) == 0:
+            gdb_print("property data not ready yet")
+            return
+
+        reg = r"(%s)+" % regex
+        try:
+            pattern = re.compile(reg)
+        except:
+            return
+
+        index = 1
+        for element in data:
+            m = pattern.search(element['name'])
+            if not m:
+                continue
+            else:
+                buf = "#" + str(index) + " " + MColors.TP_CNAME + "property name=" + MColors.ENDC + MColors.TP_STR_V + element['name'] + MColors.ENDC \
+                      + MColors.TP_ANAME + ", node addr=" + MColors.ENDC + MColors.TP_STR_V + element['node_addr'] + MColors.ENDC \
+                      + MColors.TP_ANAME + ", tag=" + MColors.ENDC + MColors.TP_STR_V + element['tag'] + MColors.ENDC \
+                      + MColors.TP_ANAME + ", value=" + MColors.ENDC + MColors.TP_STR_V + element['value'] + MColors.ENDC
+                gdb_print(buf)
+            index += 1
+
+
+    def mtype_func_static(self, regex):
         # create a re.recompile pattern
-        reg = r"(%s)+" % s[0]
+        reg = r"(%s)+" % regex
         pattern = re.compile(reg)
 
         # class_list is a sorted list that contains class names
@@ -175,7 +208,10 @@ def search_display_symbol_list(sym_regexp, indent, print_prefix, asm_path_list):
 
     # create a re.recompile pattern
     reg = r"(%s)+" % sym_regexp
-    pattern = re.compile(reg)
+    try:
+        pattern = re.compile(reg)
+    except:
+        return 0, None, None
 
     count = 0
     last_matching_symbol_name = None
@@ -185,25 +221,34 @@ def search_display_symbol_list(sym_regexp, indent, print_prefix, asm_path_list):
         # asm_symbol_list is a sorted list contains all the symbols from asm_path
         asm_symbol_list = m_datastore.mgdb_rdata.get_mirbin_cache_symbol_list(asm_path)
         if m_debug.Debug: m_debug.dbg_print("asm=", asm_path, ", len(asm_symbol_list)=", len(asm_symbol_list))
-        for symbol_name in asm_symbol_list:
+        # !!! element in asm_symbol_list all contain '_mirbin_info' suffix, need to remove it before the pattern search
+        asm_symbol_list_trim = [e[:-12] for e in asm_symbol_list]
+        if m_debug.Debug: m_debug.dbg_print("asm=", asm_path, ", len(asm_symbol_list_trim)=", len(asm_symbol_list_trim))
+        for symbol_name in asm_symbol_list_trim:
             m = pattern.search(symbol_name)
             if not m:
                 continue
             count += 1
             indent_str = ' ' * indent
             if print_prefix:
-                buffer = '{}#{} {}: {}'.format(indent_str, count, print_prefix, m_util.color_symbol(MColors.SP_SNAME, symbol_name[:-12]))
+                buffer = '{}#{} {}: {}'.format(indent_str, count, print_prefix, m_util.color_symbol(MColors.SP_SNAME, symbol_name))
             else:
-                buffer = '{}#{} {}'.format(indent_str, count, m_util.color_symbol(MColors.TP_MNAME, symbol_name[:-12]))
+                buffer = '{}#{} {}'.format(indent_str, count, m_util.color_symbol(MColors.TP_MNAME, symbol_name))
             gdb_print(buffer)
             last_matching_symbol_name = symbol_name
             last_matching_symbol_path = asm_path
 
     return count, last_matching_symbol_name, last_matching_symbol_path
 
-def display_symbol_detail(symbol_name, symbol_asm_path):
-    if m_debug.Debug: m_debug.dbg_print("symbol_asm_path=", symbol_asm_path, "symbol_name=", symbol_name)
-    if not symbol_name or not symbol_asm_path:
+def display_symbol_detail(short_symbol_name, symbol_asm_path):
+    '''
+    Input:
+        short_symbol_name: short symbol name, e.g Add_5453f871. The real symbol name used for search
+                           in Add_5453f871_mirbin_info. String
+        symbol_asm_path; the assembly file name to search the symbol
+    '''
+    if m_debug.Debug: m_debug.dbg_print("symbol_asm_path=", symbol_asm_path, "short_symbol_name=", short_symbol_name)
+    if not short_symbol_name or not symbol_asm_path:
         return
 
     frame = m_frame.get_selected_frame()
@@ -213,6 +258,8 @@ def display_symbol_detail(symbol_name, symbol_asm_path):
     if m_frame.is_maple_frame_dync(frame):
         is_dync = True
 
+    # short_symbol_name does not contain suffix "_mirbin_info" which is the element name cached in m_datastore
+    symbol_name = short_symbol_name + "_mirbin_info"
     data = m_datastore.mgdb_rdata.get_one_label_mirbin_info_cache(symbol_asm_path,symbol_name)
     if is_dync == True:
         d = m_asm.lookup_src_file_info_dync(symbol_asm_path, symbol_name, "0000")
@@ -240,12 +287,17 @@ def display_symbol_detail(symbol_name, symbol_asm_path):
     if is_dync == True:
         return
     else:
-        gdb_print("demangled name: " + m_symbol.get_demangled_maple_symbol(m_util.color_symbol(MColors.SP_SNAME, symbol_name[:-12])))
+        demangled_name = m_symbol.get_demangled_maple_symbol(short_symbol_name)
+        if not demangled_name:
+            gdb_print("demangled name: " + m_util.color_symbol(MColors.SP_SNAME, short_symbol_name))
+        else:
+            #gdb_print("demangled name: " + m_symbol.get_demangled_maple_symbol(m_util.color_symbol(MColors.SP_SNAME, symbol_name)))
+            gdb_print("demangled name: " + m_util.color_symbol(MColors.SP_SNAME, demangled_name))
 
 
 class MapleSymbolCmd(gdb.Command):
     """print a matching symbol list or it's detailed infomation
-    msymbol: given a regex, searches and prints all matching symbol names if multiple are found, 
+    msymbol: given a regex, searches and prints all matching symbol names if multiple are found,
     or print detailed information of the symbol if a single match is found
     msymbol <regular-express>: e.g. msymbol sun.*executor
     """
