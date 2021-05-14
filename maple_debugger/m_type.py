@@ -79,10 +79,18 @@ class MapleTypeCmd(gdb.Command):
             if not m:
                 continue
             else:
+                if type(element['value']) == dict:
+                    value_items = element['value'].items()
+                    value_buf = "{"
+                    for item in value_items:
+                        value_buf += MColors.MP_ANAME + item[0] + MColors.ENDC + ": " + MColors.TP_STR_V + item[1] + MColors.ENDC + ", "
+                    value_buf = value_buf[:-2] + "}"
+                else:
+                    value_buf = MColors.TP_STR_V + str(element['value']) + MColors.ENDC
                 buf = "#" + str(index) + " " + MColors.TP_CNAME + "property name=" + MColors.ENDC + MColors.TP_STR_V + element['name'] + MColors.ENDC \
                       + MColors.TP_ANAME + ", node addr=" + MColors.ENDC + MColors.TP_STR_V + element['node_addr'] + MColors.ENDC \
                       + MColors.TP_ANAME + ", tag=" + MColors.ENDC + MColors.TP_STR_V + element['tag'] + MColors.ENDC \
-                      + MColors.TP_ANAME + ", value=" + MColors.ENDC + MColors.TP_STR_V + element['value'] + MColors.ENDC
+                      + MColors.TP_ANAME + ", value=" + MColors.ENDC + value_buf
                 gdb_print(buf)
             index += 1
 

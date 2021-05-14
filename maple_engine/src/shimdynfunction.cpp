@@ -139,6 +139,11 @@ void InterSource::EmulateStore(uint8_t *memory, MValue mval, PrimType pty) {
 void InterSource::EmulateStoreGC(uint8_t *memory, MValue mval, PrimType pty) {
   if (pty == PTY_simpleobj || pty == PTY_simplestr) {
     GCUpdateRf((void *)(*(uint64_t *)memory), mval.x.a64);
+    if (*memory != 0) {
+      MemHeader *header = (MemHeader *)(((uint64_t)(*(uint64_t *)memory)) - 4L);
+      if (header->refcount == 1)
+        GCDecRf((void *)(*(uint64_t *)memory));
+    }
     *(uint64_t *)memory = mval.x.u64;
     return;
   }
@@ -1811,8 +1816,14 @@ MValue InterSource::JSString(MValue &mv) {
 
 MValue InterSource::JSopLength(MValue &mv) {
   __jsvalue v0 = MValueToJsval(mv);
-  __jsobject *obj = __js_ToObject(&v0);
-  return JsvalToMValue(__jsobj_helper_get_length_value(obj));
+  if (__jsval_typeof(&v0) == JSTYPE_STRING) {
+    __jsstring *primstring = __js_ToString(&v0);
+    __jsvalue length_value = __number_value(__jsstr_get_length(primstring));
+    return JsvalToMValue(length_value);
+  } else {
+    __jsobject *obj = __js_ToObject(&v0);
+    return JsvalToMValue(__jsobj_helper_get_length_value(obj));
+  }
 }
 
 MValue InterSource::JSopThis() {

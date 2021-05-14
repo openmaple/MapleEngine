@@ -17,7 +17,7 @@
 #define MAPLEVM_INCLUDE_VM_VMCONFIG_H_
 
 #ifdef TEST_BENCHMARK
-#define APP_MEMORY_SIZE (8 * 1024 * 1024)       // 8M application memory
+#define APP_MEMORY_SIZE (12 * 1024 * 1024)       // 12M application memory
 // make sure VM_MEMORY_SIZE == VM_MEMORY_BIG_SIZE + VM_MEMORY_SMALL_SIZE
 #define VM_MEMORY_BIG_SIZE (4 * 1024 * 1024)    // 4M
 #define VM_MEMORY_SMALL_SIZE (2 * 1024 * 1024)  // 2M

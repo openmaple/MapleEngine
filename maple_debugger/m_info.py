@@ -863,7 +863,10 @@ def get_current_thisbinding():
         for __js_ThisBinding object, return its type and co-responding index, or None if type is not valid
     '''
     cmd = "p __js_ThisBinding"
-    buf = m_util.gdb_exec_to_str(cmd)
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None, None
     # example of output: $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
     buf = buf.rstrip()
 
@@ -883,7 +886,10 @@ def get_realAddr_by_index(index):
     '''
 
     cmd = "p memory_manager->GetRealAddr(" + str(index) + ")"
-    buf = m_util.gdb_exec_to_str(cmd)
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None
     # example of a command to issue "p memory_manager->GetRealAddr(1)"
     buf = buf.rstrip()
     # example of returning output: "$39 = (void *) 0x7ffff63d4014"
@@ -923,8 +929,11 @@ def get_obj_prop_list_head(addr):
     # 2. when prop_list is available, we should get the list and traverse the prop list
     #    $85 = {prop_list = 0x7ffff63d4178, prototype = {obj = 0x2, id = JSBUILTIN_OBJECTPROTOTYPE}, extensible = 1 '\001', object_class = JSGLOBAL, object_type = 0 '\000'    #    , is_builtin = 1 '\001', proto_is_builtin = 1 '\001', builtin_id = JSBUILTIN_GLOBALOBJECT, shared = {fast_props = 0x0, array_props = 0x0, fun = 0x0,
     #    prim_string = 0x0, prim_regexp = 0x0, prim_number = 0, prim_bool = 0, arr = 0x0, primDouble = 0}}
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None
 
-    buf = m_util.gdb_exec_to_str(cmd)
     buf = buf.rstrip()
     if m_debug.Debug: m_debug.dbg_print("get_obj_prop_list_head buf = ", buf)
 
@@ -962,7 +971,11 @@ def get_ascii_utf_string_value(start_addr, length, stype):
     addr = start_addr
     for i in range(length):
         cmd = "x/1hx " + hex(addr) if stype == 'utf16' else "x/1bx " + hex(addr)
-        buf = m_util.gdb_exec_to_str(cmd)
+        try:
+            buf = m_util.gdb_exec_to_str(cmd)
+        except:
+            return None
+
         if hex(addr) not in buf:
             return None
         c = buf.split()[1]
@@ -992,7 +1005,10 @@ def get_js_string_value(addr):
     '''
     # input example: 0x55555576d1a8
     cmd = "p *(__jsstring *)" + str(addr)
-    buf = m_util.gdb_exec_to_str(cmd)
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None
     buf = buf.rstrip()
     if buf[0] != '$' or 'length = ' not in buf or 'ascii = ' not in buf:
         return None
@@ -1036,6 +1052,53 @@ def get_string_value_from_index(index):
         return None
     return get_js_string_value(addr)
 
+def get_jsobject_value_from_index(index):
+    addr = get_realAddr_by_index(str(index))
+    if not addr:
+        return None
+
+    cmd = "p *(__jsobject *)" + str(addr)
+    if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None
+    buf = buf.rstrip()
+    if m_debug.Debug: m_debug.dbg_print("cmd ", cmd, " returns buf=", buf)
+    ### (gdb) p *(__jsobject *)0x7ffff5859a58
+    ### $138 = {prop_list = 0x7ffff5859a9c, prop_index_map = 0x555555770c60, prop_string_map = 0x555555770d20, prototype = {obj = 0x2,
+    ### id = __jsbuiltin_object_id::JSBUILTIN_OBJECTPROTOTYPE}, extensible = 1 '\001', object_class = __jsobj_class::JSARGUMENTS, object_type = 2 '\002',
+    ### is_builtin = 0 '\000', proto_is_builtin = 1 '\001', builtin_id = __jsbuiltin_object_id::JSBUILTIN_GLOBALOBJECT, shared = {fast_props = 0x0, array_props = 0x0,
+    ## fun = 0x0, intl = 0x0, prim_string = 0x0, prim_number = 0, prim_bool = 0, arr = 0x0, primDouble = 0}}
+    v = {}
+    if buf[0] != '$' or '{prop_list = ' not in buf or 'shared = {' not in buf: #sanity check
+        return None
+    prop_list_addr = buf.split("prop_list = ")[1].split(",")[0]
+    prop_index_map_addr = buf.split("prop_index_map = ")[1].split(",")[0]
+    prop_string_map_addr = buf.split("prop_string_map = ")[1].split(",")[0]
+    prototype_union = buf.split("prototype = {")[1].split("}")[0]
+    extensible = buf.split("extensible = ")[1].split(",")[0]
+    object_class = buf.split("object_class = ")[1].split(",")[0]
+    object_type = buf.split("object_type = ")[1].split(",")[0]
+    is_builtin = buf.split("is_builtin = ")[1].split(",")[0]
+    proto_is_builtin = buf.split("proto_is_builtin = ")[1].split(",")[0]
+    builtin_id = buf.split("builtin_id = ")[1].split(",")[0]
+    shared_union = buf.split("shared = {")[1].split("}")[0]
+    v['prop_list'] = prop_list_addr
+    v['prop_index_map'] = prop_index_map_addr
+    v['prop_string_map'] = prop_string_map_addr
+    v['prototype'] = prototype_union
+    v['extensible'] = extensible
+    v['object_class'] = object_class
+    v['object_type'] = object_type
+    v['is_builtin'] = is_builtin
+    v['proto_is_builtin'] = proto_is_builtin
+    v['builtin_id'] = builtin_id
+    v['shared'] = shared_union
+
+    return v
+
+
 def get_prop_list_node_data(node_addr):
     '''
     input: node_addr is the address of node, a pointer value to 'struct __jsprop'
@@ -1054,14 +1117,17 @@ def get_prop_list_node_data(node_addr):
 
     cmd = "p *(struct __jsprop *)" + node_addr
     if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
-    buf = m_util.gdb_exec_to_str(cmd)
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None
     buf = buf.rstrip()
     if m_debug.Debug: m_debug.dbg_print("get_prop_list_data buf=", buf)
 
     # example of output:
     # "$86 = {n = {index = 1433850280, name = 0x55555576d1a8}, next = 0x0, desc = {{named_data_property = {value = {asbits = 34359738368, s = {payload = {i32 = 0,u32 = 0, boo = 0, str = 0, obj = 0, ptr = 0}, tag = JSTYPE_UNDEFINED}}}, named_accessor_property = {get = 0x800000000, set = 0x0}}, {s = {attr_writable = 3 '\003', attr_enumerable = 3 '\003', attr_configurable = 2 '\002', fields = 0 '\000'}, attrs = 131843}}, isIndex = false}"
     if buf[0] != '$' or 'next = ' not in buf or 'desc = ' not in buf:
-        return data
+        return None
     prop_next = buf.split("next = ")[1].split(',')[0]
     prop_name_addr = buf.split("name = ")[1].split(',')[0][:-1]
     tag = buf.split("tag = ")[1].split('}}}')[0]
@@ -1069,6 +1135,8 @@ def get_prop_list_node_data(node_addr):
     if m_debug.Debug: m_debug.dbg_print("prop_next=", prop_next, "prop_name_addr=", prop_name_addr, "tag=", tag)
     name = get_js_string_value(prop_name_addr)
     if m_debug.Debug: m_debug.dbg_print("name=", name)
+    if not name:
+        return None
     element = {}
     element['tag'] = tag
     element['name'] = name
@@ -1089,6 +1157,13 @@ def get_prop_list_node_data(node_addr):
         index = buf.split('str = ')[1].split(',')[0]
         str_v = get_string_value_from_index(index)
         element['value'] = str_v
+    elif tag == 'JSTYPE_OBJECT':
+        index = buf.split('obj = ')[1].split(',')[0]
+        object_data = get_jsobject_value_from_index(index)
+        if not object_data or len(object_data) == 0:
+            element["value"] = ""
+        else:
+            element["value"] = object_data
     else:
         element['value'] = ""
 
@@ -1116,7 +1191,7 @@ def get_prop_list_data(prop_list_head):
     node_addr = prop_list_head
     while True:
         element = get_prop_list_node_data(node_addr)
-        if len(element) == 0:
+        if not element or len(element) == 0:
             return data
         data.append(element)
         try:
@@ -1164,7 +1239,10 @@ def get_current_intersource_fp_addr():
     Get current stack frame's gInterSource FP Address
     '''
     cmd = "p gInterSource->GetFPAddr()"
-    buf = m_util.gdb_exec_to_str(cmd)
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return
     buf = buf.rstrip()
     if buf[0] != '$' or ' = ' not in buf:
         return None
@@ -1190,7 +1268,10 @@ def get_current_js_func_formals(formals_num):
     for i in range(formals_num):
         addr = int(fpaddr,16) + 8 * (i+1)
         cmd = "x/1x " + hex(addr)
-        buf = gdb.execute(cmd, to_string = True)
+        try:
+            buf = gdb.execute(cmd, to_string = True)
+        except:
+            return None, None
         buf = buf.rstrip()
         if "Cannot access memory at address" in buf or "No symbol" in buf:
             return None,None
@@ -1217,7 +1298,10 @@ def get_current_js_func_locals(locals_num):
     for i in range(locals_num):
         addr = int(fpaddr, 16) - ( 8 + 8 * (i + 1))
         cmd = "x/x " + hex(addr)
-        buf = m_util.gdb_exec_to_str(cmd)
+        try:
+            buf = m_util.gdb_exec_to_str(cmd)
+        except:
+            return None, None
         buf = buf.rstrip()
         if "Cannot access memory at address" in buf or "No symbol" in buf:
             return None, None
@@ -1304,5 +1388,7 @@ def get_jstype_value_by_addr(addr):
     elif maple_type == "JSTYPE_STRING":
         ret_str = get_string_value_from_index(v)
         return  maple_type, ret_str
+    elif maple_type == "JSTYPE_OBJECT":
+        return maple_type, None
     else:
         return None, None

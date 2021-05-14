@@ -702,7 +702,27 @@ property name    : v1
   parent         : Global Object
 ```
 
+#### 3. Syntax: mprint <node hex address of an internal JS Object>
+This syntax displays a JavaScript program's property contents via a specified JS object property node address in memory
+
+Example:
+```
+(gdb) mprint 0x7ffff585a2d4
+0x7ffff585a2d4: arguments
+  tag         : JSTYPE_OBJECT
+  value       : prop_list = 0x7ffff585a204, prop_index_map = 0x55555576edb0, prop_string_map = 0x55555576ee70
+                extensible = 1 '\001', object_class = __jsobj_class::JSARGUMENTS, object_type = 2 '\002', is_builtin = 0 '\000'
+                proto_is_builtin = 1 '\001', builtin_id = __jsbuiltin_object_id::JSBUILTIN_GLOBALOBJECT
+                prototype = {obj = 0x2, id = __jsbuiltin_object_id::JSBUILTIN_OBJECTPROTOTYPE}
+                shared = {fast_props = 0x0, array_props = 0x0, fun = 0x0, intl = 0x0, prim_string = 0x0, prim_number = 0, prim_bool = 0, arr = 0x0, primDouble = 0}
+  node addr   : 140737312563924
+  next addr   : 0x0
+  parent      : Global Object
+```
+
 ### mtype command
+This command is used to display a JavaScript property contents via a regular expression search pattern
+
 **_syntax_**: mtype <regex-of-a-property-name-search-pattern>
 
 #### 1. If only one matches
@@ -724,9 +744,12 @@ Example:
 (gdb) mtype $
 #1 property name=Add, node addr=0x7ffff5867048, tag=JSTYPE_UNDEFINED, value=undefined
 #2 property name=v1, node addr=0x7ffff586719c, tag=JSTYPE_NUMBER, value=3
+#3 property name=arguments, node addr=0x7ffff585a2d4, tag=JSTYPE_OBJECT, value={prop_list: 0x7ffff585a204, prop_index_map: 0x55555576edb0, prop_string_map: 0x55555576ee70, prototype: obj = 0x2, id = __jsbuiltin_object_id::JSBUILTIN_OBJECTPROTOTYPE, extensible: 1 '\001', object_class: __jsobj_class::JSARGUMENTS, object_type: 2 '\002', is_builtin: 0 '\000', proto_is_builtin: 1 '\001', builtin_id: __jsbuiltin_object_id::JSBUILTIN_GLOBALOBJECT, shared: fast_props = 0x0, array_props = 0x0, fun = 0x0, intl = 0x0, prim_string = 0x0, prim_number = 0, prim_bool = 0, arr = 0x0, primDouble = 0}
 ```
 
 ### msymbol command
+This command is used to display JavaScript function symbols via a regular expression search pattern
+
 **_syntax_**: msymbol <regex-of-symbol-name-search-pattern>
 
 #### 1. If only one matches

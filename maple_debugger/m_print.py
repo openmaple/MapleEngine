@@ -57,8 +57,7 @@ class MaplePrintCmd(gdb.Command):
             # if variable: x[0] must not be a number character
             if not x[0][0].isdigit(): # x[0] is a variable
                 ### mprint <variable> is only supported for dyncmic language frames
-                self.mprint_func_dync_by_property_name(x[0])
-                return
+                return self.mprint_func_dync_by_property_name(x[0])
             else:
                 try:
                     addr = int(x[0],16)
@@ -580,8 +579,27 @@ class MaplePrintCmd(gdb.Command):
             gdb_print(buf)
             buf = MColors.MP_FSYNTAX + "  tag            : " + MColors.ENDC + MColors.MP_STR_V + match[0]['tag'] + MColors.ENDC
             gdb_print(buf)
-            buf = MColors.MP_FSYNTAX + "  value          : " + MColors.ENDC + MColors.MP_STR_V + match[0]['value'] + MColors.ENDC
+            if match[0]['tag'] == 'JSTYPE_OBJECT':
+                buf = MColors.MP_FSYNTAX + "  value          : " + MColors.ENDC\
+                      + MColors.MP_ANAME + "prop_list" + MColors.ENDC + " = " +  MColors.MP_STR_V + match[0]['value']['prop_list'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "prop_index_map" + MColors.ENDC + " = " + MColors.MP_STR_V + match[0]['value']['prop_index_map'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "prop_string_map" + MColors.ENDC + " = " + MColors.MP_STR_V + match[0]['value']['prop_string_map'] + MColors.ENDC + "\n"\
+                      + "                   "\
+                      + MColors.MP_ANAME + "extensible" + MColors.ENDC + " = " + MColors.MP_STR_V + match[0]['value']['extensible'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "object_class" + MColors.ENDC + " = " + MColors.MP_STR_V + match[0]['value']['object_class'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "object_type" + MColors.ENDC + " = " + MColors.MP_STR_V + match[0]['value']['object_type'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "is_builtin" + MColors.ENDC + " = " + MColors.MP_STR_V + match[0]['value']['is_builtin'] + MColors.ENDC + "\n"\
+                      + "                   "\
+                      + MColors.MP_ANAME + "proto_is_builtin" + MColors.ENDC + " = " + MColors.MP_STR_V + match[0]['value']['proto_is_builtin'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "builtin_id" + MColors.ENDC + " = " + MColors.MP_STR_V + match[0]['value']['builtin_id'] + MColors.ENDC + "\n"\
+                      + "                   "\
+                      + MColors.MP_ANAME + "prototype" + MColors.ENDC + " = {" + MColors.MP_STR_V + match[0]['value']['prototype'] + MColors.ENDC + "}\n"\
+                      + "                   "\
+                      + MColors.MP_ANAME + "shared" + MColors.ENDC + " = {" + MColors.MP_STR_V + match[0]['value']['shared'] + MColors.ENDC + "}"
+            else:
+                buf = MColors.MP_FSYNTAX + "  value          : " + MColors.ENDC + MColors.MP_STR_V + match[0]['value'] + MColors.ENDC
             gdb_print(buf)
+
             buf = MColors.MP_FSYNTAX + "  node addr      : " + MColors.ENDC + MColors.MP_STR_V + match[0]['node_addr'] + MColors.ENDC
             gdb_print(buf)
             buf = MColors.MP_FSYNTAX + "  next addr      : " + MColors.ENDC + MColors.MP_STR_V + match[0]['next'] + MColors.ENDC
@@ -605,13 +623,54 @@ class MaplePrintCmd(gdb.Command):
         '''
         if m_debug.Debug: m_debug.dbg_print("addr in int =", addr)
         mtype, v = m_info.get_jstype_value_by_addr(addr)
-        if not v or not mtype:
-            buf = MColors.MP_CNAME + hex(addr) + ": " + MColors.ENDC + "value not valid"
+        if not mtype or not v: # if address specifed is a property node address
+            v = m_info.get_prop_list_node_data(str(addr))
+            if not v or len(v) == 0:
+                buf = MColors.MP_CNAME + hex(addr) + ": " + MColors.ENDC + "value not valid"
+                gdb_print(buf)
+                return
+            elif v['tag'] == "JSTYPE_OBJECT":
+                buf = MColors.MP_CNAME + hex(addr) + ": " + MColors.ENDC + MColors.MP_STR_V + v['name'] + MColors.ENDC
+                gdb_print(buf)
+                buf = MColors.MP_FSYNTAX + "  tag         : " + MColors.ENDC + MColors.MP_STR_V + v['tag'] + MColors.ENDC
+                gdb_print(buf)
+
+                buf = MColors.MP_FSYNTAX + "  value       : " + MColors.ENDC\
+                      + MColors.MP_ANAME + "prop_list" + MColors.ENDC + " = " +  MColors.MP_STR_V + v['value']['prop_list'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "prop_index_map" + MColors.ENDC + " = " + MColors.MP_STR_V + v['value']['prop_index_map'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "prop_string_map" + MColors.ENDC + " = " + MColors.MP_STR_V + v['value']['prop_string_map'] + MColors.ENDC + "\n"\
+                      + "                "\
+                      + MColors.MP_ANAME + "extensible" + MColors.ENDC + " = " + MColors.MP_STR_V + v['value']['extensible'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "object_class" + MColors.ENDC + " = " + MColors.MP_STR_V + v['value']['object_class'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "object_type" + MColors.ENDC + " = " + MColors.MP_STR_V + v['value']['object_type'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "is_builtin" + MColors.ENDC + " = " + MColors.MP_STR_V + v['value']['is_builtin'] + MColors.ENDC + "\n"\
+                      + "                "\
+                      + MColors.MP_ANAME + "proto_is_builtin" + MColors.ENDC + " = " + MColors.MP_STR_V + v['value']['proto_is_builtin'] + MColors.ENDC\
+                      + ", " + MColors.MP_ANAME + "builtin_id" + MColors.ENDC + " = " + MColors.MP_STR_V + v['value']['builtin_id'] + MColors.ENDC + "\n"\
+                      + "                "\
+                      + MColors.MP_ANAME + "prototype" + MColors.ENDC + " = {" + MColors.MP_STR_V + v['value']['prototype'] + MColors.ENDC + "}\n"\
+                      + "                "\
+                      + MColors.MP_ANAME + "shared" + MColors.ENDC + " = {" + MColors.MP_STR_V + v['value']['shared'] + MColors.ENDC + "}"
+                gdb_print(buf)
+            else: # for other JSTYPE properties
+                buf = MColors.MP_CNAME + hex(addr) + ": " + MColors.ENDC + MColors.MP_STR_V + v['name'] + MColors.ENDC
+                gdb_print(buf)
+                buf = MColors.MP_FSYNTAX + "  tag         : " + MColors.ENDC + MColors.MP_STR_V + v['tag'] + MColors.ENDC
+                gdb_print(buf)
+                buf = MColors.MP_FSYNTAX + "  value       : " + MColors.ENDC + MColors.MP_STR_V + v['value'] + MColors.ENDC
+                gdb_print(buf)
+
+            buf = MColors.MP_FSYNTAX + "  node addr   : " + MColors.ENDC + MColors.MP_STR_V + v['node_addr'] + MColors.ENDC
+            gdb_print(buf)
+            buf = MColors.MP_FSYNTAX + "  next addr   : " + MColors.ENDC + MColors.MP_STR_V + v['next'] + MColors.ENDC
+            gdb_print(buf)
+            buf = MColors.MP_FSYNTAX + "  parent      : " + MColors.ENDC + MColors.MP_STR_V + "Global Object" + MColors.ENDC
             gdb_print(buf)
             return
 
-        buf = MColors.MP_CNAME + hex(addr) + ": " + MColors.ENDC + MColors.MP_FSYNTAX + "type=" + MColors.ENDC + MColors.MP_STR_V + \
-              str(mtype) + MColors.ENDC + ","+ MColors.MP_FSYNTAX + " value=" + MColors.ENDC + MColors.MP_STR_V + str(v) + MColors.ENDC
-        gdb_print(buf)
+        else: # if address specifed is something like function's parameter in mbt command
+            buf = MColors.MP_CNAME + hex(addr) + ": " + MColors.ENDC + MColors.MP_FSYNTAX + "type=" + MColors.ENDC + MColors.MP_STR_V + \
+                str(mtype) + MColors.ENDC + ","+ MColors.MP_FSYNTAX + " value=" + MColors.ENDC + MColors.MP_STR_V + str(v) + MColors.ENDC
+            gdb_print(buf)
 
         return

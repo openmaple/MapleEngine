@@ -29,6 +29,7 @@
 
 # Set include file based on if the headers are local or in the compile directory
 # Note: md5.h requires package libssl-dev to be installed
+# Note: ICU requires package libicu-dev to be installed
 
 add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O0 -fno-omit-frame-pointer -funsigned-char -DMACHINE64 -DRC_NO_MMAP -DMARK_CYCLE_ROOTS -DTEST_BENCHMARK)
 #add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O0 -fno-omit-frame-pointer -funsigned-char)
@@ -41,6 +42,7 @@ endif()
 
 include_directories (AFTER PUBLIC 
 	/usr/include/
+	/usr/include/x86_64-linux-gnu/
 	${CMAKE_CURRENT_SOURCE_DIR}/../include
 	${BASE_INC_DIR}/../huawei_secure_c/include
 	${BASE_INC_DIR}/../jscre/
@@ -65,7 +67,7 @@ find_library( PBjaddr2_LIB java_addr2line "${CMAKE_CURRENT_SOURCE_DIR}/../lib/*"
 find_library( PBmplre_LIB mplre "${CMAKE_CURRENT_SOURCE_DIR}/../lib/*" )
 find_library( PBunwind_LIB unwind "${CMAKE_CURRENT_SOURCE_DIR}/../lib/*" )
 
-target_link_libraries( mplre-dyn "${CMAKE_CURRENT_SOURCE_DIR}/../../../mapleall/out/ark-clang-release/lib/64/libHWSecureC.a" "${CMAKE_CURRENT_SOURCE_DIR}/../../../mapleall/jscre/build/libjscre.a")
+target_link_libraries( mplre-dyn "${CMAKE_CURRENT_SOURCE_DIR}/../../../mapleall/out/ark-clang-release/lib/64/libHWSecureC.a" "${CMAKE_CURRENT_SOURCE_DIR}/../../../mapleall/jscre/build/libjscre.a" icuio icui18n icuuc icudata)
 #target_link_libraries( mplsh ${PBmpl_LIB} )
 #target_link_libraries( mplsh ${PBcorea_LIB} )
 #target_link_libraries( mplsh ${PBcomb_LIB} )

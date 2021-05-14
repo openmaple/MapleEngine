@@ -72,6 +72,7 @@ class MColors:
         MColors.MP_CNAME = MColors.BBLUE if colored else ''
         MColors.MP_FSYNTAX = MColors.BYELLOW if colored else ''
         MColors.MP_STR_V = MColors.BGREEN if colored else ''
+        MColors.MP_ANAME = MColors.BBLUE if colored else ''
 
 def is_interactive():
     """ check if gdb runs in interactive mode

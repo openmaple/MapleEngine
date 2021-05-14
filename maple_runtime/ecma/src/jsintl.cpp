@@ -15,6 +15,8 @@
 
 #include <unordered_map>
 #include <regex>
+#include <unicode/uenum.h>
+#include <unicode/uloc.h>
 #include "jsintl.h"
 #include "jsvalueinline.h"
 #include "jsvalue.h"
@@ -45,6 +47,12 @@ std::unordered_map<std::string,std::vector<std::string>> kDateTimeFormatComponen
   {"minute", {"2-digit", "numeric"}},
   {"second", {"2-digit", "numeric"}},
   {"timeZoneName", {"short", "long"}},
+};
+
+std::vector<std::vector<std::string>> kCollatorOptions = {
+  {"kn", "numeric", "boolean"},
+  {"kf", "caseFirst", "string", "upper", "lower", "false"},
+
 };
 
 static inline __jsvalue StrToVal(std::string str) {
@@ -89,6 +97,8 @@ __jsvalue __js_CollatorConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
   obj->object_class = JSINTL;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
+  obj->shared.intl = (__jsintl*) VMMallocGC(sizeof(__jsintl));
+  obj->shared.intl->kind = JSINTL_COLLATOR;
   __jsvalue obj_val = __object_value(obj);
 
   __jsvalue locales = __undefined_value();
@@ -108,7 +118,7 @@ __jsvalue __js_CollatorConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
   return obj_val;
 }
 
-// ECMA-402 1.0 11.1 The Intl.NumberFormat Constructor
+// ECMA-402 1.0 11.1.3.1 The Intl.NumberFormat Constructor
 __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
                                        uint32_t nargs) {
   __jsobject *obj = __create_object();
@@ -116,6 +126,7 @@ __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
   obj->shared.intl = (__jsintl*) VMMallocGC(sizeof(__jsintl));
+  obj->shared.intl->kind = JSINTL_NUMBERFORMAT;
   __jsvalue obj_val = __object_value(obj);
 
   __jsvalue prop = StrToVal("InitializedIntlObject");
@@ -146,6 +157,8 @@ __jsvalue __js_DateTimeFormatConstructor(__jsvalue *this_arg,
   obj->object_class = JSINTL;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
+  obj->shared.intl = (__jsintl*) VMMallocGC(sizeof(__jsintl));
+  obj->shared.intl->kind = JSINTL_DATETIMEFORMAT;
   __jsvalue obj_val = __object_value(obj);
 
   __jsvalue locales = __undefined_value();
@@ -846,16 +859,47 @@ __jsvalue GetNumberOption(__jsvalue *options, __jsvalue *property,
 // InitializeCollator(collator, locales, options)
 void InitializeCollator(__jsvalue *collator, __jsvalue *locales,
                         __jsvalue *options) {
-  // TODO: not implemented yet.
+  // Step 1.
+  __jsvalue prop = StrToVal("initializedIntlObject");
+  __jsvalue v = __jsop_getprop(collator, &prop);
+  if (!__is_undefined(&v)) {
+    if (__is_boolean(&v) && __jsval_to_boolean(&v) == true) {
+      MAPLE_JS_TYPEERROR_EXCEPTION();
+    }
+  }
+  // Step 2.
+  v = __boolean_value(true);
+  __jsop_setprop(collator, &prop, &v);
+  // Step 3.
+  __jsvalue requested_locales = CanonicalizeLocaleList(locales);
+  // Step 4.
+  if (__is_undefined(options)) {
+    // Step 4a.
+    __jsobject *o = __js_new_obj_obj_0();
+    *options = __object_value(o);
+  }
 }
 
 // ECMA-402 1.0 10.2.2
 // Intl.Collator.supportedLocalesOf(locales [, options])
-__jsvalue __jsintl_CollatorSupportedLocalesOf(__jsvalue *this_arg,
+__jsvalue __jsintl_CollatorSupportedLocalesOf(__jsvalue *locales,
                                               __jsvalue *arg_list,
                                               uint32_t nargs) {
-  // TODO: not implemented yet.
-  return __null_value();
+  // Step 1.
+  __jsvalue options;
+  if (nargs == 1) {
+    options = __undefined_value();
+  } else {
+    options = arg_list[1];
+  }
+  // Step 2.
+  __jsvalue prop = StrToVal("availableLocales");
+  __jsvalue collator_init; // TODO
+  __jsvalue available_locales = __jsop_getprop(&collator_init, &prop);
+  // Step 3.
+  __jsvalue requested_locales = CanonicalizeLocaleList(locales);
+  // Step 4.
+  return SupportedLocales(&available_locales, &requested_locales, &options);
 }
 
 // ECMA-402 1.0 10.3.2
@@ -915,7 +959,10 @@ void InitializeNumberFormat(__jsvalue *number_format, __jsvalue *locales,
   number_format_obj->extensible = true;
   number_format_obj->object_type = JSREGULAR_OBJECT;
   __jsvalue number_format_init = __object_value(number_format_obj);
-  // TODO: any other properties to initialize?
+  // TODO: set 'availableLocales', 'relevantExtensionKeys' as "nu", and 'localeData'.
+  InitProperty(&number_format_init, "availableLocales");
+  InitProperty(&number_format_init, "relevantExtensionKeys");
+  InitProperty(&number_format_init, "localeData");
   // Step 10.
   prop = StrToVal("localeData");
   __jsvalue locale_data = __jsop_getprop(&number_format_init, &prop);
@@ -1082,6 +1129,7 @@ void InitializeNumberFormat(__jsvalue *number_format, __jsvalue *locales,
   }
   // Step 38.
   MAPLE_JS_ASSERT(__is_js_object(&patterns)); // TODO: failed here.
+  // initial Intl.NumberFormat, locale_data, patterns not set.
   // Step 39.
   prop = s;
   __jsvalue style_patterns;
@@ -1152,6 +1200,12 @@ __jsvalue __jsintl_NumberFormatFormat(__jsvalue *number_format, __jsvalue *arg_l
   __jsvalue bound_format = __jsop_getprop(number_format, &prop);
   if (__is_undefined(&bound_format)) {
     // Step 1a.
+    void *func = (void*) FormatNumber;
+    //__jsvalue f = __js_new_function(func, NULL,
+    __jsvalue length_value = __number_value(1);
+    //__jsobj_helper_init_value_property(f, JSBUILTIN_STRING_LENGTH, &length_value, JSPROP_DESC_HAS_VUWUEC);
+    __jsvalue value;
+    prop = StrToVal("value");
     // TODO
   }
   return __jsop_getprop(number_format, &prop);
@@ -1351,28 +1405,193 @@ void InitializeDateTimeFormat(__jsvalue *date_time_format, __jsvalue *locales,
 
 // ECMA-402 1.0 12.1.1.1
 __jsvalue ToDateTimeOptions(__jsvalue *options, __jsvalue *required, __jsvalue *defaults) {
-  // TODO
-  return __null_value();
+  // Step 1.
+  if (__is_undefined(options)) {
+    *options = __null_value();
+  }
+  // Step 2.
+  __jsvalue create; //  = __jsobj_create(); // TODO
+  // Step 3.
+  *options = __jsfun_pt_call(&create, options, 1);
+  // Step 4.
+  __jsvalue need_defaults = __boolean_value(true);
+  // Step 5.
+  std::string required_str = ValToStr(required);
+  std::vector<std::string> vprops;
+  __jsvalue prop, value;
+  if (required_str == "date" || required_str == "any") {
+    // Step 5a.
+    vprops = {"weekday", "year", "day"};
+    for (int i = 0; i < vprops.size(); i++) {
+      // Step 5a i.
+      prop = StrToVal(vprops[i]);
+      value = __jsop_getprop(options, &prop);
+      if (!__is_undefined(&value)) {
+        need_defaults = __boolean_value(false);
+      }
+    }
+  }
+  // Step 6.
+  if (required_str == "time" || required_str == "any") {
+    // Step 6a.
+    vprops = {"hour", "minute", "second"};
+    for (int i = 0; i < vprops.size(); i++) {
+      // Step 6a i.
+      prop = StrToVal(vprops[i]);
+      value = __jsop_getprop(options, &prop);
+      if (!__is_undefined(&value)) {
+        need_defaults = __boolean_value(false);
+      }
+    }
+  }
+  // Step 7.
+  std::string defaults_str = ValToStr(defaults);
+  __jsvalue v;
+  __jsprop_desc desc;
+  __jsobject *o;
+  if (__jsval_to_boolean(&need_defaults) == true &&
+      (defaults_str == "date" || defaults_str == "all")) {
+    // Step 7a.
+    vprops = {"year", "month", "day"};
+    for (int i = 0 ; i < vprops.size(); i++) {
+      prop = StrToVal(vprops[i]);
+      // Step 7a i.
+      o = __jsval_to_object(options);
+      v = StrToVal("numeric");
+      desc = __new_value_desc(&v, JSPROP_DESC_HAS_VWEC);
+      __jsobj_internal_DefineOwnProperty(o, &prop, desc, false);
+    }
+  }
+  // Step 8.
+  if (__jsval_to_boolean(&need_defaults) == true &&
+      (defaults_str == "time" || defaults_str == "all'")) {
+    // Step 8a.
+    vprops = {"hour", "minute", "second"};
+    for (int i = 0; i < vprops.size(); i++) {
+      // Step 8a i.
+      o = __jsval_to_object(options);
+      v = StrToVal("numeric");
+      desc = __new_value_desc(&v, JSPROP_DESC_HAS_VWEC);
+      __jsobj_internal_DefineOwnProperty(o, &prop, desc, false);
+    }
+  }
+  return *options;
 }
 
 // ECMA-402 1.0 12.1.1.1
 __jsvalue BasicFormatMatcher(__jsvalue *options, __jsvalue *formats) {
-  // TODO
-  return __null_value();
+  // Step 1.
+  int removal_penalty = 120;
+  // Step 2.
+  int addition_penalty = 20;
+  // Step 3.
+  int long_less_penalty = 8;
+  // Step 4.
+  int long_more_penalty = 6;
+  // Step 5.
+  int short_less_penalty = 6;
+  // Step 6.
+  int short_more_penalty = 3;
+  // Step 7.
+  int best_score = (int)-INFINITY;
+  // Step 8.
+  __jsvalue best_format = __undefined_value();
+  // Step 9.
+  int i = 0;
+  // Step 10.
+  __jsvalue prop = StrToVal("length");
+  __jsvalue len = __jsop_getprop(formats, &prop);
+  // Step 11.
+  while (i < __jsval_to_number(&len)) {
+    // Step 11a.
+    prop = StrToVal("formats");
+    __jsvalue format = __jsop_getprop(formats, &prop);
+    // Step 11b.
+    int score = 0;
+    // Step 11c.
+    auto it = kDateTimeFormatComponents.begin();
+    while (it != kDateTimeFormatComponents.end()) {
+      // Step 11c i.
+      std::string p = it->first;
+      __jsvalue property = StrToVal(p);
+      __jsvalue options_prop = __jsop_getprop(options, &property);
+      // Step 11c ii.
+      __jsvalue format_prop_desc = __jsobj_getOwnPropertyNames(formats, &property);
+      // Step 11c iii.
+      if (!__is_undefined(&format_prop_desc)) {
+        // Step 11c iii 1.
+        __jsvalue format_prop = __jsop_getprop(&format, &property);
+        // Step 11c iv.
+        if (__is_undefined(&options_prop) && !__is_undefined(&format_prop)) {
+          score -= addition_penalty;
+        } else if (!__is_undefined(&options_prop) && __is_undefined(&format_prop)) {
+          // Step 11c v.
+          score -= removal_penalty;
+        } else {
+          // Step 11c vi 1.
+          std::vector<std::string> v = {"2-digit", "numeric", "narrow", "short", "long"};
+          __jsvalue values = StrVecToVal(v);
+          // Step 11c vi 2.
+          __jsvalue options_prop_index = __jsarr_pt_indexOf(&values, &options_prop, 0);
+          // Step 11c vi 3.
+          __jsvalue format_prop_index = __jsarr_pt_indexOf(&values, &format_prop, 0);
+          // Step 11c vi 4.
+          int delta = std::max(std::min(__jsval_to_number(&format_prop_index) -
+                                        __jsval_to_number(&options_prop_index), 2), -2);
+          // Step 11c vi 5.
+          if (delta == 2) {
+            score -= long_more_penalty;
+          } else if (delta == 1) {
+            // Step 11c vi 6.
+            score -= short_more_penalty;
+          } else if (delta == -1) {
+            // Step 11c vi 7.
+            score -= short_less_penalty;
+          } else if (delta == -2) {
+            // Step 11c vi 8.
+            score -= long_less_penalty;
+          }
+        }
+      }
+    }
+    // Step 11d.
+    if (score > best_score) {
+      // Step 11d i.
+      best_score = score;
+      // Step 11d ii.
+      best_format = format;
+    }
+    // Step 11e.
+    i--;
+  }
+  // Step 12.
+  return best_format;
 }
 
 __jsvalue BestFitFormatMatcher(__jsvalue *options, __jsvalue *formats) {
-  // TODO
-  return __null_value();
+  return BasicFormatMatcher(options, formats);
 }
 
 // ECMA-402 1.0 12.2.2
 // Intl.DateTimeFormat.supportedLocalesOf(locales [, options])
-__jsvalue __jsintl_DateTimeFormatSupportedLocalesOf(__jsvalue *this_arg,
+__jsvalue __jsintl_DateTimeFormatSupportedLocalesOf(__jsvalue *locales,
                                                     __jsvalue *arg_list,
                                                     uint32_t nargs) {
-  // TODO: not implemented yet.
-  return __null_value();
+  // Step 1.
+  __jsvalue options;
+  if (nargs == 1) {
+    options = __undefined_value();
+  } else {
+    options = arg_list[0];
+  }
+  // Step 2.
+  __jsvalue prop = StrToVal("availableLocales");
+  __jsvalue date_time_format_init; // TODO
+  __jsvalue available_locales = __jsop_getprop(&date_time_format_init, &prop);
+  // Step 3.
+  __jsvalue requested_locales = CanonicalizeLocaleList(&options);
+  // Step 4.
+  return SupportedLocales(&available_locales, &requested_locales, &options);
 }
 
 // ECMA-402 1.0 12.3.2
@@ -1395,6 +1614,85 @@ __jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *this_arg,
 // ECMA-402 6,2,4
 // DefaultLocale()
 __jsvalue DefaultLocale() {
-  // TODO: not implemented yet.
+  char *locale = getenv("LANG");
+  if (!locale || !strcmp(locale, "C"))
+    locale = const_cast<char*>("und");
+  std::string l(locale);
+
+  return StrToVal(l);
+}
+
+// ECMA-402 11.3.2
+// FormatNumber(numberFormat, x)
+__jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x) {
+  // Step 1.
+  __jsvalue negative = __boolean_value(false);
+  // Step 2.
+  if (__is_infinity(x) == true) {
+    // Step 2a.
+    if (__is_nan(x)) {
+    }
+  }
+  // TODO
   return __null_value();
+}
+
+void InitProperty(__jsvalue *object, std::string prop) {
+  __jsobject *obj = __jsval_to_object(object);
+  if (prop == "availableLocales") {
+    int n = uloc_countAvailable();
+    std::vector<std::string> locs;
+    for (int i = 0; i < n; i++) {
+      std::string str(uloc_getAvailable(i));
+      std::replace(str.begin(), str.end(), '_', '-');
+      locs.push_back(str);
+    }
+    __jsvalue p = StrToVal(prop);
+    __jsvalue v = StrVecToVal(locs);
+    __jsop_setprop(object, &p, &v);
+  } else if (prop == "relevantExtensionKeys") {
+    __jsvalue p = StrToVal(prop);
+    std::vector<std::string> values;
+    switch (obj->shared.intl->kind) {
+      case JSINTL_COLLATOR:
+        values = {"co", "kn", "kf"};
+        break;
+      case JSINTL_NUMBERFORMAT:
+        values = {"nu"};
+        break;
+      case JSINTL_DATETIMEFORMAT:
+        values = {"ca", "nu"};
+        break;
+    }
+    __jsvalue v = StrVecToVal(values);
+    __jsop_setprop(object, &p, &v);
+  } else if (prop == "localeData") {
+    __jsintl_type kind = obj->shared.intl->kind;
+    if (kind == JSINTL_COLLATOR) {
+      // TODO
+    } else if (kind == JSINTL_COLLATOR) {
+      // TODO
+    } else if (kind == JSINTL_NUMBERFORMAT) {
+      __jsvalue p = StrToVal("nu");
+      std::vector<std::string> vec = {"arab", "arabext", "bali", "beng",
+                                      "deva", "fullwide", "gujr", "guru",
+                                      "hanidec", "khmr", "knda", "laoo",
+                                      "latn", "limb", "mlym", "mong",
+                                      "mymr", "orya", "tamldec", "telu",
+                                      "thai", "tibt"};
+      __jsvalue v = StrVecToVal(vec);
+      __jsop_setprop(object, &p, &v);
+    } else if (kind == JSINTL_DATETIMEFORMAT) {
+      for (auto it = kDateTimeFormatComponents.begin();
+          it != kDateTimeFormatComponents.end(); it++) {
+        __jsvalue p = StrToVal(it->first);
+        __jsvalue v = StrVecToVal(it->second);
+        __jsop_setprop(object, &p, &v);
+      }
+    }
+  } else if (prop == "sortLocaleData") {
+    // TODO
+  } else if (prop == "searchLocaleData") {
+    // TODO
+  }
 }

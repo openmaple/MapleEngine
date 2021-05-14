@@ -1089,6 +1089,10 @@ void MemoryManager::ManageObject(__jsobject *obj, ManageType flag) {
       MIR_FATAL("manage unknown js object class");
   }
   if (flag == SWEEP || flag == RECALL) {
+    if (obj->prop_index_map)
+      delete(obj->prop_index_map);
+    if (obj->prop_string_map)
+      delete(obj->prop_string_map);
     RecallMem((void *)obj, sizeof(__jsobject));
   }
 }

@@ -859,6 +859,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUPPORTED_LOCALES_OF, __jsintl_CollatorSupportedLocalesOf, ATTRS(UNCERTAIN_NARGS, 2));
       break;
     case JSBUILTIN_INTL_COLLATOR_PROTOTYPE:
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_INTL_COLLATOR_CONSTRUCTOR));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_COMPARE, __jsintl_CollatorCompare, ATTRS(2, 2));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_CollatorResolvedOptions, ATTRS(0, 0));
       break;
@@ -867,6 +868,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUPPORTED_LOCALES_OF, __jsintl_NumberFormatSupportedLocalesOf, ATTRS(UNCERTAIN_NARGS, 2));
       break;
     case JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE:
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_INTL_NUMBERFORMAT_CONSTRUCTOR));
       ADD_ACCESSOR_PROPERTY(JSBUILTIN_STRING_FORMAT, JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE, __jsintl_NumberFormatFormat, ATTRS(0, 0), NULL, ATTRS(0,0), JSPROP_DESC_HAS_UVUWUEC);
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_FORMAT, __jsintl_NumberFormatFormat, ATTRS(1, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_NumberFormatResolvedOptions, ATTRS(0, 0));
@@ -876,6 +878,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUPPORTED_LOCALES_OF, __jsintl_DateTimeFormatSupportedLocalesOf, ATTRS(UNCERTAIN_NARGS, 2));
       break;
     case JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE:
+      ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_FORMAT, __jsintl_DateTimeFormatFormat, ATTRS(1, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_DateTimeFormatResolvedOptions, ATTRS(0, 0));
       break;
@@ -2795,6 +2798,11 @@ __jsvalue __jsop_getprop_by_name(__jsvalue *o, __jsstring *p) {
     __jsobject *obj = __jsval_to_object(o);
     __jsop_check_func_nameprop(obj, p);
     return __jsobj_internal_Get(obj, p);
+  } else if (__is_string(o)) {
+    __jsobject *proto = __jsobj_get_or_create_builtin(JSBUILTIN_STRINGPROTOTYPE);
+    __jsprop_desc desc = __jsobj_internal_GetProperty(proto, p);
+    __jsvalue ret = __jsobj_internal_get_by_desc(proto, desc, o);
+    return ret;
   } else {
     return __jsobj_getprop_by_scalar(o, p);
   }
