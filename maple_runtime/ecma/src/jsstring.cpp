@@ -216,26 +216,31 @@ bool __jsstr_equal(__jsstring *str1, __jsstring *str2, bool checknumber) {
 }
 
 void __jsstr_copy_ascii(__jsstring *to, uint32_t to_index, __jsstring *from) {
-  for (uint32_t i = 0; i < __jsstr_get_length(from); i++) {
-    ((uint8_t *)to)[4 + to_index + i] = ((uint8_t *)from)[4 + i];
-  }
+  uint32_t len = __jsstr_get_length(from);
+  memcpy(&(((uint8_t *)to)[4 + to_index]), &(((uint8_t *)from)[4]), len);
 }
 
 void __jsstr_copy_unicode(__jsstring *to, uint32_t to_index, __jsstring *from) {
-  for (uint32_t i = 0; i < __jsstr_get_length(from); i++) {
-    ((uint16_t *)to)[2 + to_index + i] = ((uint16_t *)from)[2 + i];
-  }
+  uint32_t len = __jsstr_get_length(from);
+  memcpy(&(((uint16_t *)to)[2 + to_index]), &(((uint16_t *)from)[2]), len * sizeof(uint16_t));
 }
 
 void __jsstr_copy_ascii_to_unicode(__jsstring *to, uint32_t to_index, __jsstring *from) {
-  for (uint32_t i = 0; i < __jsstr_get_length(from); i++) {
+  uint32_t len = __jsstr_get_length(from);
+  for (uint32_t i = 0; i < len; i++) {
     ((uint16_t *)to)[2 + to_index + i] = ((uint8_t *)from)[4 + i];
   }
 }
 
 void __jsstr_copy(__jsstring *to, uint32_t to_index, __jsstring *from) {
-  for (uint32_t i = 0; i < __jsstr_get_length(from); i++) {
-    __jsstr_set_char(to, to_index + i, __jsstr_get_char(from, i));
+  if (__jsstr_is_ascii(to) && __jsstr_is_ascii(from)) {
+    __jsstr_copy_ascii(to, to_index, from);
+  } else if (!__jsstr_is_ascii(to) && !__jsstr_is_ascii(from)) {
+    __jsstr_copy_unicode(to, to_index, from);
+  } else if (!__jsstr_is_ascii(to) && __jsstr_is_ascii(from)) {
+    __jsstr_copy_ascii_to_unicode(to, to_index, from);
+  } else {
+    MAPLE_JS_ASSERT("Can't copy unicode to ascii");
   }
 }
 
@@ -1102,7 +1107,7 @@ __jsvalue __jsstr_match(__jsvalue *this_string, __jsvalue *regexp) {
   if (r == -1 && vres_ret.size() == 0) {
     __jsvalue items[1];
     items[0] = __undefined_value();
-    __jsobject *array_obj = __js_new_arr_elems(items, 1);
+    __jsobject *array_obj = __js_new_arr_elems_direct(items, 1);
     return __object_value(array_obj);
   }
   // workaround: vres_ret may contain duplicates due to dart::jscre issue, delete dup
@@ -1124,7 +1129,7 @@ __jsvalue __jsstr_match(__jsvalue *this_string, __jsvalue *regexp) {
     }
   }
 
-  __jsobject *array_obj = __js_new_arr_elems(items, length);
+  __jsobject *array_obj = __js_new_arr_elems_direct(items, length);
 
   __jsvalue index = __number_value(vres_ret[0].first);
   __jsobj_helper_add_value_property(array_obj, JSBUILTIN_STRING_INDEX, &index,

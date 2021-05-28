@@ -64,6 +64,7 @@ def debugger_exception_handler(etype, evalue, etraceback):
 
 def init_gdb():
     m_util.gdb_exec('set auto-load python-scripts off')
+    m_util.gdb_exec('set overload-resolution off')
     m_util.enable_color_output(m_util.is_interactive())
     sys.excepthook = debugger_exception_handler
     m_event.init_event_handlers()

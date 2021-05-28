@@ -31,8 +31,14 @@
 # Note: md5.h requires package libssl-dev to be installed
 # Note: ICU requires package libicu-dev to be installed
 
-add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O0 -fno-omit-frame-pointer -funsigned-char -DMACHINE64 -DRC_NO_MMAP -DMARK_CYCLE_ROOTS -DTEST_BENCHMARK)
+#add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O0 -fno-omit-frame-pointer -funsigned-char -DMACHINE64 -DRC_NO_MMAP -DMARK_CYCLE_ROOTS -DTEST_BENCHMARK)
 #add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O0 -fno-omit-frame-pointer -funsigned-char)
+option(MACHINE64 "Enable 64bit Machine compile for JS" OFF)
+if (MACHINE64)
+    add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O0 -fno-omit-frame-pointer -funsigned-char -DMACHINE64 -DRC_NO_MMAP -DMARK_CYCLE_ROOTS -DTEST_BENCHMARK)
+else()
+    add_definitions(-std=c++11 -DTARGX86_64=1 -DUSE_CLANG -DDYNAMICLANG -g -O0 -fno-omit-frame-pointer -funsigned-char -DRC_NO_MMAP -DMARK_CYCLE_ROOTS -DTEST_BENCHMARK)
+endif()
 
 if(DEFINED ENV{USE_LOCAL_REP_HEADERS})
 	SET(BASE_INC_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/../include)
@@ -40,7 +46,7 @@ else()
 	SET(BASE_INC_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/../../../mapleall/mapleall)
 endif()
 
-include_directories (AFTER PUBLIC 
+include_directories (AFTER PUBLIC
 	/usr/include/
 	/usr/include/x86_64-linux-gnu/
 	${CMAKE_CURRENT_SOURCE_DIR}/../include

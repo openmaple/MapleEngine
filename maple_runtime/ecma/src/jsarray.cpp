@@ -47,6 +47,18 @@ __jsobject *__js_new_arr_elems(__jsvalue *items, uint32_t length) {
   __jsobject *arr = __js_new_arr_internal(length);
   __jsvalue *array_elems = arr->shared.array_props;
   for (uint32_t i = 0; i < length; i++) {
+    __jsvalue itVt = memory_manager->EmulateLoad(((uint64_t *)items->s.ptr + i), items->tag);
+    __set_regular_elem(array_elems, i, &itVt);
+  }
+  return arr;
+}
+
+// different from the function above which will load items from memory that
+// is iassigned to value
+__jsobject *__js_new_arr_elems_direct(__jsvalue *items, uint32_t length) {
+  __jsobject *arr = __js_new_arr_internal(length);
+  __jsvalue *array_elems = arr->shared.array_props;
+  for (uint32_t i = 0; i < length; i++) {
     __set_regular_elem(array_elems, i, &items[i]);
   }
   return arr;
@@ -182,7 +194,7 @@ __jsvalue __jsarr_pt_toLocaleString(__jsvalue *this_array) {
 // return the length property of src.
 uint32_t __jsarr_helper_copy_values(__jsvalue *dest, __jsvalue *src) {
   if (!__is_js_array(src)) {
-    GCCheckAndIncRf(src->asbits);
+    GCCheckAndIncRf(src->s.asbits, IsNeedRc(src->tag));
     *dest = *src;
     return 1;
   } else {
@@ -190,7 +202,7 @@ uint32_t __jsarr_helper_copy_values(__jsvalue *dest, __jsvalue *src) {
     uint32_t len = __jsobj_helper_get_length(o);
     for (uint32_t i = 0; i < len; i++) {
       dest[i] = __jsarr_GetElem(o, i);
-      GCCheckAndIncRf(dest[i].asbits);
+      GCCheckAndIncRf(dest[i].s.asbits, IsNeedRc(dest[i].tag));
     }
     return len;
   }
@@ -384,7 +396,7 @@ void __jsarr_helper_ExchangeElem(__jsobject *arr, uint32_t idx1, uint32_t idx2) 
   if (exist2) {
     if (exist1) {
       // Inc RF for elem1 otherwise it will goes down to 0 and get released
-      GCCheckAndIncRf(elem1.asbits);
+      GCCheckAndIncRf(elem1.s.asbits, IsNeedRc(elem1.tag));
     }
     __jsobj_internal_Put(arr, idx1, &elem2, true);
   } else {
@@ -393,7 +405,7 @@ void __jsarr_helper_ExchangeElem(__jsobject *arr, uint32_t idx1, uint32_t idx2) 
   if (exist1) {
     if (exist2) {
       // Inc RF for elem1 otherwise it will goes down to 0 and get released
-      GCCheckAndIncRf(elem2.asbits);
+      GCCheckAndIncRf(elem2.s.asbits, IsNeedRc((elem2.tag)));
     }
     __jsobj_internal_Put(arr, idx2, &elem1, true);
   } else {
@@ -1413,7 +1425,7 @@ void __set_regular_elem(__jsvalue *arr, uint32_t index, __jsvalue *v) {
 #ifndef RC_NO_MMAP
   memory_manager->UpdateGCReference(&arr[index + 1].s.payload.ptr, JsvalToMval(*v));
 #else
-  GCCheckAndUpdateRf(arr[index + 1].asbits, v->asbits);
+  GCCheckAndUpdateRf(arr[index + 1].s.asbits, IsNeedRc(arr[index +1].tag), v->s.asbits, IsNeedRc(v->tag));
 #endif
   arr[index + 1] = *v;
 }
@@ -1493,7 +1505,7 @@ __jsvalue *__jsarr_RegularRealloc(__jsvalue *arr, uint32_t old_len, uint32_t new
   if (new_len < old_len) {
     for (uint32_t i = new_size; i < old_size; i++) {
 #ifdef MACHINE64
-      GCCheckAndDecRf(arr[i].asbits);
+      GCCheckAndDecRf(arr[i].s.asbits, IsNeedRc(arr[i].tag));
 #else
       GCDecRf(arr[i].s.payload.ptr);
 #endif
@@ -1527,7 +1539,7 @@ __jsvalue __jsarr_pt_of(__jsvalue *this_array, __jsvalue *items, uint32_t size) 
     MAPLE_JS_ASSERT(false && "NIY: __jsarr_pt_of");
   }
   // create a new array
-  return __object_value(__js_new_arr_elems(items, size));
+  return __object_value(__js_new_arr_elems_direct(items, size));
 }
 
 // ecma 23.1.2.1 Array.from(items, [mpfunc, [arg]])

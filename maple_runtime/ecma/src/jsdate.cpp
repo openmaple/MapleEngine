@@ -33,8 +33,8 @@ __jsvalue  __js_ToDate(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nar
 static bool __js_argsZero(__jsvalue *arg_list, uint32_t nargs) {
   for (uint32_t i = 0; i < nargs; i++) {
     __jsvalue *arg = &arg_list[i];
-    if ((arg->s.tag != JSTYPE_NUMBER) ||
-        (arg->s.payload.i32 != 0)) {
+    if ((arg->tag != JSTYPE_NUMBER) ||
+        (arg->s.i32 != 0)) {
       return false;
     }
   }

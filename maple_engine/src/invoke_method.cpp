@@ -12,7 +12,6 @@
  * FIT FOR A PARTICULAR PURPOSE.
  * See the MulanPSL - 2.0 for more details.
  */
-
 #include <cstdio>
 #include <cmath>
 #include <climits>
@@ -29,6 +28,13 @@
 #include "opcodes.h"
 #include "massert.h" // for MASSERT
 #include "mdebug.h"
+
+#ifdef MACHINE64
+MValue maple_invoke_method(const method_header_t* const mir_header, const MFunction *caller) {
+  assert(false && "NYI");
+}
+#else
+
 
 
 namespace maple {
@@ -1921,3 +1927,4 @@ void collect_stack_refs(void* c, std::set<void*>& refs)
 
 
 } // namespace maple
+#endif // #ifdef MACHINE64

@@ -40,7 +40,7 @@ __jsvalue __js_ToPrimitive(__jsvalue *v, __jstype preferred_type) {
 }
 
 __jsvalue __js_ToPrimitive2(__jsvalue *v) {
-  if (v->s.tag == JSTYPE_OBJECT) {
+  if (v->tag == JSTYPE_OBJECT) {
     __jsobject *obj = __jsval_to_object(v);
     uint8_t oClass = obj->object_class;
     if (oClass == JSNUMBER || oClass == JSBOOLEAN) {
@@ -101,9 +101,9 @@ int32_t __js_ToNumberSlow(__jsvalue *v) {
       break;
     case JSTYPE_OBJECT: {
       __jsvalue prim_value = __js_ToPrimitive(v, JSTYPE_NUMBER);
-      GCCheckAndIncRf(prim_value.asbits);
+      GCCheckAndIncRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
       int32_t num = __js_ToNumber(&prim_value);
-      GCCheckAndDecRf(prim_value.asbits);
+      GCCheckAndDecRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
       return num;
     } break;
     case JSTYPE_DOUBLE: {
@@ -151,7 +151,7 @@ __jsvalue __js_ToNumberSlow2(__jsvalue *v, bool &isConvertible) {
     }
     case JSTYPE_BOOLEAN: {
       isConvertible = true;
-      return __number_value(v->s.payload.i32);
+      return __number_value(v->s.i32);
     }
     case JSTYPE_STRING: {
       __jsvalue jsDv = __js_str2double(__jsval_to_string(v), isConvertible);
@@ -175,7 +175,7 @@ __jsvalue __js_ToNumberSlow2(__jsvalue *v, bool &isConvertible) {
         return __js_ToNumberSlow2(&prim_value, isConvertible);
       } else if (__is_boolean(&prim_value)) {
         isConvertible = true;
-        return __number_value(prim_value.s.payload.i32);
+        return __number_value(prim_value.s.i32);
       } else {
         isConvertible = true; // TODO: depends
         return prim_value;
@@ -280,11 +280,11 @@ __jsstring *__js_ToStringSlow(__jsvalue *v) {
     case JSTYPE_OBJECT: {
       __jsvalue prim_value = __js_ToPrimitive(v, JSTYPE_STRING);
       if (!__is_string(&prim_value)) {
-        GCCheckAndIncRf(prim_value.asbits);
+        GCCheckAndIncRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
       }
       __jsstring *str = __js_ToString(&prim_value);
       if (!__is_string(&prim_value)) {
-        GCCheckAndDecRf(prim_value.asbits);
+        GCCheckAndDecRf(prim_value.s.asbits, IsNeedRc((prim_value.tag)));
       }
       return str;
     }
@@ -346,16 +346,19 @@ bool __js_IsCallable(__jsvalue *v) {
 
 // ecma 9.12
 bool __js_SameValue(__jsvalue *x, __jsvalue *y) {
-  if (x->asbits == y->asbits)
+  if (x->s.asbits == y->s.asbits && x->tag == y->tag)
     return true;
   if ((__is_number(x) && __is_boolean(y)) || (__is_number(y) && __is_boolean(x))) {
-    return x->s.payload.u32 == y->s.payload.u32;
+    return x->s.u32 == y->s.u32;
+  }
+  if ((__is_number(x) && __is_number(y))) {
+    return x->s.i32 == y->s.i32;
   }
   if (__jsval_typeof(x) == JSTYPE_STRING)
     return __jsval_typeof(y) == JSTYPE_STRING && __jsstr_equal(__jsval_to_string(x), __jsval_to_string(y));
   if (__jsval_typeof(x) == JSTYPE_OBJECT && sizeof(void *) == 8)
     return __jsval_typeof(y) == JSTYPE_OBJECT &&
-           memory_manager->GetRealAddr(x->s.payload.obj) == memory_manager->GetRealAddr(y->s.payload.obj);
+           x->s.obj == y->s.obj;
   return false;
 }
 
@@ -389,9 +392,9 @@ uint64_t __js_toLength(__jsvalue *v) {
     return 0;       // 7.1.15 step 4. If len ≤ 0, return +0
   } else if (__is_js_object(v)) {
     __jsvalue prim_value = __js_ToPrimitive(v, JSTYPE_NUMBER);
-    GCCheckAndIncRf(prim_value.asbits);
+    GCCheckAndIncRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
     len = __js_toLength(&prim_value);
-    GCCheckAndDecRf(prim_value.asbits);
+    GCCheckAndDecRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
     return len;
   } else if (__is_boolean(v)) {
     return __jsval_to_boolean(v) ? 1 : 0;

@@ -21,6 +21,7 @@
 #include "jsfunction.h"
 #include "cmpl.h"
 #include "jsarray.h"
+#include "jsiter.h"
 #include "securec.h"
 #include <cmath>
 // This module performs memory management for both the app's heap space and the
@@ -232,8 +233,8 @@ __jsvalue MemoryManager::GetF64Builtin(uint32_t index) {
     SetF64Builtin();
   }
   __jsvalue jsval;
-  jsval.s.tag = JSTYPE_DOUBLE;
-  jsval.s.payload.u32 = index;
+  jsval.tag = JSTYPE_DOUBLE;
+  jsval.s.u32 = index;
   return jsval;
 }
 
@@ -242,6 +243,7 @@ double MemoryManager::GetF64FromU32 (uint32 index) {
   return f64ToU32Vec[index];
 }
 
+#if 0
 uint32_t MemoryManager::SetF64ToU32 (double f64) {
   // std::map<double, uint32>::iterator it = f64ToU32Map.find(f64);
   uint32 size = f64ToU32Vec.size();
@@ -274,6 +276,7 @@ uint32_t MemoryManager::SetF64ToU32 (double f64) {
   }
   */
 }
+#endif
 #endif
 
 // malloc memory in VM internal memory region, re-cycled via MemoryChunk nodes
@@ -328,7 +331,8 @@ void MemoryManager::ReleaseVariables(uint8_t *base, uint8_t *typetagged, uint8_t
         MIR_ASSERT(!(refcounted[i] & (1 << j)));
         // uint64_t val = load_64bits(addr);
         uint64_t val = *((uint64 *)addr);
-        GCCheckAndDecRf(val);
+        assert(false&&"NYI");
+        // GCCheckAndDecRf(val, IsNeedRc(GetFlagFromMemory(addr)));
       } else if (refcounted[i] & (1 << j)) {
         uint64_t val = *(uint64_t *)(addr);
         GCDecRf((void *)val);
@@ -467,6 +471,7 @@ MemoryChunk *MemoryManager::NewMemoryChunk(uint32 offset, uint32 size, MemoryChu
 
 void MemoryManager::Init(void *app_memory, uint32 app_memory_size, void *vm_memory, uint32 vm_memory_size) {
   memory_ = app_memory;
+  memoryFlagMap = (uint8_t *)calloc(TOTAL_MEMORY_SIZE / sizeof(void *), sizeof(uint8_t));
   total_small_size_ = HEAP_SMALL_SIZE;
 #if DEBUGGC
   assert((HEAP_SMALL_SIZE % 4) == 0 && (VM_MEMORY_SIZE % 4) == 0 && "make sure HEAP SIZE is aligned to 4B");
@@ -618,6 +623,9 @@ void MemoryManager::RecallMem(void *mem, uint32 size) {
       case MemHeadJSList:
         printf("jsstring mem %p size %d is going to be released\n", mem, size);
         break;
+      case MemHeadJSIter:
+        printf("jsiter mem %p size %d is going to be released\n", mem, size);
+        break;
       default:
         MIR_FATAL("unknown VM memory header value");
     }
@@ -678,7 +686,7 @@ void MemoryManager::RecallArray_props(__jsvalue *array_props) {
       mmap->RemoveAddrMapNode(mmap_node);
 #endif
 #if MACHINE64
-      GCDecRf(GetRealAddr(array_props[i].s.payload.ptr));
+      GCDecRf((array_props[i].s.ptr));
 #else
       GCDecRf(array_props[i].s.payload.ptr);
 #endif
@@ -693,7 +701,7 @@ void MemoryManager::RecallList(__json_list *list) {
   uint32_t count = list->count;
   __json_node *node = list->first;
   for (uint32_t i = 0; i < count; i++) {
-    GCCheckAndDecRf(node->value.asbits);
+    GCCheckAndDecRf(node->value.s.asbits, IsNeedRc((node->value.tag)));
     VMFreeNOGC(node, sizeof(__json_node));
     node = node->next;
   }
@@ -727,6 +735,11 @@ void MemoryManager::GCDecRf(void *addr) {
       }
       case MemHeadEnv: {
         ManageEnvironment(addr, RECALL);
+        return;
+      }
+      case MemHeadJSIter: {
+        MemHeader &header = memory_manager->GetMemHeader(addr);
+        RecallMem(addr, sizeof(__jsiterator));
         return;
       }
       default:
@@ -945,19 +958,19 @@ void MemoryManager::ManageJsvalue(__jsvalue *val, ManageType flag) {
     // if the val is an object, then do nothing
     if (__is_string(val)) {
 #ifdef MACHINE64
-      GCDecRf(memory_manager->GetRealAddr(val->s.payload.ptr));
+      GCDecRf((val->s.ptr));
 #else
-      GCDecRf(val->s.payload.ptr);
+      GCDecRf(val->s.ptr);
 #endif
     }
   } else if (flag == RECALL) {
-    GCCheckAndDecRf(val->asbits);
+    GCCheckAndDecRf(val->s.asbits, IsNeedRc(val->tag));
   } else {
     if (__is_js_object(val)) {
 #ifdef MACHINE64
-      ManageChildObj((__jsobject *)memory_manager->GetRealAddr(val->s.payload.obj), flag);
+      ManageChildObj((val->s.obj), flag);
 #else
-      ManageChildObj(val->s.payload.obj, flag);
+      ManageChildObj(val->s.obj, flag);
 #endif
     }
   }
@@ -1208,9 +1221,9 @@ void MemoryManager::ManageJsvalue(__jsvalue *val, ManageType flag) {
   if (flag == MARK || flag == DECRF) {
     if (__is_js_object(val)) {
 #ifdef MACHINE64
-      ManageChildObj((__jsobject *) GetRealAddr(val->s.payload.obj), flag);
+      ManageChildObj((val->s.obj), flag);
 #else
-      ManageChildObj(val->s.payload.obj, flag);
+      ManageChildObj(val->s.obj, flag);
 #endif
     }
   } else if (is_sweep && NotMarkedObject(val)) {

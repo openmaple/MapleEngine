@@ -25,8 +25,12 @@ mkdir build
 cd build || exit 1
 
 # create build system
-cmake ..
+if [ $# -lt 1 ]; then
+  cmake .. -DMACHINE64=True
+elif [ $1 = "mplre" ]; then
+  cmake ..
+fi
 
-# build 
+# build
 make VERBOSE=1 "$@"
 

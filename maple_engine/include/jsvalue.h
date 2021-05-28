@@ -71,6 +71,9 @@ enum __jstype {
   JSTYPE_DOUBLE,
   JSTYPE_NAN,
   JSTYPE_INFINITY,
+  JSTYPE_SPBASE,
+  JSTYPE_FPBASE,
+  JSTYPE_GPBASE,
 };
 
 enum __jsbuiltin_object_id : uint8_t {  // must in accordance with js_value.h:js_builtin_id in the front-end (js2mpl/include/jsvalue.h)
@@ -128,6 +131,7 @@ enum __jsbuiltin_object_id : uint8_t {  // must in accordance with js_value.h:js
   JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE,
   JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR,
   JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE,
+  JSBUILTIN_CONSOLE,
   JSBUILTIN_LAST_OBJECT,
 };
 
@@ -159,19 +163,18 @@ const double NumberMinValue = 5e-324;
 #define MATH_LAST_INDEX NUMBER_MIN_VALUE
 
 #ifdef MACHINE64
-union __jsvalue {
-  uint64_t asbits;
-  struct {
-    union {
-      int32_t i32;
-      uint32_t u32;
-      uint32_t boo;
-      uint32_t str;
-      uint32_t obj;
-      uint32_t ptr;
-    } payload;
-    __jstype tag;
+struct __jsvalue {
+  union {
+    int32_t i32;
+    uint32_t u32;
+    uint32_t boo;
+    void *ptr;
+    void *str;
+    __jsobject *obj;
+    double f64;
+    uint64_t asbits;
   } s;
+  __jstype tag;
 };
 #else
 union __jsvalue {

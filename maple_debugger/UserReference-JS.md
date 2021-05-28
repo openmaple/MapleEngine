@@ -80,8 +80,8 @@ Breakpoint 2 (maple::InvokeInterpretMethod) pending.
 ```
 Example 2:
 ```
-(gdb) mb Add__a63c049
-set breakpoint Add__a63c049
+(gdb) mb Add__snid0
+set breakpoint Add__snid0
 ```
 ***Note***: this shows "pending" Maple breakpoints because the program has not been loaded yet
 
@@ -92,7 +92,7 @@ Example 1:
 (gdb) mb -list
 list all Maple breakpoints
 #1 __jsmain enabled hit_count 1 ignore_count 0 at pending address in maple::maple_invoke_method()
-#2 Add__a63c049 enabled hit_count 0 ignore_count 0 at pending address in maple::maple_invoke_method()
+#2 Add__snid0 enabled hit_count 1 ignore_count 0 at pending address in maple::maple_invoke_method()
 ```
 ***Note***: this output shows the Maple breakpoints when those breakpoints are in a "pending" state.
 
@@ -158,10 +158,10 @@ Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff381ffc8, dynany<> %par2=0x7ffff381ffd0) at ./add.js:18
 #3 add.so:0xad4:008c: __jsmain() at ./add.js:23
 ```
-***Note***: #0 is the stack frame level, **_Add__59aaa481_** is the function symbol in **_add.so_**, the function address is 0xa64:0000. This function has 2 passed in parameters. The first one is marked as %par1, and its memory address is **_0x7ffff6066fc8_**, its compile time type is **_dynany_**, its runtime value can be retrieved by **_mprint_** command. This also shows the function is in the source code file **_./add.js, line 18_**
+***Note***: #0 is the stack frame level, **_Add__snid0_** is the function symbol in **_add.so_**, the function address is 0xa64:0000. This function has 2 passed in parameters. The first one is marked as %par1, and its memory address is **_0x7ffff6066fc8_**, its compile time type is **_dynany_**, its runtime value can be retrieved by **_mprint_** command. This also shows the function is in the source code file **_./add.js, line 18_**
 
 #### 2. View Maple backtrace in asm format
 Execute 'mbt -asm' command
@@ -169,8 +169,8 @@ Example:
 ```
 (gdb) mbt -asm
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s:203
-#3 add.so:0xad4:008c: __jsmain() at /home/che/maple_engine_standalone/maple_engine/maple_build/examples/JavaScript/add/add.s:290
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s:203
+#3 add.so:0xad4:008c: __jsmain() at /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s:290
 ```
 **Note**: This is exact same Maple backtrace, but the displayed source file is the assembly file. For example, **_/home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s_** is the assembly file,  line number is **_203_** in the assmebly file.
 
@@ -188,9 +188,9 @@ Example:
 ```
 (gdb) mbt -full
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
-#1  0x00007ffff6977a19 in maple::maple_invoke_dynamic_method (header=0x7ffff6c9da64 <Add__59aaa481_mirbin_info>, obj=0x7ffff58671d0) at /home/test/gitee/maple_engine/maple_engine/src/invoke_dyn_method.cpp:2744
-#2  0x00007ffff6981d13 in maple::InterSource::FuncCall (this=0x55555576d5f0, callee=0x7ffff6c9da60 <Add__59aaa481>, isIntrinsiccall=false, env=0x0, args=0x7fffffffa840, numArgs=4, start=2, nargs=-1, strictP=false) at /home/test/gitee/maple_engine/maple_engine/src/shimdynfunction.cpp:2159
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#1  0x00007ffff6977a19 in maple::maple_invoke_dynamic_method (header=0x7ffff6c9da64 <Add__snid0_mirbin_info>, obj=0x7ffff58671d0) at /home/test/gitee/maple_engine/maple_engine/src/invoke_dyn_method.cpp:2744
+#2  0x00007ffff6981d13 in maple::InterSource::FuncCall (this=0x55555576d5f0, callee=0x7ffff6c9da60 <Add__snid0>, isIntrinsiccall=false, env=0x0, args=0x7fffffffa840, numArgs=4, start=2, nargs=-1, strictP=false) at /home/test/gitee/maple_engine/maple_engine/src/shimdynfunction.cpp:2159
 #3 add.so:0xad4:008c: __jsmain() at ./add.js:23
 #4  0x00007ffff6977b49 in maple::maple_invoke_dynamic_method_main (mPC=0x7ffff6c9daec <__jsmain_mirbin_code> "]\n", cheader=0x7ffff6c9dad4 <__jsmain_mirbin_info>) at /home/test/gitee/maple_engine/maple_engine/src/invoke_dyn_method.cpp:2750
 #5  0x00007ffff6982d4d in EngineShimDynamic (firstArg=140737333811920, appPath=0x55555576c140 "/home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.so") at /home/test/gitee/maple_engine/maple_engine/src/shimdynfunction.cpp:2377
@@ -207,7 +207,7 @@ Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
 #3 add.so:0xad4:008c: __jsmain() at ./add.js:23
 ````
 ***Note***: current frame stack level is at level 0
@@ -222,7 +222,7 @@ Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
 #3 add.so:0xad4:008c: __jsmain() at ./add.js:23
 ```
 ***Note***: the current frame stack level is set to level 0
@@ -244,7 +244,7 @@ Maple Traceback (most recent call first):
 ***Note***: the current Maple frame is at stack level 3
 ```
 (gdb) mdown
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
 ```
 ***Note***: the current Maple frame is set to stack level 0 after the "mdown" command
 #### 2. mdown [n]
@@ -258,7 +258,7 @@ Maple Traceback (most recent call first):
 ***Note***: the current Maple frame is set to stack level 3
 ```
 (gdb) mdown 1
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
 ```
 ***Note***: after "mdown 1", the current Maple frame is set back to stack level 0
 
@@ -453,7 +453,7 @@ asm file: /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.
          197    .byte 0x28, 0x0, 0x0, 0x0       // localWordsTypeTagged
          198    .byte 0x0, 0x0, 0x0, 0x0        // localWordsRefCounted
          199    .p2align 1
-         200 Add__a63c049_mirbin_code:
+         200 Add__snid0_mirbin_code:
          201    // LINE add.js : 3:   var sum;
          202    // LINE add.js : 3: JSOP_GETLOCAL
 =>       203    .byte OP_constval64, 0x17, 0x0, 0x0               // 0000
@@ -584,7 +584,7 @@ Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
 #3 add.so:0xad4:008c: __jsmain() at ./add.js:23
 (gdb) mlist .
 src file: ./add.js line: 18
@@ -604,7 +604,7 @@ Lists the asm code located by the filename and line number of the current Maple 
 ```
 (gdb) mbt -asm
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s:203
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s:203
 #3 add.so:0xad4:008c: __jsmain() at /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s:290
 (gdb) mlist -asm
 asm file: /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s line: 223
@@ -644,7 +644,7 @@ Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
 #3 add.so:0xad4:008c: __jsmain() at ./add.js:23
 (gdb) msi 4
 Breakpoint 4 at 0x7ffff695180b: file /home/test/gitee/maple_engine/maple_engine/src/invoke_dyn_method.cpp, line 230.
@@ -662,7 +662,7 @@ Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
 #3 add.so:0xad4:008c: __jsmain() at ./add.js:23
 (gdb) msi 4
 Breakpoint 4 at 0x7ffff695180b: file /home/test/gitee/maple_engine/maple_engine/src/invoke_dyn_method.cpp, line 230.
@@ -683,7 +683,7 @@ Example:
 ```
 (gdb) mbt
 Maple Traceback (most recent call first):
-#0 add.so:0xa64:0000: Add__59aaa481(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
+#0 add.so:0xa64:0000: Add__snid0(dynany<> %par1=0x7ffff6066fc8, dynany<> %par2=0x7ffff6066fd0) at ./add.js:18
 #3 add.so:0xad4:008c: __jsmain() at ./add.js:23
 (gdb) mprint 0x7ffff6066fc8
 0x7ffff6066fc8: type=JSTYPE_NUMBER, value=1
@@ -756,7 +756,7 @@ This command is used to display JavaScript function symbols via a regular expres
 Example:
 ```
 (gdb) msymbol Add
-#1 symbol name: Add__59aaa481
+#1 symbol name: Add__snid0
 assembly file : /home/test/gitee/maple_engine/maple_build/examples/JavaScript/add/add.s
 source        : ./add.js
 ```
@@ -764,13 +764,13 @@ source        : ./add.js
 Example:
 ```
 (gdb) msymbol [a-zA-Z]
-#1 symbol name: Add__59aaa481
+#1 symbol name: Add__snid0
 #2 symbol name: __jsmain
 ```
 #### 3. To get all symbols
 ```
 (gdb) msymbol $
-#1 symbol name: Add__59aaa481
+#1 symbol name: Add__snid0
 #2 symbol name: __jsmain
 ```
 

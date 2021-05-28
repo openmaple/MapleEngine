@@ -49,3 +49,4 @@ int32_t __js_str2num2(__jsstring *, bool &, bool);
 __jsvalue __js_str2double(__jsstring *, bool &);
 __jsvalue __js_str2double2(__jsstring *, bool &);
 bool __is_double_no_decimal(double);
+bool __is_double_to_int(double);

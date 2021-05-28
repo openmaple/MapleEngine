@@ -99,13 +99,11 @@ static inline bool __has_and_unconfigurable(__jsprop_desc desc) {
 }
 
 static inline __jsobject *__get_get(__jsprop_desc desc) {
-  //  MAPLE_JS_ASSERT(__has_get(desc));
-  return desc.named_accessor_property.get;
+  return __has_get(desc) ? desc.named_accessor_property.get : NULL;
 }
 
 static inline __jsobject *__get_set(__jsprop_desc desc) {
-  //  MAPLE_JS_ASSERT(__has_set(desc));
-  return desc.named_accessor_property.set;
+  return __has_set(desc) ? desc.named_accessor_property.set : NULL;
 }
 
 static inline __jsvalue __get_value(__jsprop_desc desc) {
@@ -160,7 +158,7 @@ static inline void __set_value_gc(__jsprop_desc *desc, __jsvalue *v) {
 #ifndef RC_NO_MMAP
   UpdateGCReference(&desc->named_data_property.value.s.payload.ptr, JsvalToMval(*v));
 #else
-  GCCheckAndUpdateRf(desc->named_data_property.value.asbits, v->asbits);
+  GCCheckAndUpdateRf(desc->named_data_property.value.s.asbits, desc->named_data_property.value.tag,  v->s.asbits, v->tag);
 #endif
   __set_value(desc, v);
 }
@@ -168,9 +166,6 @@ static inline void __set_value_gc(__jsprop_desc *desc, __jsvalue *v) {
 static inline __jsprop_desc __new_init_desc() {
   __jsprop_desc d;
   d.named_data_property.value = __undefined_value();
-#ifdef MACHINE64
-  d.named_accessor_property.set = NULL;
-#endif
   d.attrs = 0;
   __set_writable(&d, false);
   __set_enumerable(&d, false);
@@ -181,9 +176,6 @@ static inline __jsprop_desc __new_init_desc() {
 static inline __jsprop_desc __new_empty_desc() {
   __jsprop_desc d;
   d.named_data_property.value = __undefined_value();
-#ifdef MACHINE64
-  d.named_accessor_property.set = NULL;
-#endif
   d.attrs = 0;
   return d;
 }
@@ -191,9 +183,6 @@ static inline __jsprop_desc __new_empty_desc() {
 static inline __jsprop_desc __new__desc() {
   __jsprop_desc d;
   d.named_data_property.value = __undefined_value();
-#ifdef MACHINE64
-  d.named_accessor_property.set = NULL;
-#endif
   d.attrs = 0;
   return d;
 }
@@ -201,9 +190,6 @@ static inline __jsprop_desc __new__desc() {
 static inline __jsprop_desc __new_value_desc(__jsvalue *v, uint32_t attrs) {
   __jsprop_desc d;
   d.named_data_property.value = *v;
-#ifdef MACHINE64
-  d.named_accessor_property.set = NULL;
-#endif
   d.attrs = attrs;
   return d;
 }

@@ -354,4 +354,5 @@ void __jsobj_initprop_fromString(__jsobject *obj, __jsstring *str);
 __jsprop *__jsobj_helper_init_value_propertyByValue(__jsobject *, uint32_t, __jsvalue *, uint32_t);
 __jsvalue __jsobj_GetValueFromPropertyByValue(__jsobject *, uint32_t);
 bool __jsPropertyIsWritable(__jsobject *, uint32_t);
+void __jsconsole_pt_log (__jsvalue *, __jsvalue *);
 #endif

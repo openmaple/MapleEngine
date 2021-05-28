@@ -101,7 +101,7 @@ echo Installed Maple compiler into "$MAPLE_COMPILER_ROOT/bin/ark-clang-release/"
 # Build Maple Engine for JS
 cd "$MAPLE_ENGINE_ROOT" || exit 5
 git pull || exit 5
-./buildit.sh mplre-dyn || exit 5
+./buildit.sh || exit 5
 
 if [ -f "$MAPLE_ENGINE_ROOT"/build/src/libmplre-dyn.so ]; then
     cp "$MAPLE_ENGINE_ROOT"/build/src/libmplre-dyn.so "$MAPLE_RUNTIME_ROOT/lib/$MAPLE_TARGET_ARCH"

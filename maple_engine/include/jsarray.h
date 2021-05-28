@@ -65,6 +65,7 @@ __jsvalue *__jsarr_RegularRealloc(__jsvalue *arr, uint32_t old_len, uint32_t new
 
 // ecma 15.4.2.1
 __jsobject *__js_new_arr_elems(__jsvalue *items, uint32_t length);
+__jsobject *__js_new_arr_elems_direct(__jsvalue *items, uint32_t length);
 // ecma 15.4.2.2
 __jsobject *__js_new_arr_length(__jsvalue *l);
 // ecma 15.4.3.2

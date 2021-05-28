@@ -84,7 +84,7 @@ __jsvalue __js_IntlConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
                             uint32_t nargs) {
   __jsobject *obj = __create_object();
   obj->object_class = JSINTL;
-  obj->extensible = true; 
+  obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
 
   return __object_value(obj);
@@ -348,7 +348,7 @@ bool IsWellFormedCurrencyCode(__jsvalue *currency) {
   if (__jsstr_is_ascii(normalized_str)) {
     for (int i = 0; i < len; i++) {
       uint16_t c = __jsstr_get_char(normalized_str, i);
-      if (c < 'A' || c > 'Z') 
+      if (c < 'A' || c > 'Z')
         return false;
     }
   } else {
@@ -375,7 +375,7 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
   // Step 3.
   __jsvalue locales2 = *locales;
   if (__is_string(locales)) {
-    __jsobject *arr_obj = __js_new_arr_elems(locales, 1);
+    __jsobject *arr_obj = __js_new_arr_elems_direct(locales, 1);
     locales2 = __object_value(arr_obj);
   }
 

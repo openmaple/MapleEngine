@@ -214,54 +214,5 @@ void ListT<T>::DeleteNode(T x) {
   VMFreeNOGC(node, sizeof(NodeT<T>));
 }
 
-// Operand stack. This stack is per function,
-// should be allocated on stack only to make it fast
-struct MvalStack {
-  Mval stack_[OPERANDS_STACK_SIZE];
-  int32 size_;  // current elements on stack
-
-  inline void init() {
-    size_ = 0;
-  }
-
-  inline void push(Mval val) {
-#ifdef DEBUG
-    if (size_ < 0 || size_ >= OPERANDS_STACK_SIZE - 1) {
-      MIR_FATAL("push to wrong stack");
-    }
-#endif
-    stack_[size_++] = val;
-  }
-
-  inline Mval pop() {
-#ifdef DEBUG
-    if (size_ <= 0) {
-      MIR_FATAL("pop wrong");
-    }
-#endif
-    MIR_ASSERT(size_ > 0);
-    return stack_[--size_];
-  }
-
-  inline Mval top() {
-#ifdef DEBUG
-    if (size_ <= 0) {
-      MIR_FATAL("top wrong");
-    }
-#endif
-    MIR_ASSERT(size_ > 0);
-    return stack_[size_ - 1];
-  }
-
-  Mval TopNth(int32 n)  // count from 0
-  {
-#ifdef DEBUG
-    if (n > size_ || n < 0) {
-      MIR_FATAL("top n wrong");
-    }
-#endif
-    return stack_[size_ - n - 1];
-  }
-};
 
 #endif  // MAPLE_INCLUDE_VM_VMUTILS

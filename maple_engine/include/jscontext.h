@@ -53,16 +53,17 @@ __jsobject *__js_new_obj_obj_1(__jsvalue *v);
 void __jsop_setprop(__jsvalue *o, __jsvalue *p, __jsvalue *v);
 __jsvalue __jsop_getprop(__jsvalue *o, __jsvalue *p);
 void __jsop_setprop_by_name(__jsvalue *o, __jsstring *p, __jsvalue *v, bool isStrict);
-void __jsop_set_this_prop_by_name(__jsvalue *o, __jsstring *p, __jsvalue *v, bool noThrowTE = false);
+void __jsop_set_this_prop_by_name(__jsvalue *o, __jsstring *p, __jsvalue *v, bool noThrowTE = false, bool asciiOnly = false);
 void __jsop_init_this_prop_by_name(__jsvalue *o, __jsstring *name);
 __jsvalue __jsop_getprop_by_name(__jsvalue *o, __jsstring *p);
-__jsvalue __jsop_get_this_prop_by_name(__jsvalue *o, __jsstring *p);
+__jsvalue __jsop_get_this_prop_by_name(__jsvalue *o, __jsstring *p, bool asciiOnly = false);
 __jsvalue __jsop_delprop(__jsvalue *o, __jsvalue *p);
 void __jsop_initprop_by_name(__jsvalue *o, __jsstring *p, __jsvalue *v);
 void __jsop_initprop_getter(__jsvalue *o, __jsvalue *p, __jsvalue *v);
 void __jsop_initprop_setter(__jsvalue *o, __jsvalue *p, __jsvalue *v);
 // Array
 __jsobject *__js_new_arr_elems(__jsvalue *items, uint32_t len);
+__jsobject *__js_new_arr_elems_direct(__jsvalue *items, uint32_t length);
 __jsobject *__js_new_arr_length(__jsvalue *len);
 uint32_t __jsop_length(__jsvalue *data);
 // String

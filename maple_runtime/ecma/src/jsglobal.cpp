@@ -67,7 +67,7 @@ __jsvalue __js_new_arr(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nar
           MAPLE_JS_RANGEERROR_EXCEPTION();
       }
   }
-  return __object_value(__js_new_arr_elems(arg_list, nargs));
+  return __object_value(__js_new_arr_elems_direct(arg_list, nargs));
 }
 
 __jsvalue __js_new_str_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
@@ -87,7 +87,8 @@ __jsvalue __js_new_str_obj(__jsvalue *this_object, __jsvalue *arg_list, uint32_t
   GCIncRf(primstring);
   __jsvalue length_value = __number_value(__jsstr_get_length(primstring));
   __jsobj_helper_init_value_property(obj, JSBUILTIN_STRING_LENGTH, &length_value, JSPROP_DESC_HAS_VUWUEUC);
-  __jsobj_initprop_fromString(obj, obj->shared.prim_string);
+  // call __jsobj_initprop_fromString only when needed for performance
+  //  __jsobj_initprop_fromString(obj, obj->shared.prim_string);
   return __object_value(obj);
 }
 
@@ -198,17 +199,17 @@ __jsvalue __js_new_type_error_obj(__jsvalue *this_object, __jsvalue *arg_list, u
 __jsvalue __js_isnan(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
   MAPLE_JS_ASSERT(nargs == 1);
   __jsvalue resvalue;
-  resvalue.s.tag = JSTYPE_BOOLEAN;
+  resvalue.tag = JSTYPE_BOOLEAN;
   if(__is_string(arg_list)) {
       bool conv = true;
       __jsvalue n = __js_str2double(__jsval_to_string(arg_list), conv);
-      resvalue.s.payload.u32 = __is_nan(&n) ? 1 : 0;
+      resvalue.s.asbits = __is_nan(&n) ? 1 : 0;
   } else if (__is_js_object(arg_list)) {
     bool isYConvertible = false;
     __jsvalue res = __js_ToNumberSlow2(arg_list, isYConvertible);
-    resvalue.s.payload.u32 = isYConvertible ? __is_nan(&res) : 1;
+    resvalue.s.asbits = isYConvertible ? __is_nan(&res) : 1;
   } else {
-      resvalue.s.payload.u32 = __is_nan(arg_list) || __is_undefined(arg_list) ? 1 : 0;
+      resvalue.s.asbits = __is_nan(arg_list) || __is_undefined(arg_list) ? 1 : 0;
 
   }
   return(resvalue);
@@ -248,7 +249,7 @@ __jsvalue __js_parseint(__jsvalue *this_object, __jsvalue *arg_list, uint32_t na
   if (__is_string(&arg_list[0])) {
     jsstr = __jsval_to_string(&arg_list[0]);
   } else if ((__is_number(&arg_list[0]) &&
-               (__is_pos_zero_num(&arg_list[0]) || __is_neg_zero_num(&arg_list[0]))) ||
+               (__is_positive_zero(&arg_list[0]) || __is_negative_zero(&arg_list[0]))) ||
              (__is_double(&arg_list[0]) &&
                (__is_positive_zero(&arg_list[0])|| __is_negative_zero(&arg_list[0])))) {
     // parseInt return pos 0 regardless of sign of zero
@@ -279,7 +280,7 @@ __jsvalue __js_parsefloat(__jsvalue *this_object, __jsvalue *arg_list, uint32_t 
     return(__nan_value());
   }
   if ((__is_number(&arg_list[0]) &&
-        (__is_pos_zero_num(&arg_list[0]) || __is_neg_zero_num(&arg_list[0]))) ||
+        (__is_positive_zero(&arg_list[0]) || __is_negative_zero(&arg_list[0]))) ||
       (__is_double(&arg_list[0]) &&
         (__is_positive_zero(&arg_list[0])|| __is_negative_zero(&arg_list[0])))) {
       // parseFloat returns pos 0 regardless of sign of zero
@@ -289,7 +290,7 @@ __jsvalue __js_parsefloat(__jsvalue *this_object, __jsvalue *arg_list, uint32_t 
   } else if (__is_string(arg_list)) {
       return(__js_str2double2(__jsval_to_string(arg_list), isNum));
   } else if (__is_number(arg_list)) {
-      return(__js_str2double2(__js_NumberToString(arg_list->s.payload.i32), isNum));
+      return(__js_str2double2(__js_NumberToString(arg_list->s.i32), isNum));
   } else if (__is_js_object(arg_list)) { //ecma 19.2.4.1 and 7.1.17
       __jsobject *obj = __jsval_to_object(arg_list);
       if (obj->object_class == JSDOUBLE) {
@@ -316,17 +317,17 @@ __jsvalue __js_parsefloat(__jsvalue *this_object, __jsvalue *arg_list, uint32_t 
 __jsvalue __js_isfinite(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
   MAPLE_JS_ASSERT(nargs == 1);
   __jsvalue resvalue;
-  resvalue.s.tag = JSTYPE_BOOLEAN;
+  resvalue.tag = JSTYPE_BOOLEAN;
   if(__is_string(arg_list)) {
       bool conv = true;
       __jsvalue n = __js_str2double(__jsval_to_string(arg_list), conv);
-      resvalue.s.payload.u32 = __is_nan(&n) || __is_infinity(&n) ? 0 : 1;
+      resvalue.s.asbits = __is_nan(&n) || __is_infinity(&n) ? 0 : 1;
   } else if (__is_js_object(arg_list)) {
     bool isYConvertible = false;
     __jsvalue res = __js_ToNumberSlow2(arg_list, isYConvertible);
-    resvalue.s.payload.u32 = isYConvertible ? !__is_nan(&res) : 0;
+    resvalue.s.asbits = isYConvertible ? !__is_nan(&res) : 0;
   } else {
-      resvalue.s.payload.u32 = __is_nan(arg_list) || __is_undefined(arg_list) || __is_infinity(arg_list) ? 0 : 1;
+      resvalue.s.asbits = __is_nan(arg_list) || __is_undefined(arg_list) || __is_infinity(arg_list) ? 0 : 1;
 
   }
   return(resvalue);
@@ -432,6 +433,7 @@ __jsvalue __js_new_booleanconstructor(__jsvalue *this_object, __jsvalue *arg_lis
   MAPLE_JS_ASSERT(nargs == 0 || nargs == 1);
   bool val = (nargs == 0) ? false : __js_ToBoolean(arg_list);
   __jsvalue ret;
+  ret.s.asbits = 0;
   __set_boolean(&ret, val);
   return ret;
 }

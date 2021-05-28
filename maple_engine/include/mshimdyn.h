@@ -29,6 +29,7 @@ namespace maple {
 #define JSEHOP_jscatch 0x3
 #define JSEHOP_finally 0x4
 
+
 struct JavaScriptGlobal {
   uint8_t flavor;
   uint8_t srcLang;
@@ -68,9 +69,9 @@ public:
   void SetRetval0(MValue, bool);
   void SetRetval0Object(void *, bool);
   void SetRetval0NoInc (uint64_t);
-  void EmulateStore(uint8 *, MValue, PrimType);
-  void EmulateStoreGC(uint8 *, MValue, PrimType);
-  uint64_t EmulateLoad(uint8 *, PrimType);
+  void EmulateStore(uint8_t *, uint8_t,  MValue, PrimType);
+  void EmulateStoreGC(uint8 *, uint8_t, MValue, PrimType);
+  MValue EmulateLoad(uint8 *, uint8, PrimType);
   int32_t PassArguments(MValue , void *, MValue *, int32_t, int32_t);
   inline void *GetSPAddr() {return (void *) (sp + (uint8 *)memory);}
   inline void *GetFPAddr() {return (void *) (fp + (uint8 *)memory);}
@@ -83,17 +84,17 @@ public:
   MValue JSopDiv(MValue &, MValue &, PrimType, Opcode);
   MValue JSopRem(MValue &, MValue &, PrimType, Opcode);
   MValue JSopBitOp(MValue &, MValue &, PrimType, Opcode);
-  MValue JSopCmp(MValue, MValue, Opcode);
+  MValue JSopCmp(MValue, MValue, Opcode, PrimType);
   bool JSopSwitchCmp(MValue &, MValue &, MValue &);
   MValue JSopCVT(MValue, PrimType, PrimType);
-  void * JSopNewArrLength(MValue &);
+  MValue JSopNewArrLength(MValue &);
   void JSopSetProp(MValue &, MValue &, MValue &);
   void JSopInitProp(MValue &, MValue &, MValue &);
   MValue  JSopNew(MValue &size);
-  uint64_t JSopNewIterator(MValue &, MValue &);
+  MValue  JSopNewIterator(MValue &, MValue &);
   MValue JSopNextIterator(MValue &);
-  uint32_t JSopMoreIterator(MValue &);
-  uint64_t JSopBinary(MIRIntrinsicID, MValue &, MValue &);
+  MValue JSopMoreIterator(MValue &);
+  MValue JSopBinary(MIRIntrinsicID, MValue &, MValue &);
   MValue JSBoolean(MValue &);
   MValue JSNumber(MValue &);
   MValue JSopConcat(MValue &, MValue &);
@@ -155,7 +156,34 @@ private:
   bool JSopPrimCmp(Opcode, MValue &, MValue &, PrimType);
 };
 
-
+inline uint8_t GetTagFromPtyp (PrimType ptyp) {
+  switch(ptyp) {
+        case PTY_dynnone:     return JSTYPE_NONE;
+        case PTY_dynnull:  return JSTYPE_NULL;
+        case PTY_dynbool:
+        case PTY_u1:       return JSTYPE_BOOLEAN;
+        case PTY_i8:
+        case PTY_i16:
+        case PTY_i32:
+        case PTY_i64:
+        case PTY_u16:
+        case PTY_u8:
+        case PTY_u32:
+        case PTY_a64:
+        case PTY_u64:       return  JSTYPE_NUMBER;
+        case PTY_f32:
+        case PTY_f64:       return  JSTYPE_DOUBLE;
+        case PTY_simplestr: return  JSTYPE_STRING;
+        case PTY_simpleobj: return  JSTYPE_OBJECT;
+        case kPtyInvalid:
+        case PTY_dynany:
+        case PTY_dynundef:
+        case PTY_dynstr:
+        case PTY_dynobj:
+        case PTY_void:
+        default:            assert(false&&"unexpected");
+    };
+}
 
 inline bool IsPrimitiveDyn(PrimType ptyp) {
   // return ptyp >= PTY_simplestr && ptyp <= PTY_dynnone;
@@ -165,15 +193,15 @@ inline bool IsPrimitiveDyn(PrimType ptyp) {
 inline uint32_t GetMvalueValue(MValue &mv) {
   return mv.x.u32;
 }
-inline uint32_t GetMValueTag(MValue &mv) {
-  return (uint32_t)(mv.x.u64 >> 32);
+inline uint8_t GetMValueTag(MValue &mv) {
+  return (mv.ptyp);
 }
 
-inline void SetMValueValue (MValue &mv, uint32_t val) {
-  mv.x.u64 = (((uint64_t)val) | (mv.x.u64 & 0xffffffff00000000));
+inline void SetMValueValue (MValue &mv, uint64_t val) {
+  mv.x.u64 = val;
 }
 inline void SetMValueTag (MValue &mv, uint32_t tag) {
-  mv.x.u64 = (((uint64_t)tag << 32) | (mv.x.u64 & 0xffffffff));
+  mv.ptyp = tag;
 }
 extern JavaScriptGlobal *jsGlobal;
 extern uint32_t *jsGlobalMemmap;

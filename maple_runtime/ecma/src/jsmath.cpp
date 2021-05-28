@@ -217,8 +217,7 @@ __jsvalue __jsmath_pt_pow(__jsvalue *this_math, __jsvalue *x, __jsvalue *y) {
       return __number_value((int32_t)t);
     else {
       __jsvalue jsval;
-      jsval.s.payload.i32 = memory_manager->SetF64ToU32(t);
-      jsval.s.tag = JSTYPE_DOUBLE;
+      jsval = __double_value(t);
       return jsval;
     }
   }

@@ -37,7 +37,11 @@ namespace maple {
             uint32_t   u32;     // For operand type in OP_ge, OP_eq...
             uint64_t   u64;     // For zero-extension
         } x;
+#ifdef MACHINE64
+        uint8_t ptyp:8;
+#else
         PrimType ptyp:8;
+#endif
     };
 
 }

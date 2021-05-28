@@ -65,7 +65,7 @@ void __jsop_print_item(__jsvalue value) {
       break;
     }
     case JSTYPE_DOUBLE: {
-      printf("%.16g", memory_manager->GetF64FromU32((value.s.payload.u32)));
+      printf("%.16g", (value.s.f64));
       break;
     }
     case JSTYPE_NAN: {

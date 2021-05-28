@@ -810,38 +810,42 @@ def get_one_frame_stack_dynamic(sp, idx):
 ################################################################################
 # jstype from jsvalue.h
 jstype_dict = {
-  "JSTYPE_NONE",
-  "JSTYPE_NULL",
-  "JSTYPE_BOOLEAN",
-  "JSTYPE_STRING",
-  "JSTYPE_NUMBER",
-  "JSTYPE_OBJECT",
-  "JSTYPE_ENV",
-  "JSTYPE_UNKNOWN",
-  "JSTYPE_UNDEFINED",
-  "JSTYPE_DOUBLE",
-  "JSTYPE_NAN",
-  "JSTYPE_INFINITY"
+  "JSTYPE_NONE"      : 0,
+  "JSTYPE_NULL"      : 1,
+  "JSTYPE_BOOLEAN"   : 2,
+  "JSTYPE_STRING"    : 3,
+  "JSTYPE_NUMBER"    : 4,
+  "JSTYPE_OBJECT"    : 5,
+  "JSTYPE_ENV"       : 6,
+  "JSTYPE_UNKNOWN"   : 7,
+  "JSTYPE_UNDEFINED" : 8,
+  "JSTYPE_DOUBLE"    : 9,
+  "JSTYPE_NAN"       : 10,
+  "JSTYPE_INFINITY"  : 11,
+  "JSTYPE_SPBASE"    : 12,
+  "JSTYPE_FPBASE"    : 13,
+  "JSTYPE_GPBASE"    : 14
 }
 
 def get_jsvalue_tag_value(buf):
     '''
     Input:
         buf: output of Maple Engine JS __jsvalue structure. Used in operand_stack[].x or __this_BindObject etc.
-             string example: $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
-    Output:
-        None
+             string example: $284 = {s = {i32 = -222167020, u32 = 4072800276, boo = 4072800276, ptr = 0x7ffff2c20014, str = 0x7ffff2c20014, obj = 0x7ffff2c20014, f64 = 6.9533448313257822e-310,  asbits = 140737266188308}, tag = JSTYPE_OBJECT}
 
     Return:
         tag (type) if any, or None if not valid
-        index: index value in string for co-responding type, e.g if type == JSTYPE_NUMBER, value should be same to i32. None if type is not valid
+        value: value in string for co-responding type, e.g if type == JSTYPE_NUMBER, value should be same to i32. None if type is not valid
+
+    Use this function when you need return tag and val altogether, like get tag and val from  __js_ThisBinding or get tag and val from
+    a valid perand_stack[idx].x data
     '''
     if not buf or len(buf) == 0:
         return None, None
 
     if buf[0] != '$' or 'tag = JSTYPE' not in buf:
         return None, None
-    tag = buf.split("tag = ")[-1][:-2]
+    tag = buf.split("tag = ")[-1][:-1]
     if tag == "JSTYPE_OBJECT":
         val = buf.split("obj = ")[1].split(',')[0]
     elif tag == "JSTYPE_NUMBER":
@@ -855,6 +859,36 @@ def get_jsvalue_tag_value(buf):
 
     return tag, val
 
+def get_jsvalue_value_by_tag(buf, tag):
+    '''
+    Input:
+        buf: output of Maple Engine JS __jsvalue structure. Used in operand_stack[].x or __this_BindObject etc.
+             string example: $284 = {s = {i32 = -222167020, u32 = 4072800276, boo = 4072800276, ptr = 0x7ffff2c20014, str = 0x7ffff2c20014, obj = 0x7ffff2c20014, f64 = 6.9533448313257822e-310,  asbits = 140737266188308}, tag = JSTYPE_OBJECT}
+        tag: tag string. e,g "JSTYPE_NUMBER"
+
+    Return:
+        value of tag in string
+
+    Use this function in case tag needs to be fetched first or separately with value, like mprint <addr> to get the values from a specified address
+    '''
+    if not buf or len(buf) == 0:
+        return None, None
+
+    if buf[0] != '$':
+        return None
+    if tag == "JSTYPE_OBJECT":
+        val = buf.split("obj = ")[1].split(',')[0]
+    elif tag == "JSTYPE_NUMBER":
+        val = buf.split("i32 = ")[1].split(',')[0]
+    elif tag == "JSTYPE_BOOLEAN":
+        val = buf.split("boo = ")[1].split(',')[0]
+    elif tag == "JSTYPE_STRING":
+        val = buf.split("str = ")[1].split(',')[0]
+    else:
+        val = None
+
+    return val
+
 def get_current_thisbinding():
     '''
     Input: None
@@ -867,37 +901,14 @@ def get_current_thisbinding():
         buf = m_util.gdb_exec_to_str(cmd)
     except:
         return None, None
-    # example of output: $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
+    # example of old output: $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
+    # example of new output:$284 = {s = {i32 = -222167020, u32 = 4072800276, boo = 4072800276, ptr = 0x7ffff2c20014, str = 0x7ffff2c20014, obj = 0x7ffff2c20014, f64 = 6.9533448313257822e-310,  asbits = 140737266188308}, tag = JSTYPE_OBJECT}
+    # NOTE!!! if tag is JSTYPE_OBJECT, s.obj is an ADDRESS other than index!!!. It used to an index, but changed now
     buf = buf.rstrip()
 
     tag, val = get_jsvalue_tag_value(buf)
     if m_debug.Debug: m_debug.dbg_print("tag = ", tag, "val = ", val)
     return tag, val
-
-def get_realAddr_by_index(index):
-    '''
-    Input:
-        index: index of one __jsvalue structure instance. In string.
-            e.g $38 = {asbits = 21474836481, s = {payload = {i32 = 1, u32 = 1, boo = 1, str = 1, obj = 1, ptr = 1}, tag = JSTYPE_OBJECT}}
-            Index is 1 in this example.
-
-    Return:
-        address in string, that represents an index.
-    '''
-
-    cmd = "p memory_manager->GetRealAddr(" + str(index) + ")"
-    try:
-        buf = m_util.gdb_exec_to_str(cmd)
-    except:
-        return None
-    # example of a command to issue "p memory_manager->GetRealAddr(1)"
-    buf = buf.rstrip()
-    # example of returning output: "$39 = (void *) 0x7ffff63d4014"
-
-    if buf[0] != '$' or ' = ' not in buf:
-        return None
-    addr = buf.split()[4]
-    return addr
 
 def get_realAddr_data(addr, jstype):
     '''
@@ -1043,20 +1054,7 @@ def get_js_string_value(addr):
 
     return string_value
 
-def get_string_value_from_index(index):
-    '''
-        for a given js string index, return its real value in ascii or utf16
-    '''
-    addr = get_realAddr_by_index(str(index))
-    if not addr:
-        return None
-    return get_js_string_value(addr)
-
-def get_jsobject_value_from_index(index):
-    addr = get_realAddr_by_index(str(index))
-    if not addr:
-        return None
-
+def get_jsobject_value_by_addr(addr):
     cmd = "p *(__jsobject *)" + str(addr)
     if m_debug.Debug: m_debug.dbg_print("cmd=", cmd)
     try:
@@ -1124,13 +1122,15 @@ def get_prop_list_node_data(node_addr):
     buf = buf.rstrip()
     if m_debug.Debug: m_debug.dbg_print("get_prop_list_data buf=", buf)
 
-    # example of output:
+    # example of old output:
     # "$86 = {n = {index = 1433850280, name = 0x55555576d1a8}, next = 0x0, desc = {{named_data_property = {value = {asbits = 34359738368, s = {payload = {i32 = 0,u32 = 0, boo = 0, str = 0, obj = 0, ptr = 0}, tag = JSTYPE_UNDEFINED}}}, named_accessor_property = {get = 0x800000000, set = 0x0}}, {s = {attr_writable = 3 '\003', attr_enumerable = 3 '\003', attr_configurable = 2 '\002', fields = 0 '\000'}, attrs = 131843}}, isIndex = false}"
+    # example of new output:
+    # $56 = {n = {index = 1433864704, name = 0x555555770a00}, prev = 0x7ffff2c202d4, next = 0x7ffff2c2019c, desc = {{named_data_property = {value = {s = {i32 = 0, u32 = 0, boo = 0, ptr = 0x0, str = 0x0, obj = 0x0, f64 = 0, asbits = 0}, tag = JSTYPE_UNDEFINED}}, named_accessor_property = {get = 0x0, set = 0x7fff00000008}}, {s = {attr_writable = 3 '\003', attr_enumerable = 3 '\003', attr_configurable = 2 '\002', fields = 0 '\000'}, attrs = 131843}}, isIndex = false}
     if buf[0] != '$' or 'next = ' not in buf or 'desc = ' not in buf:
         return None
     prop_next = buf.split("next = ")[1].split(',')[0]
     prop_name_addr = buf.split("name = ")[1].split(',')[0][:-1]
-    tag = buf.split("tag = ")[1].split('}}}')[0]
+    tag = buf.split("tag = ")[1].split('}}')[0]
 
     if m_debug.Debug: m_debug.dbg_print("prop_next=", prop_next, "prop_name_addr=", prop_name_addr, "tag=", tag)
     name = get_js_string_value(prop_name_addr)
@@ -1148,18 +1148,18 @@ def get_prop_list_node_data(node_addr):
     if tag == 'JSTYPE_UNDEFINED' or tag == 'JSTYPE_NONE' or tag == 'JSTYPE_NULL':
         element['value'] = "undefined"
     elif tag == 'JSTYPE_NUMBER':
-        value = buf.split('payload = {i32 = ')[1].split(',')[0]
+        value = buf.split('{i32 = ')[1].split(',')[0]
         element['value'] = value
     elif tag == 'JSTYPE_BOOLEAN':
         value = buf.split('boo = ')[1].split(',')[0]
         element['value'] = value
     elif tag == 'JSTYPE_STRING':
-        index = buf.split('str = ')[1].split(',')[0]
-        str_v = get_string_value_from_index(index)
+        addr = buf.split('str = ')[1].split(',')[0]
+        str_v = get_js_string_value(addr)
         element['value'] = str_v
     elif tag == 'JSTYPE_OBJECT':
-        index = buf.split('obj = ')[1].split(',')[0]
-        object_data = get_jsobject_value_from_index(index)
+        addr = buf.split('obj = ')[1].split(',')[0]
+        object_data = get_jsobject_value_by_addr(addr)
         if not object_data or len(object_data) == 0:
             element["value"] = ""
         else:
@@ -1215,9 +1215,7 @@ def get_all_dync_properties_data():
     tag,val = get_current_thisbinding()
     if m_debug.Debug: m_debug.dbg_print("tag=", tag, "val=", val)
     if tag and val:
-        addr = get_realAddr_by_index(val)
-        if m_debug.Debug: m_debug.dbg_print("real addr=", addr)
-
+        addr = val
         #only when prop_list returns non-0 address, could the prop_list starts
         # to have meaningful data filled in.
         # also nite, prop_list_head is in struct of struct __jsprop. reference this
@@ -1356,8 +1354,10 @@ def get_one_js_frame_stack_dynamic(sp, idx):
     except:
         return None, None
     buf = buf.rstrip()
-    # output sample: $174 = {asbits = 17179869186, s = {payload = {i32 = 2, u32 = 2, boo = 2, str = 2, obj = 2, ptr = 2}, tag = JSTYPE_NUMBER}}
+    # old output sample: $174 = {asbits = 17179869186, s = {payload = {i32 = 2, u32 = 2, boo = 2, str = 2, obj = 2, ptr = 2}, tag = JSTYPE_NUMBER}}
     # or a bad output sample: $194 = {asbits = 14627392582107119343, s = {payload = {i32 = -559038737, u32 = 3735928559, boo = 3735928559, str = 3735928559, obj = 3735928559, ptr = 3735928559}, tag = 3405705229}}
+    # example of new output:
+    # $56 = {n = {index = 1433864704, name = 0x555555770a00}, prev = 0x7ffff2c202d4, next = 0x7ffff2c2019c, desc = {{named_data_property = {value = {s = {i32 = 0, u32 = 0, boo = 0, ptr = 0x0, str = 0x0, obj = 0x0, f64 = 0, asbits = 0}, tag = JSTYPE_UNDEFINED}}, named_accessor_property = {get = 0x0, set = 0x7fff00000008}}, {s = {attr_writable = 3 '\003', attr_enumerable = 3 '\003', attr_configurable = 2 '\002', fields = 0 '\000'}, attrs = 131843}}, isIndex = false}
     maple_type, v = get_jsvalue_tag_value(buf)
     if not v or maple_type not in jstype_dict:
         return None, None
@@ -1366,27 +1366,53 @@ def get_one_js_frame_stack_dynamic(sp, idx):
     return maple_type, v
 
 def get_jstype_value_by_addr(addr):
-    ''' addr is the address in int. This address is the one shown in mbt output for parameter's address '''
+    ''' addr is the address in int, e,g the one shown in mbt output for parameter's address, or a prop
+        node address in prop list '''
 
-    # first, to get the jsvalue type (string or number or boolean or object), and get its corresponding index
+
+    # first, since __jsvalue data structure got changed to 72 bites, so the payload part (64bits) remains
+    # same as before, however, ptyp (8bits) is kept in a different place. we must go get it
+    cmd = "p memory_manager->GetFlagFromMemory(" + hex(addr) + ", memory_manager->fpBaseFlag)"
+    try:
+        buf = m_util.gdb_exec_to_str(cmd)
+    except:
+        return None, None
+    buf = buf.rstrip()
+    if buf[0] != '$':
+        return None, None
+    type_v_str = buf.split(" = ")[1].split()[0]
+    try:
+        type_v = int(type_v_str)
+    except:
+        return None, None
+
+    try:
+        maple_type = [ky for ky, ve in jstype_dict.items() if ve == type_v]
+    except:
+        return None, None
+    if len(maple_type) == 0:
+        return None, None
+    maple_type = maple_type[0]
+    if m_debug.Debug: m_debug.dbg_print("return maple_type=", maple_type)
+
+    # second, to get the jsvalue type (string or number or boolean or object), and get its corresponding index
     cmd = "p *(__jsvalue *)" + hex(addr)
     try:
         buf = m_util.gdb_exec_to_str(cmd)
     except:
         return None, None
     buf = buf.rstrip()
-    # output sample: $174 = {asbits = 17179869186, s = {payload = {i32 = 2, u32 = 2, boo = 2, str = 2, obj = 2, ptr = 2}, tag = JSTYPE_NUMBER}}
-    # or a bad output sample: $194 = {asbits = 14627392582107119343, s = {payload = {i32 = -559038737, u32 = 3735928559, boo = 3735928559, str = 3735928559, obj = 3735928559, ptr = 3735928559}, tag = 3405705229}}
-    maple_type, v = get_jsvalue_tag_value(buf)
-    if m_debug.Debug: m_debug.dbg_print("return maple_type=", maple_type, "v=", v)
-    if not v or maple_type not in jstype_dict:
+
+    v = get_jsvalue_value_by_tag(buf, maple_type)
+    if m_debug.Debug: m_debug.dbg_print("return v=", v)
+    if not v :
         return None, None
 
-    # second, for string type and object type, need additional steps to get the value
+    # third, for string type and object type, need additional steps to get the value
     if maple_type == "JSTYPE_NUMBER" or maple_type == "JSTYPE_BOOLEAN":
         return maple_type, v
     elif maple_type == "JSTYPE_STRING":
-        ret_str = get_string_value_from_index(v)
+        ret_str = get_js_string_value(v)
         return  maple_type, ret_str
     elif maple_type == "JSTYPE_OBJECT":
         return maple_type, None

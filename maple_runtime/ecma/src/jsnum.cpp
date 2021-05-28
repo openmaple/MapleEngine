@@ -558,8 +558,9 @@ __jsvalue __jsnum_pt_toString(__jsvalue *this_number, __jsvalue *radix) {
   signstr = istr = ret = NULL;
   int64_t val;
 #ifdef MACHINE64
-  if (this_number->s.tag == JSTYPE_OBJECT) {
-    __jsobject *obj = (__jsobject *)memory_manager->GetRealAddr(this_number->s.payload.obj);
+  if (this_number->tag == JSTYPE_OBJECT) {
+    // __jsobject *obj = (__jsobject *)memory_manager->GetRealAddr(this_number->s.payload.obj);
+    __jsobject *obj = this_number->s.obj;
     if(obj->object_class == JSNUMBER) {
       if (obj->object_type == JSSPECIAL_NUMBER_OBJECT) {
         // NaN or Infinity
@@ -660,7 +661,7 @@ __jsvalue __jsnum_pt_toFixed(__jsvalue *this_number, __jsvalue *fracdigit) {
 
   // get double value from this_number
   if (__is_double(this_number)) {
-    dval = memory_manager->GetF64FromU32(this_number->s.payload.u32);
+    dval = (this_number->s.f64);
   } else if (__is_number(this_number)) {
     dval = (double)__js_ToNumber(this_number);
   } else {
@@ -703,5 +704,8 @@ __jsvalue __jsnum_pt_toPrecision(__jsvalue *this_number, __jsvalue *precision) {
 
 bool __is_double_no_decimal(double x) {
   return (fabs(x - (double)(int64_t)x) < NumberMinValue);
+}
+bool __is_double_to_int(double x) {
+  return __is_double_no_decimal(x) && fabs(x) < (double)0x7fffffff;
 }
 

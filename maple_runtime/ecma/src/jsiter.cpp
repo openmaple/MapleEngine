@@ -23,7 +23,7 @@
 #include "vmmemory.h"
 
 __jsiterator *__jsop_valueto_iterator(__jsvalue *value, uint32_t flags) {
-  __jsiterator *itr = (__jsiterator *)VMMallocNOGC(sizeof(__jsiterator));
+  __jsiterator *itr = (__jsiterator *)VMMallocGC(sizeof(__jsiterator), MemHeadJSIter);
   // if value is undefined, return an empty iterator
   if (__is_null_or_undefined(value)) {
     itr->obj = NULL;

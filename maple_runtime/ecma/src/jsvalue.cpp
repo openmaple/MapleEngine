@@ -33,9 +33,10 @@ void dumpJSString(uint16_t *ptr) {
 
 void dumpJSValue(__jsvalue *jsval) {
 #if MIR_FEATURE_FULL | MIR_DEBUG
-  printf("tag is %x, value is %x\n", jsval->s.tag, jsval->s.payload.i32);
+  printf("tag is %x, value is %x\n", jsval->tag, jsval->s.i32);
   if (__is_string(jsval)) {
-    dumpJSString((uint16_t *) memory_manager->GetRealAddr(jsval->s.payload.ptr));
+    // dumpJSString((uint16_t *) memory_manager->GetRealAddr(jsval->s.payload.ptr));
+    dumpJSString((uint16_t *) (jsval->s.str));
   }
 #endif  // MIR_FEATURE_FULL
 }
@@ -49,15 +50,16 @@ uint32_t __jsop_length(__jsvalue *v) {
   return length;
 }
 
-#ifdef MACHINE64
+#if 0
 __jsstring *__jsval_to_string(__jsvalue *data) {
   MAPLE_JS_ASSERT(__is_string(data));
-  return (__jsstring *)memory_manager->GetRealAddr(data->s.payload.str);
+  // return (__jsstring *)memory_manager->GetRealAddr(data->s.payload.str);
+  return (__jsstring *)(data->s.str);
 }
 
 __jsobject *__jsval_to_object(__jsvalue *data) {
   MAPLE_JS_ASSERT(__is_js_object(data));
-  return (__jsobject *)memory_manager->GetRealAddr(data->s.payload.obj);
+  return (__jsobject *)(data->s.obj);
 }
 void __set_string(__jsvalue *data, __jsstring *str) {
   data->s.tag = JSTYPE_STRING;
@@ -69,14 +71,14 @@ void __set_object(__jsvalue *data, __jsobject *obj) {
 }
 bool __is_js_function(__jsvalue *data) {
   if (__is_js_object(data)) {
-    __jsobject *obj = (__jsobject *)(memory_manager->GetRealAddr(data->s.payload.obj));
+    __jsobject *obj = (__jsobject *)((data->s.obj));
     return obj->object_class == JSFUNCTION;
   }
   return false;
 }
 bool __is_js_array(__jsvalue *data) {
   if (__is_js_object(data)) {
-    __jsobject *obj = (__jsobject *)(memory_manager->GetRealAddr(data->s.payload.obj));
+    __jsobject *obj = (__jsobject *)((data->s.obj));
     return obj->object_class == JSARRAY;
   }
   return false;

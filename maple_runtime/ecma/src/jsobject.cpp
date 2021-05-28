@@ -42,11 +42,22 @@ void __jsobj_set_prototype(__jsobject *obj, __jsobject *proto_obj) {
   GCIncRf((void *)proto_obj);
 }
 
-static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, bool createBuiltin = true) {
+static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, bool createBuiltin = true, bool asciiOnly = false) {
 #ifdef USE_PROP_MAP
   if (obj->prop_string_map != NULL) {
     std::map<std::wstring, __jsprop *>::iterator it;
-    it = obj->prop_string_map->find(__jsstr_to_wstring(name));
+    if (asciiOnly) {
+      uint32_t len = __jsstr_get_length(name);
+      wchar_t w_name[len + 1];
+      char *n = name->x.ascii;
+      for (int i = 0; i < len; i++) {
+        w_name[i] = n[i];
+      }
+      w_name[len] = 0;
+      it = obj->prop_string_map->find(w_name);
+    } else {
+      it = obj->prop_string_map->find(__jsstr_to_wstring(name));
+    }
     if (it != obj->prop_string_map->end()) {
       __jsprop *p = it->second;
         if (__is_undefined_desc(p->desc)) {
@@ -82,6 +93,10 @@ static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, 
 
 static __jsprop *__jsobj_helper_get_propertyByValue(__jsobject *obj, uint32_t index, bool createBuiltin = true) {
 #ifdef USE_PROP_MAP
+  if (obj->prop_index_map == NULL && obj->object_class == JSSTRING && obj->shared.prim_string) {
+    // lazy initailize properties for string
+    __jsobj_initprop_fromString(obj, obj->shared.prim_string);
+  }
   if (obj->prop_index_map != NULL) {
     std::map<uint32_t, __jsprop *>::iterator it;
     it = obj->prop_index_map->find(index);
@@ -373,14 +388,14 @@ void __jsobj_helper_add_value_property(__jsobject *obj, __jsbuiltin_string_id id
 __jsprop *__jsobj_helper_init_value_propertyByValue(__jsobject *obj, uint32_t index, __jsvalue *v, uint32_t attrs) {
   __jsprop *prop = __jsobj_helper_create_propertyByValue(obj, index);
   prop->desc = __new_value_desc(v, attrs);
-  GCCheckAndIncRf(v->asbits);
+  GCCheckAndIncRf(v->s.asbits, IsNeedRc((v->tag)));
   return prop;
 }
 
 __jsprop *__jsobj_helper_init_value_property(__jsobject *obj, __jsstring *p, __jsvalue *v, uint32_t attrs) {
   __jsprop *prop = __jsobj_helper_create_property(obj, p);
   prop->desc = __new_value_desc(v, attrs);
-  GCCheckAndIncRf(v->asbits);
+  GCCheckAndIncRf(v->s.asbits, IsNeedRc(v->tag));
   return prop;
 }
 
@@ -643,8 +658,8 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       break;
     case JSBUILTIN_NUMBERCONSTRUCTOR:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_PROTOTYPE, (JSBUILTIN_NUMBERPROTOTYPE));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_MAX_VALUE_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(NUMBER_MAX_VALUE)));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_MIN_VALUE_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(NUMBER_MIN_VALUE)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_MAX_VALUE_U, (JSBUILTIN_MATH), __double_value(NumberMaxValue));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_MIN_VALUE_U, (JSBUILTIN_MATH), __double_value(NumberMinValue));
       ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_POSITIVE_INFINITY_U, (JSBUILTIN_MATH), __number_value(0));
       ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NEGATIVE_INFINITY_U, (JSBUILTIN_MATH), __number_value(0));
       ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NAN, (JSBUILTIN_MATH), __number_value(0));
@@ -678,14 +693,14 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_LOG, __jsmath_pt_log, ATTRS(1, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_EXP, __jsmath_pt_exp, ATTRS(1, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RANDOM, __jsmath_pt_random, ATTRS(0, 0));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_E_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(MATH_E_INDEX)));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_LN10_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(MATH_LN10_INDEX)));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_LN2_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(MATH_LN2_INDEX)));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_LOG10E_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(MATH_LOG10E_INDEX)));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_LOG2E_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(MATH_LOG2E_INDEX)));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_PI_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(MATH_PI_INDEX)));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_SQRT1_2_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(MATH_SQRT1_2_INDEX)));
-      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_SQRT2_U, (JSBUILTIN_MATH), (memory_manager->GetF64Builtin(MATH_SQRT2_INDEX)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_E_U, (JSBUILTIN_MATH), (__double_value(MathE)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_LN10_U, (JSBUILTIN_MATH), (__double_value(MathLn10)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_LN2_U, (JSBUILTIN_MATH), (__double_value(MathLn2)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_LOG10E_U, (JSBUILTIN_MATH), (__double_value(MathLog10e)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_LOG2E_U, (JSBUILTIN_MATH), (__double_value(MathLog2e)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_PI_U, (JSBUILTIN_MATH), (__double_value(MathPi)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_SQRT1_2_U, (JSBUILTIN_MATH), (__double_value(MathSqrt1_2)));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_SQRT2_U, (JSBUILTIN_MATH), (__double_value(MathSqrt2)));
       break;
     case JSBUILTIN_JSON:
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TOSOURCE, __json_toSource, ATTRS(2, 2));
@@ -882,6 +897,8 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_FORMAT, __jsintl_DateTimeFormatFormat, ATTRS(1, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_DateTimeFormatResolvedOptions, ATTRS(0, 0));
       break;
+    case JSBUILTIN_CONSOLE:
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_LOG, __jsconsole_pt_log, ATTRS(1, 1));
     default:
       break;
   }
@@ -1551,6 +1568,10 @@ bool __jsobj_internal_DeleteByValue(__jsobject *o, uint32 index, bool mark_as_de
                                     bool throw_p = false) {
   __jsobj_helper_convert_to_generic(o);
 #ifdef USE_PROP_MAP
+  if (o->prop_index_map == NULL && o->object_class == JSSTRING && o->shared.prim_string) {
+    // lazy initailize properties for string
+    __jsobj_initprop_fromString(o, o->shared.prim_string);
+  }
   if (!o->prop_index_map)
     return true;
   std::map<uint32_t, __jsprop *>::iterator it, prev;
@@ -2283,24 +2304,11 @@ __jsvalue __jsobj_defineProperties(__jsvalue *this_object, __jsvalue *o, __jsval
   // ecma 15.2.3.7 step 3, 4, 5, 6
   __jsobj_helper_convert_to_generic(props);
   {
-#ifdef NOT_NEEDED
- if (props->prop_index_map)
-  for (std::map<std::uint32_t, __jsprop *>::iterator it = props->prop_index_map->begin(); it != props->prop_index_map->end(); ++it) {
-    __jsprop *p = it->second;
-    __jsobj_walk_defineProperties(properties, p, obj);
-  }
- if (props->prop_string_map)
-  for (std::map<std::wstring, __jsprop *>::iterator it = props->prop_string_map->begin(); it != props->prop_string_map->end(); ++it) {
-    __jsprop *p = it->second;
-    __jsobj_walk_defineProperties(properties, p, obj);
-  }
-#else
     __jsprop *p = props->prop_list;
     while (p) {
       __jsobj_walk_defineProperties(properties, p, obj);
       p = p->next;
     }
-#endif
   }
 
   GCDecRf(props);
@@ -2733,8 +2741,8 @@ void __jsop_initprop_getter(__jsvalue *o, __jsvalue *p, __jsvalue *v) {
   __jsobject *obj = __jsval_to_object(o);
   __jsobj_helper_convert_to_generic(obj);
   __jsprop_desc desc = __new_get_desc(__jsval_to_object(v), JSPROP_DESC_HAS_GEC);
-  if (p->s.tag == JSTYPE_NUMBER)
-    __jsobj_internal_DefineOwnPropertyByValue(obj, p->s.payload.u32, desc, false);
+  if (p->tag == JSTYPE_NUMBER)
+    __jsobj_internal_DefineOwnPropertyByValue(obj, p->s.u32, desc, false);
   else
     __jsobj_internal_DefineOwnProperty(obj, p, desc, false);
 }
@@ -2745,8 +2753,8 @@ void __jsop_initprop_setter(__jsvalue *o, __jsvalue *p, __jsvalue *v) {
   __jsobject *obj = __jsval_to_object(o);
   __jsobj_helper_convert_to_generic(obj);
   __jsprop_desc desc = __new_set_desc(__jsval_to_object(v), JSPROP_DESC_HAS_SEC);
-  if (p->s.tag == JSTYPE_NUMBER)
-    __jsobj_internal_DefineOwnPropertyByValue(obj, p->s.payload.u32, desc, false);
+  if (p->tag == JSTYPE_NUMBER)
+    __jsobj_internal_DefineOwnPropertyByValue(obj, p->s.u32, desc, false);
   else
     __jsobj_internal_DefineOwnProperty(obj, p, desc, false);
 }
@@ -2808,40 +2816,41 @@ __jsvalue __jsop_getprop_by_name(__jsvalue *o, __jsstring *p) {
   }
 }
 
-static __jsprop * __jsop_get_prop_jsobject(__jsobject *obj, __jsstring *name) {
+static __jsprop * __jsop_get_prop_jsobject(__jsobject *obj, __jsstring *name, bool asciiOnly = false) {
   bool isNum;
   uint32 idxNum = __jsstr_is_numidx(name, isNum);
   __jsprop *p = nullptr;
   if (isNum) {
     p = __jsobj_helper_get_propertyByValue(obj, idxNum, false);
   } else {
-    p = __jsobj_helper_get_property(obj, name, false);
+    p = __jsobj_helper_get_property(obj, name, false, asciiOnly);
   }
   return p;
 }
 
 // make things faster
-__jsvalue __jsop_get_this_prop_by_name(__jsvalue *o,  __jsstring *name) {
+__jsvalue __jsop_get_this_prop_by_name(__jsvalue *o,  __jsstring *name, bool asciiOnly) {
   __jsobject *obj = __is_js_object(o) ? __jsval_to_object(o) : __js_ToObject(o);
-  __jsprop *p = __jsop_get_prop_jsobject(obj, name);
+  __jsprop *p = __jsobj_helper_get_property(obj, name, false, asciiOnly);
   if (p) {
     return __jsobj_internal_get_by_desc(obj, p->desc);
   } else {
     __jsvalue ret;
-    ret.asbits = 0;
+    ret.s.asbits = 0;
+    ret.tag = JSTYPE_NONE;
     return ret;
   }
 }
 
 // make things faster
-void __jsop_set_this_prop_by_name(__jsvalue *o, __jsstring *name, __jsvalue *v, bool noThrowTE) {
+void __jsop_set_this_prop_by_name(__jsvalue *o, __jsstring *name, __jsvalue *v, bool noThrowTE, bool asciiOnly) {
   __jsobject *obj = __is_js_object(o) ? __jsval_to_object(o) : __js_ToObject(o);
   // if name is builtin object like NaN, undefined.. JS will throw a TypeError
   if (__is_global_strict && __jsstr_throw_typeerror(name) && !noThrowTE) {
     MAPLE_JS_TYPEERROR_EXCEPTION();
   }
   // search the prop first
-  __jsprop *p = __jsop_get_prop_jsobject(obj, name);
+  __jsprop *p = __jsop_get_prop_jsobject(obj, name, asciiOnly);
   if (p) {
     __set_value_gc(&p->desc, v);
   } else {
@@ -2987,4 +2996,9 @@ __jsvalue __jsobj_GetValueFromPropertyByValue(__jsobject *obj, uint32_t index) {
 bool __jsPropertyIsWritable(__jsobject *obj, uint32_t index) {
   __jsprop_desc desc = __jsobj_internal_GetPropertyByValue(obj, index);
   return __has_and_writable(desc);
+}
+
+void __jsconsole_pt_log (__jsvalue *thisV, __jsvalue *v) {
+  __jsop_print_item(*v);
+  printf("\n");
 }

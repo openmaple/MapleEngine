@@ -97,76 +97,69 @@ InterSource::InterSource() {
 }
 
 void InterSource::SetRetval0 (MValue mval, bool isdyntype) {
-  if (!isdyntype)
-    SetMValueTag(mval, 0);
-  GCCheckAndUpdateRf(retVal0.x.u64, mval.x.u64);
+  GCCheckAndUpdateRf(retVal0.x.u64, IsNeedRc(retVal0.ptyp), mval.x.u64, IsNeedRc(mval.ptyp));
   retVal0 = mval;
 }
 
 void InterSource::SetRetval0Object (void *obj, bool isdyntype) {
   GCIncRf(obj);
-  GCCheckAndDecRf(retVal0.x.u64);
+  GCCheckAndDecRf(retVal0.x.u64, IsNeedRc(retVal0.ptyp));
   retVal0.x.a64 = (uint8_t *)obj;
 }
 
 void InterSource::SetRetval0NoInc (uint64_t val) {
-  GCCheckAndDecRf(retVal0.x.u64);
+  GCCheckAndDecRf(retVal0.x.u64, IsNeedRc(retVal0.ptyp));
   retVal0.x.u64 = val;
 }
 
-void InterSource::EmulateStore(uint8_t *memory, MValue mval, PrimType pty) {
+void InterSource::EmulateStore(uint8_t *memory, uint8_t addrTy, MValue mval, PrimType pty) {
+  // TODO: setup flag of *((uint64_t *)memory)
   uint32_t bytesize = ptypesizetable[pty];
-  if (bytesize == 8) {
-    *((uint64_t *)memory) = mval.x.u64;
-    return;
+  switch (bytesize) {
+    case 8: {
+      *((uint64_t *)memory) = mval.x.u64;
+      break;
+    }
+    case 4: {
+      *((uint32_t *)memory) = mval.x.u32;
+      break;
+    }
+    case 2: {
+      *((uint16_t *)memory) = mval.x.u32;
+      break;
+    }
+    case 1: {
+      *(memory) = mval.x.u32; return;
+      break;
+    }
+    default:
+      assert(false && "unexpected size");
   }
-  if (bytesize == 4) {
-    *((uint32_t *)memory) = mval.x.u32;
-    return;
-  }
-  if (bytesize == 2) {
-    *((uint16_t *)memory) = mval.x.u32;
-    return;
-  }
-  if (bytesize == 1) {
-    *(memory) = mval.x.u32; return;
-    return;
-  }
-  assert(false && "unexpected type");
+  memory_manager->SetFlagFromMemory(memory, addrTy, mval.ptyp);
+}
+
+void InterSource::EmulateStoreGC(uint8_t *memory, uint8_t addrTy, MValue mval, PrimType pty) {
+  // GCUpdateRf((void *)(*(uint64_t *)memory), mval.x.a64);
+  uint8_t oldFlg = memory_manager->GetFlagFromMemory(memory, addrTy);
+  GCCheckAndUpdateRf(*((uint64_t *)memory), IsNeedRc(oldFlg), mval.x.u64, IsNeedRc(mval.ptyp));
+  *(uint64_t *)memory = mval.x.u64;
+  memory_manager->SetFlagFromMemory(memory, addrTy, mval.ptyp);
   return;
 }
 
-void InterSource::EmulateStoreGC(uint8_t *memory, MValue mval, PrimType pty) {
-  if (pty == PTY_simpleobj || pty == PTY_simplestr) {
-    GCUpdateRf((void *)(*(uint64_t *)memory), mval.x.a64);
-    if (*memory != 0) {
-      MemHeader *header = (MemHeader *)(((uint64_t)(*(uint64_t *)memory)) - 4L);
-      if (header->refcount == 1)
-        GCDecRf((void *)(*(uint64_t *)memory));
-    }
-    *(uint64_t *)memory = mval.x.u64;
-    return;
-  }
-  if (IsPrimitiveDyn(pty)) {
-    GCCheckAndUpdateRf(*(uint64_t *)(memory), mval.x.u64);
-    *(uint64_t *)(memory) = mval.x.u64;
-    return;
-  }
-  EmulateStore(memory, mval, pty);
-}
-
-uint64_t InterSource::EmulateLoad(uint8_t *memory, PrimType pty) {
+MValue InterSource::EmulateLoad(uint8_t *memory, uint8_t addrTy, PrimType pty) {
   uint32 bytesize = ptypesizetable[pty];
+  MValue retMv;
   if (bytesize == 8)
-    return  *((uint64_t *)memory);
+    retMv.x.u64 =  *((uint64_t *)memory);
   if (bytesize == 4)
-    return *((uint32_t *)memory);
+    retMv.x.u32 = *((uint32_t *)memory);
   if (bytesize == 2)
-    return *((uint16_t *)memory);
+    retMv.x.u16 = *((uint16_t *)memory);
   if (bytesize == 1)
-    return *memory;
-  assert(false && "unexpected type");
-  return (uint64_t) 0;
+    retMv.x.u8 = *memory;
+  retMv.ptyp = memory_manager->GetFlagFromMemory(memory, addrTy);
+  return retMv;
 }
 
 int32_t InterSource::PassArguments(MValue this_arg, void *env, MValue *arg_list,
@@ -189,7 +182,7 @@ int32_t InterSource::PassArguments(MValue this_arg, void *env, MValue *arg_list,
     for (int32_t i = func_narg - narg; i > 0; i--) {
       offset -= MVALSIZE;
       ALIGNMENTNEGOFFSET(offset, MVALSIZE);
-      EmulateStore(spaddr + offset, undefined, PTY_u64);
+      EmulateStore(spaddr + offset, memory_manager->spBaseFlag, undefined, PTY_u64);
     }
   } else /* Set the actual argument-number to the function acceptant. */ {
     narg = func_narg;
@@ -199,8 +192,8 @@ int32_t InterSource::PassArguments(MValue this_arg, void *env, MValue *arg_list,
     MValue actual = arg_list[i];
     offset -= MVALSIZE;
     ALIGNMENTNEGOFFSET(offset, MVALSIZE);
-    EmulateStore(spaddr + offset, actual, PTY_u64);
-    GCCheckAndIncRf(actual.x.u64);
+    EmulateStore(spaddr + offset, memory_manager->spBaseFlag, actual, PTY_u64);
+    GCCheckAndIncRf(actual.x.u64, IsNeedRc(actual.ptyp));
   }
   if (env) {
     offset -= PTRSIZE + MVALSIZE;
@@ -212,14 +205,15 @@ int32_t InterSource::PassArguments(MValue this_arg, void *env, MValue *arg_list,
   if (env) {
     MValue envMal;
     envMal.x.a64 = (uint8_t *)env;
+    envMal.ptyp = (uint8_t)JSTYPE_ENV;
     // SetMValueValue(envMal, memory_manager->MapRealAddr(env));
     // SetMValueTag(envMal, JSTYPE_ENV);
-    EmulateStore(spaddr + offset + MVALSIZE, envMal, PTY_u64);
+    EmulateStore(spaddr + offset + MVALSIZE, memory_manager->spBaseFlag, envMal, PTY_u64);
     // GCCheckAndIncRf(envMal.x.u64);
   }
   // Pass the 'this'.
-  EmulateStore(spaddr + offset, this_arg, PTY_u64);
-  GCCheckAndIncRf(this_arg.x.u64);
+  EmulateStore(spaddr + offset,memory_manager->spBaseFlag, this_arg, PTY_u64);
+  GCCheckAndIncRf(this_arg.x.u64, IsNeedRc(this_arg.ptyp));
   return offset;
 }
 
@@ -231,6 +225,7 @@ MValue InterSource::VmJSopAdd(MValue mv0, MValue mv1) {
 
 MValue InterSource::PrimAdd(MValue mv0, MValue mv1, PrimType ptyp) {
   MValue res;
+  uint8_t tag = (uint8_t)JSTYPE_NUMBER;
   switch (ptyp) {
     case PTY_i8:  res.x.i8  = mv0.x.i8  + mv1.x.i8;  break;
     case PTY_i16: res.x.i16 = mv0.x.i16 + mv1.x.i16; break;
@@ -239,18 +234,31 @@ MValue InterSource::PrimAdd(MValue mv0, MValue mv1, PrimType ptyp) {
     case PTY_u16: res.x.u16 = mv0.x.u16 + mv1.x.u16; break;
     case PTY_u1:  res.x.u1  = mv0.x.u1  + mv1.x.u1;  break;
     case PTY_a32:
-    case PTY_a64: res.x.a64 = mv0.x.a64 + mv1.x.i64; break;
+    case PTY_a64:  {
+      if (mv0.ptyp == memory_manager->spBaseFlag || mv0.ptyp == memory_manager->fpBaseFlag
+        || mv0.ptyp == memory_manager->gpBaseFlag) {
+        tag = mv0.ptyp;
+        assert(mv1.ptyp == (uint8_t)JSTYPE_NUMBER || mv1.ptyp == 0);
+      }
+      res.x.a64 = mv0.x.a64 + mv1.x.i64;
+      break;
+    }
+    case PTY_simplestr: {
+      tag = (uint8_t)JSTYPE_STRING;
+      res.x.a64 = mv0.x.a64 + mv1.x.i64;
+      break;
+    }
     case PTY_f32: res.x.f32 = mv0.x.f32 + mv1.x.f32; break;
     case PTY_f64: assert(false && "nyi");
     default: assert(false && "error");
   }
-  res.ptyp = ptyp;
+  res.ptyp = tag;
   return res;
 }
 
 MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) {
   __jstype resTag;
-  uint32_t resVal;
+  uint64_t resVal;
   __jstype tag0 = (__jstype)GetMValueTag(mv0);
   __jstype tag1 = (__jstype)GetMValueTag(mv1);
   if (tag0 == JSTYPE_NAN || tag1 == JSTYPE_NAN
@@ -313,17 +321,22 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           if (x1 == 0) {
             return JsvalToMValue(x0 >= 0 ? __number_infinity() : __number_neg_infinity());
           }
-          resTag = JSTYPE_NUMBER;
-          resVal = x0 / x1;
+          double db = (double)x0 / (double)x1;
+          if (__is_double_to_int(db)) {
+            resTag = JSTYPE_NUMBER;
+            resVal = x0 / x1;
+          } else {
+            return JsvalToMValue(__double_value(db));
+          }
           break;
         }
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          if (mv1.x.u64 == 0x900000000) {
+          if (mv1.x.f64 == 0.0f) {
             // negative_zero
             return JsvalToMValue(x0 < 0 ? __number_infinity() : __number_neg_infinity());
           }
-          double x1 = memory_manager->GetF64FromU32(mv1.x.u32);
+          double x1 = (mv1.x.f64);
           if (fabs(x1) < NumberMinValue) {
             return JsvalToMValue(x0 < 0 ? __number_infinity() : __number_neg_infinity());
           }
@@ -332,7 +345,8 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);
           } else {
-            resVal = memory_manager->SetF64ToU32(rtx);
+            // resVal = __double_value(rtx);
+            return JsvalToMValue(__double_value(rtx));
           }
           break;
         }
@@ -355,12 +369,12 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
       break;
     }
     case JSTYPE_DOUBLE: {
-      double ldb = memory_manager->GetF64FromU32(mv0.x.u32);
+      double ldb = mv0.x.f64;
       switch (tag1) {
         case JSTYPE_NUMBER:
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : memory_manager->GetF64FromU32(mv1.x.u32));
+          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : (mv1.x.f64));
           if (fabs(rhs) < NumberMinValue) {
             return JsvalToMValue(ldb >= 0 ? __number_infinity() : __number_neg_infinity());
           }
@@ -369,7 +383,7 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);
           } else {
-            resVal = memory_manager->SetF64ToU32(rtx);
+            return JsvalToMValue(__double_value(rtx));
           }
           break;
         }
@@ -379,7 +393,7 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           return JsvalToMValue(__jsop_object_div(&v0, &v1));
         }
         case JSTYPE_NULL: {
-          double rhs = memory_manager->GetF64FromU32(mv0.x.u32);
+          double rhs = (mv0.x.f64);
           return JsvalToMValue(rhs > 0 ? __number_infinity() : __number_neg_infinity());
         }
         case JSTYPE_INFINITY: {
@@ -414,7 +428,7 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           break;
         }
         case JSTYPE_DOUBLE: {
-          double rhs = memory_manager->GetF64FromU32(mv1.x.u32);
+          double rhs = (mv1.x.f64);
           if (fabs(rhs) < NumberMinValue) {
             return JsvalToMValue(isPos0 ? __number_neg_infinity() : __number_infinity());
           } else {
@@ -462,13 +476,12 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
   MValue res;
   SetMValueValue(res, resVal);
   SetMValueTag(res, resTag);
-  res.ptyp = ptyp;
   return res;
 }
 
 MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) {
   __jstype resTag;
-  uint32_t resVal;
+  uint64_t resVal;
   __jstype tag0 = (__jstype)GetMValueTag(mv0);
   __jstype tag1 = (__jstype)GetMValueTag(mv1);
   if (tag0 == JSTYPE_NAN || tag1 == JSTYPE_NAN
@@ -516,7 +529,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         }
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double x1 = memory_manager->GetF64FromU32(mv1.x.u32);
+          double x1 = (mv1.x.f64);
           if (fabs(x1) < NumberMinValue) {
             return JsvalToMValue(x0 < 0 ? __number_infinity() : __number_neg_infinity());
           }
@@ -526,7 +539,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);  // ???
           } else {
-            resVal = memory_manager->SetF64ToU32(rtx);
+            return JsvalToMValue(__double_value(rtx));
           }
           break;
         }
@@ -609,7 +622,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         }
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double x1 = memory_manager->GetF64FromU32(mv1.x.u32);
+          double x1 = (mv1.x.f64);
           if (fabs(x1) < NumberMinValue) {
             return JsvalToMValue(x0 < 0 ? __number_infinity() : __number_neg_infinity());
           }
@@ -623,7 +636,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
               resTag = JSTYPE_NUMBER;
               resVal = 0;
             } else {
-              resVal = memory_manager->SetF64ToU32(rtx);
+              return JsvalToMValue(__double_value(rtx));
             }
           }
           break;
@@ -647,12 +660,12 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
       break;
     }
     case JSTYPE_DOUBLE: {
-      double ldb = memory_manager->GetF64FromU32(mv0.x.u32);
+      double ldb = (mv0.x.f64);
       switch (tag1) {
         case JSTYPE_NUMBER:
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : memory_manager->GetF64FromU32(mv1.x.u32));
+          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : (mv1.x.f64));
           if (fabs(rhs) < NumberMinValue) {
             return JsvalToMValue(ldb >= 0 ? __number_infinity() : __number_neg_infinity());
           }
@@ -662,7 +675,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);  // ???
           } else {
-            resVal = memory_manager->SetF64ToU32(rtx);
+            return JsvalToMValue(__double_value(rtx));
           }
           break;
         }
@@ -672,7 +685,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           return JsvalToMValue(__jsop_object_rem(&v0, &v1));
         }
         case JSTYPE_NULL: {
-          double rhs = memory_manager->GetF64FromU32(mv0.x.u32);
+          double rhs = mv0.x.f64;
           return JsvalToMValue(rhs > 0 ? __number_infinity() : __number_neg_infinity());
         }
         case JSTYPE_INFINITY: {
@@ -707,7 +720,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           break;
         }
         case JSTYPE_DOUBLE: {
-          double rhs = memory_manager->GetF64FromU32(mv1.x.u32);
+          double rhs = mv1.x.f64;
           if (fabs(rhs) < NumberMinValue) {
             return JsvalToMValue(isPos0 ? __number_neg_infinity() : __number_infinity());
           } else {
@@ -743,7 +756,6 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
   MValue res;
   SetMValueValue(res, resVal);
   SetMValueTag(res, resTag);
-  res.ptyp = ptyp;
   return res;
 }
 
@@ -751,7 +763,7 @@ MValue InterSource::JSopBitOp(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op
   __jstype tag0 = (__jstype)GetMValueTag(mv0);
   __jstype tag1 = (__jstype)GetMValueTag(mv1);
   MValue res;
-  res.ptyp = PTY_dyni32;
+  res.ptyp = (__jstype)JSTYPE_NUMBER;
   int32_t lVal;
   int32_t rVal;
   if (tag0 == JSTYPE_NAN || tag0 == JSTYPE_NULL
@@ -815,7 +827,7 @@ MValue InterSource::JSopBitOp(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op
 
 MValue InterSource::JSopSub(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) {
   __jstype resTag;
-  uint32_t resVal;
+  uint64_t resVal;
   __jstype tag0 = (__jstype)GetMValueTag(mv0);
   __jstype tag1 = (__jstype)GetMValueTag(mv1);
   switch (tag0) {
@@ -866,12 +878,12 @@ MValue InterSource::JSopSub(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         }
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double rtx = (double)mv0.x.i32 - memory_manager->GetF64FromU32(mv1.x.u32);
+          double rtx = (double)mv0.x.i32 - mv1.x.f64;
           if (std::isinf(rtx)) {
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);
           } else {
-            resVal = memory_manager->SetF64ToU32(rtx);
+            return JsvalToMValue(__double_value(rtx));
           }
           break;
         }
@@ -906,8 +918,8 @@ MValue InterSource::JSopSub(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         case JSTYPE_NUMBER:
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : memory_manager->GetF64FromU32(mv1.x.u32));
-          double rtx = memory_manager->GetF64FromU32(mv0.x.u32) - rhs;
+          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : (mv1.x.f64));
+          double rtx = (mv0.x.f64) - rhs;
           if (std::isinf(rtx)) {
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);
@@ -916,7 +928,7 @@ MValue InterSource::JSopSub(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
               resTag = JSTYPE_NUMBER;
               resVal = 0;
             } else {
-              resVal = memory_manager->SetF64ToU32(rtx);
+              return JsvalToMValue(__double_value(rtx));
             }
           }
           break;
@@ -967,8 +979,8 @@ MValue InterSource::JSopSub(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         case JSTYPE_NUMBER:
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : memory_manager->GetF64FromU32(mv1.x.u32));
-          resVal = memory_manager->SetF64ToU32(-rhs);
+          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : (mv1.x.f64));
+          return JsvalToMValue(__double_value(-rhs));
           break;
         }
         case JSTYPE_OBJECT: {
@@ -1033,13 +1045,12 @@ MValue InterSource::JSopSub(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
   MValue res;
   SetMValueValue(res, resVal);
   SetMValueTag(res, resTag);
-  res.ptyp = ptyp;
   return res;
 }
 
 MValue InterSource::JSopMul(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) {
   __jstype resTag;
-  uint32_t resVal;
+  uint64_t resVal;
   __jstype tag0 = (__jstype)GetMValueTag(mv0);
   __jstype tag1 = (__jstype)GetMValueTag(mv1);
   if (tag0 == JSTYPE_NAN || tag1 == JSTYPE_NAN ||
@@ -1091,18 +1102,18 @@ MValue InterSource::JSopMul(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);
           } else {
             resTag = JSTYPE_DOUBLE;
-            resVal = memory_manager->SetF64ToU32(rtx);
+            return  JsvalToMValue(__double_value(rtx));
           }
           break;
         }
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double rtx = (double)mv0.x.i32 * memory_manager->GetF64FromU32(mv1.x.u32);
+          double rtx = (double)mv0.x.i32 * (mv1.x.f64);
           if (std::isinf(rtx)) {
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);
           } else {
-            resVal = memory_manager->SetF64ToU32(rtx);
+            return JsvalToMValue(__double_value(rtx));
           }
           break;
         }
@@ -1129,13 +1140,13 @@ MValue InterSource::JSopMul(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         case JSTYPE_NUMBER:
         case JSTYPE_DOUBLE: {
           resTag = JSTYPE_DOUBLE;
-          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : memory_manager->GetF64FromU32(mv1.x.u32));
-          double rtx = memory_manager->GetF64FromU32(mv0.x.u32) * rhs;
+          double rhs = (tag1 == JSTYPE_NUMBER ? (double)mv1.x.i32 : (mv1.x.f64));
+          double rtx = (mv0.x.f64) * rhs;
           if (std::isinf(rtx)) {
             resTag = JSTYPE_INFINITY;
             resVal = (rtx == (-1.0/0.0) ? 1 : 0);
           } else {
-            resVal = memory_manager->SetF64ToU32(rtx);
+            return JsvalToMValue(__double_value(rtx));
           }
           break;
         }
@@ -1182,7 +1193,7 @@ MValue InterSource::JSopMul(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           break;
         }
         case JSTYPE_DOUBLE: {
-          double x = memory_manager->GetF64FromU32(mv1.x.u32);
+          double x = (mv1.x.f64);
           if (fabs(x) < NumberMinValue)
             return JsvalToMValue(__nan_value());
           isPos1 = x > 0;
@@ -1214,7 +1225,6 @@ MValue InterSource::JSopMul(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
   MValue res;
   SetMValueValue(res, resVal);
   SetMValueTag(res, resTag);
-  res.ptyp = ptyp;
   return res;
 }
 
@@ -1273,6 +1283,7 @@ MValue InterSource::JSopArith(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op
       }
       retval.x.u64 = 0;
       retval.x.i32 = val;
+      retval.ptyp = (uint8_t)JSTYPE_NUMBER;
       break;
     }
     case PTY_u32:
@@ -1323,13 +1334,16 @@ MValue InterSource::JSopArith(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op
       }
       retval.x.u64 = 0;  // clear the tag field
       retval.x.u32 = val;
+      retval.ptyp = (uint8_t)JSTYPE_NUMBER;
       break;
     }
     case PTY_a64: {
       switch (op) {
-        case OP_mul:
+        case OP_mul: {
          retval.x.u64 = mv0.x.u64 * mv1.x.u64;
+         retval.ptyp = mv0.ptyp;
          break;
+        }
         default:
           MIR_FATAL("unknown a64 arithmetic operations");
       }
@@ -1392,16 +1406,17 @@ bool InterSource::JSopPrimCmp(Opcode op, MValue &mv0, MValue &mv1, PrimType rpty
   return resBool;
 }
 
-MValue InterSource::JSopCmp(MValue mv0, MValue mv1, Opcode op) {
-  PrimType rpty0 = mv0.ptyp;
-  PrimType rpty1 = mv1.ptyp;
-  if (IsPrimitiveDyn(rpty0) || IsPrimitiveDyn(rpty1)) {
+MValue InterSource::JSopCmp(MValue mv0, MValue mv1, Opcode op, PrimType ptyp) {
+  uint8_t rpty0 = mv0.ptyp;
+  uint8_t rpty1 = mv1.ptyp;
+  if ((rpty0!= 0) || (rpty1 != 0)) {
     __jsvalue jsv0 = MValueToJsval(mv0);
     __jsvalue jsv1 = MValueToJsval(mv1);
     __jsvalue resvalue;
+    resvalue.tag = JSTYPE_BOOLEAN;
     // SetMValueTag(resvalue, JSTYPE_BOOLEAN);
     if (__is_nan(&jsv0) || __is_nan(&jsv1)) {
-      resvalue.s.payload.u32 = op == OP_ne;;
+      resvalue.s.u32 = (op == OP_ne);
     } else {
       bool isAlwaysFalse = false; // there are some weird comparison to be alwasy false for JS
       bool resCmp = false;
@@ -1433,13 +1448,14 @@ MValue InterSource::JSopCmp(MValue mv0, MValue mv1, Opcode op) {
         default:
           MIR_FATAL("unknown comparison ops");
       }
-      resvalue.s.payload.u32 = (isAlwaysFalse ? false : resCmp);
+      resvalue.s.asbits = (isAlwaysFalse ? false : resCmp);
     }
     return JsvalToMValue(resvalue);
   }
   MValue retVal;
   assert(rpty0 == rpty1 && "illegal comparison");
-  retVal.x.u64 = JSopPrimCmp(op, mv0, mv1, rpty0);
+  retVal.x.u64 = JSopPrimCmp(op, mv0, mv1, ptyp);
+  retVal.ptyp = (uint8_t)JSTYPE_BOOLEAN;
   return retVal;
 }
 
@@ -1447,56 +1463,50 @@ MValue InterSource::JSopCVT(MValue mv, PrimType toPtyp, PrimType fromPtyp) {
   MValue retMv;
    if (IsPrimitiveDyn(toPtyp)) {
     __jstype tag = JSTYPE_UNDEFINED;
-    uint32_t u32Val = 0;
     switch (fromPtyp) {
       case PTY_u1: {
         tag = JSTYPE_BOOLEAN;
-        u32Val = mv.x.u32;
+        retMv.x.u32 = mv.x.u32;
         break;
       }
       case PTY_a32:
       case PTY_i32: {
         tag = JSTYPE_NUMBER;
-        u32Val = mv.x.u32;
+        retMv.x.u32 = mv.x.u32;
         break;
       }
       case PTY_u32: {
-        u32Val = mv.x.u32;
+        uint32_t u32Val = mv.x.u32;
         if (u32Val <= INT32_MAX) {
           tag = JSTYPE_NUMBER;
+          retMv.x.u32 = u32Val;
         } else {
           tag = JSTYPE_DOUBLE;
-          u32Val = memory_manager->SetF64ToU32(mv.x.u32);
+          // u32Val = __double_value(mv.x.u32);
+          retMv.x.f64 = (double)(u32Val);
         }
+        break;
+      }
+      case PTY_simpleobj: {
+        tag = JSTYPE_OBJECT;
+        retMv.x.a64 = mv.x.a64;
         break;
       }
       case PTY_simplestr: {
         tag = JSTYPE_STRING;
-#ifdef MACHINE64
-        u32Val = memory_manager->MapRealAddr((void *)mv.x.u64);
-#else
-        u32Val = mv.x.u32;
-#endif
+        retMv.x.a64 = mv.x.a64;
         break;
       }
-      case PTY_simpleobj:
-        tag = JSTYPE_OBJECT;
-#ifdef MACHINE64
-        u32Val = memory_manager->MapRealAddr((void *)mv.x.u64);
-#else
-        u32Val = mv.u32;
-#endif
-        break;
       default:
         MIR_FATAL("interpreteCvt: NYI");
     }
-    SetMValueValue(retMv, u32Val);
-    SetMValueTag(retMv, tag);
+    retMv.ptyp = tag;
   } else if (IsPrimitiveDyn(fromPtyp)) {
     switch (toPtyp) {
       case PTY_u1: {
         __jsvalue jsv = MValueToJsval(mv);
         retMv.x.i32 = __js_ToBoolean(&jsv);
+        retMv.ptyp = JSTYPE_BOOLEAN;
         break;
       }
       case PTY_a32:
@@ -1504,6 +1514,7 @@ MValue InterSource::JSopCVT(MValue mv, PrimType toPtyp, PrimType fromPtyp) {
       case PTY_i32: {
         __jsvalue jsv = MValueToJsval(mv);
         retMv.x.i32 = __js_ToInteger(&jsv);
+        retMv.ptyp = JSTYPE_NUMBER;
         break;
       }
       case PTY_simpleobj: {
@@ -1524,12 +1535,16 @@ MValue InterSource::JSopNew(MValue &size) {
   // SetMValueTag(mv,JSTYPE_ENV);
   mv.x.a64 = (uint8_t *)VMMallocGC(size.x.i32, MemHeadEnv);
   // SetMValueTag(mv, JSTYPE_ENV);
+  mv.ptyp = (uint8_t)JSTYPE_ENV;
   return mv;
 }
 
-void* InterSource::JSopNewArrLength(MValue &conVal) {
+MValue InterSource::JSopNewArrLength(MValue &conVal) {
   __jsvalue v0 = MValueToJsval(conVal);
-  return (void *) __js_new_arr_length(&v0);
+  MValue mv;
+  mv.x.a64 = (uint8_t *) __js_new_arr_length(&v0);
+  mv.ptyp = (uint8_t)JSTYPE_OBJECT;
+  return mv;
 }
 
 
@@ -1548,7 +1563,9 @@ void InterSource::JSopSetProp(MValue &mv0, MValue &mv1, MValue &mv2) {
         uint32_t index = mv1.x.u32;
         uint32_t numArgs = curFunc->header->upFormalSize/sizeof(void *);
         if (index < numArgs - 1 && !curFunc->IsIndexDeleted(index)) {
-          EmulateStoreGC((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *), mv2, mv2.ptyp);
+          uint64_t *addrFp = (uint64_t *)((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *));
+          GCCheckAndUpdateRf(*(addrFp), IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag)), mv2.x.u64, IsNeedRc(mv2.ptyp));
+          EmulateStore((uint8_t *)addrFp, memory_manager->fpBaseFlag, mv2, PTY_u64);
         }
       }
     }
@@ -1570,30 +1587,33 @@ void InterSource::JSopInitProp(MValue &mv0, MValue &mv1, MValue &mv2) {
         uint32_t index = mv1.x.u32;
         uint32_t numArgs = curFunc->header->upFormalSize/sizeof(void *);
         if (index < numArgs - 1 && !curFunc->IsIndexDeleted(index)) {
-          EmulateStoreGC((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *), mv2, mv2.ptyp);
+          uint64_t *addrFp = (uint64_t *)((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *));
+          GCCheckAndUpdateRf(*(addrFp), IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag)), mv2.x.u64, IsNeedRc(mv2.ptyp));
+          EmulateStore((uint8_t *)addrFp, memory_manager->fpBaseFlag, mv2, PTY_u64);
         }
       }
     }
   }
 }
 
-uint64_t InterSource::JSopNewIterator(MValue &mv0, MValue &mv1) {
+MValue InterSource::JSopNewIterator(MValue &mv0, MValue &mv1) {
   __jsvalue v0 = MValueToJsval(mv0);
   MValue retMv;
   retMv.x.a64 = (uint8_t *)__jsop_valueto_iterator(&v0, mv1.x.u32);
-  retMv.ptyp = PTY_a64;
-  return retMv.x.u64;
-}
-
-MValue InterSource::JSopNextIterator(MValue &mv0) {
-  MValue retMv;
-  retMv.x.u64 = __jsop_iterator_next((void *)mv0.x.a64).asbits;
-  retMv.ptyp = PTY_dynany;
+  retMv.ptyp = (uint8_t)JSTYPE_STRING;
   return retMv;
 }
 
-uint32_t InterSource::JSopMoreIterator(MValue &mv0) {
-  return (uint32_t)__jsop_more_iterator((void *)mv0.x.a64);
+MValue InterSource::JSopNextIterator(MValue &mv0) {
+  MValue retMv = JsvalToMValue(__jsop_iterator_next((void *)mv0.x.a64));
+  return retMv;
+}
+
+MValue InterSource::JSopMoreIterator(MValue &mv0) {
+  MValue mv;
+  mv.x.u64 = (__jsop_more_iterator((void *)mv0.x.a64));
+  mv.ptyp = (uint8_t)JSTYPE_BOOLEAN;
+  return mv;
 }
 
 void InterSource::InsertProlog(uint16_t frameSize) {
@@ -1604,10 +1624,11 @@ void InterSource::InsertProlog(uint16_t frameSize) {
   sp -= frameSize;
 }
 
-uint64_t InterSource::JSopBinary(MIRIntrinsicID id, MValue &mv0, MValue &mv1) {
+MValue InterSource::JSopBinary(MIRIntrinsicID id, MValue &mv0, MValue &mv1) {
   __jsvalue v0 = MValueToJsval(mv0);
   __jsvalue v1 = MValueToJsval(mv1);
   uint64_t u64Ret = 0;
+  uint8_t tag = 0;
   switch (id) {
     case INTRN_JSOP_STRICTEQ:
       u64Ret = __jsop_stricteq(&v0, &v1);
@@ -1624,7 +1645,10 @@ uint64_t InterSource::JSopBinary(MIRIntrinsicID id, MValue &mv0, MValue &mv1) {
     default:
       MIR_FATAL("unsupported binary operators");
   }
-  return u64Ret;
+  MValue ret;
+  ret.x.u64 = u64Ret;
+  ret.ptyp = (uint8_t)JSTYPE_BOOLEAN;
+  return ret;
 }
 
 
@@ -1636,12 +1660,14 @@ MValue InterSource::JSopConcat(MValue &mv0, MValue &mv1) {
   __jsstring *v1 = (__jsstring *)mv1.x.a64;
   MValue res;
   res.x.a64 = (uint8_t *)__jsstr_concat_2(v0, v1);
+  res.ptyp = (uint8_t) JSTYPE_STRING;
   return res;
 }
 
 MValue InterSource::JSopNewObj0() {
   MValue mv;
   mv.x.a64 = (uint8_t *) __js_new_obj_obj_0();
+  mv.ptyp = (uint8_t) JSTYPE_OBJECT;
   return mv;
 }
 
@@ -1649,6 +1675,7 @@ MValue InterSource::JSopNewObj1(MValue &mv0) {
   __jsvalue v0 = MValueToJsval(mv0);
   MValue mv;
   mv.x.a64 = (uint8_t *) __js_new_obj_obj_1(&v0);
+  mv.ptyp = (uint8_t) JSTYPE_OBJECT;
   return mv;
 }
 
@@ -1667,7 +1694,7 @@ void InterSource::JSopSetThisPropByName (MValue &mv1, MValue &mv2) {
           __jsstr_throw_typeerror(v1)) {
     MAPLE_JS_TYPEERROR_EXCEPTION();
   }
-  __jsop_set_this_prop_by_name(&v0, v1, &v2);
+  __jsop_set_this_prop_by_name(&v0, v1, &v2, true);
 }
 
 void InterSource::JSopSetPropByName (MValue &mv0, MValue &mv1, MValue &mv2, bool isStrict) {
@@ -1675,11 +1702,11 @@ void InterSource::JSopSetPropByName (MValue &mv0, MValue &mv1, MValue &mv2, bool
   // __jsvalue v1 = MValueToJsval(mv1);
   __jsstring *v1 = (__jsstring *) mv1.x.a64;
   __jsvalue v2 = MValueToJsval(mv2);
-  if (v0.asbits == __js_Global_ThisBinding.asbits) {
-    __jsop_set_this_prop_by_name(&v0, v1, &v2);
-  } else {
-    __jsop_setprop_by_name(&v0, v1, &v2, isStrict);
+  if (v0.s.asbits == __js_Global_ThisBinding.s.asbits &&
+    __is_global_strict && __jsstr_throw_typeerror(v1)) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
   }
+  __jsop_setprop_by_name(&v0, v1, &v2, isStrict);
 }
 
 
@@ -1692,7 +1719,7 @@ MValue InterSource::JSopGetProp (MValue &mv0, MValue &mv1) {
 MValue InterSource::JSopGetThisPropByName(MValue &mv1) {
   __jsvalue &v0 = __js_Global_ThisBinding;
   __jsstring *v1 = (__jsstring *) mv1.x.a64;
-  return JsvalToMValue(__jsop_get_this_prop_by_name(&v0, v1));
+  return JsvalToMValue(__jsop_get_this_prop_by_name(&v0, v1, true));
 }
 
 MValue InterSource::JSopGetPropByName(MValue &mv0, MValue &mv1) {
@@ -1743,10 +1770,13 @@ void InterSource::JSopInitPropSetter(MValue &mv0, MValue &mv1, MValue &mv2) {
 }
 
 MValue InterSource::JSopNewArrElems(MValue &mv0, MValue &mv1) {
-  __jsvalue *v0 = (__jsvalue *)mv0.x.a64;
+  __jsvalue v0;
+  v0.s.asbits = mv0.x.u64;
+  v0.tag = (__jstype)mv0.ptyp;
   uint32 v1 = mv1.x.u32;
   MValue mv;
-  mv.x.a64 = (uint8_t *)__js_new_arr_elems(v0, v1);
+  mv.x.a64 = (uint8_t *)__js_new_arr_elems(&v0, v1);
+  mv.ptyp = (uint8_t) JSTYPE_OBJECT;
   return mv;
 }
 
@@ -1754,19 +1784,22 @@ MValue InterSource::JSopNewArrElems(MValue &mv0, MValue &mv1) {
 MValue InterSource::JSopGetBuiltinString(MValue &mv) {
   MValue ret;
   ret.x.a64 = (uint8_t *) __jsstr_get_builtin((__jsbuiltin_string_id)mv.x.u32);
+  ret.ptyp = (uint8_t)JSTYPE_STRING;
   return ret;
 }
 
 MValue InterSource::JSopGetBuiltinObject(MValue &mv) {
   MValue ret;
   ret.x.a64 = (uint8_t *) __jsobj_get_or_create_builtin((__jsbuiltin_object_id)mv.x.u32);
+  ret.ptyp = (uint8_t)JSTYPE_OBJECT;
   return ret;
 }
 
 MValue InterSource::JSBoolean(MValue &mv) {
   __jsvalue v0 = MValueToJsval(mv);
   __jsvalue res;
-  res.s.payload.boo = __js_ToBoolean(&v0);
+  res.s.asbits = __js_ToBoolean(&v0);
+  res.tag = JSTYPE_BOOLEAN;
   return JsvalToMValue(res);
 }
 
@@ -1811,6 +1844,7 @@ MValue InterSource::JSString(MValue &mv) {
   }
   MValue res;
   res.x.a64 = (uint8_t *)__js_ToString(&v0);
+  res.ptyp = (uint8_t)JSTYPE_STRING;
   return res;
 }
 
@@ -1962,7 +1996,8 @@ MValue InterSource::JSIsNan(MValue &mval) {
   uint32 resVal = 0;
   switch (tag) {
     case JSTYPE_STRING: {
-      resVal = __jsstr_is_number((__jsstring *)memory_manager->GetRealAddr(mval.x.u32));
+      // resVal = __jsstr_is_number((__jsstring *)memory_manager->GetRealAddr(mval.x.u32));
+      resVal = __jsstr_is_number((__jsstring *)mval.x.a64);
       break;
     }
     case JSTYPE_NAN: {
@@ -2024,7 +2059,8 @@ MValue InterSource::IntrinCall(MIRIntrinsicID id, MValue *args, int numArgs) {
   if (GetMValueTag(mval0) != (uint32)JSTYPE_OBJECT) {
     MAPLE_JS_TYPEERROR_EXCEPTION();
   }
-  __jsobject *f = (__jsobject *)memory_manager->GetRealAddr(GetMvalueValue(mval0));;
+  //__jsobject *f = (__jsobject *)memory_manager->GetRealAddr(GetMvalueValue(mval0));;
+  __jsobject *f = (__jsobject *)mval0.x.a64;
   __jsfunction *func = (__jsfunction *)f->shared.fun;
   MValue retCall;
   retCall.x.u64 = 0;
@@ -2091,14 +2127,14 @@ MValue InterSource::NativeFuncCall(MIRIntrinsicID id, MValue *args, int numArgs)
           if (index != -1 && !curFunc->IsIndexDeleted(index)) {
             assert(index >=0 && index <=32 && "extended the range");
             __jsvalue idxJs = __number_value(index);
-            MValue mv2 = args[2 + 2];
             __jsvalue arg2 = jsArgs[2];
             bool isOldWritable = __jsPropertyIsWritable(obj, index);
             __jsobj_defineProperty(&thisNode, &arg0, &idxJs, &arg2);
             __jsvalue idxValue = __jsobj_GetValueFromPropertyByValue(obj, index);
             if (!__is_undefined(&idxValue) && isOldWritable) {
-              EmulateStoreGC((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *),
-                              JsvalToMValue(idxValue), mv2.ptyp);
+              uint64_t *addrFp = (uint64_t *)((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *));
+              GCCheckAndUpdateRf(*(addrFp), IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag)), idxValue.s.asbits, IsNeedRc(idxValue.tag));
+              EmulateStore((uint8_t *)addrFp, memory_manager->fpBaseFlag, JsvalToMValue(idxValue), PTY_u64);
             }
            SetRetval0(JsvalToMValue(arg0), true);
            return JsvalToMValue(arg0);
@@ -2117,7 +2153,8 @@ MValue InterSource::BoundFuncCall(MValue *args, int numArgs) {
   MValue mv0 = args[0];
   int argNum = numArgs - 2;
   // __jsvalue jsArgs[MAXCALLARGNUM];
-  __jsobject *f = (__jsobject *)memory_manager->GetRealAddr(GetMvalueValue(mv0));
+  // __jsobject *f = (__jsobject *)memory_manager->GetRealAddr(GetMvalueValue(mv0));
+  __jsobject *f = (__jsobject *)mv0.x.a64;
   __jsfunction *func = (__jsfunction *)f->shared.fun;
   MIR_ASSERT(func->attrs & 0xff & JSFUNCPROP_BOUND);
   __jsvalue func_node = __object_value((__jsobject *)(func->fp));
@@ -2168,7 +2205,7 @@ MValue InterSource::FuncCall(void *callee, bool isIntrinsiccall, void *env, MVal
   // MValue ret = maple_invoke_dynamic_method(calleeHeader, !isVargs ? nullptr : CreateArgumentsObject(mvArgs, passedNargs));
   DynMFunction *oldDynFunc = GetCurFunc();
   MValue ret = maple_invoke_dynamic_method(calleeHeader, CreateArgumentsObject(mvArgs, passedNargs, &args[0]));
-  if (oldArgs.asbits != 0) {
+  if (oldArgs.s.asbits != 0) {
     __jsop_set_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS), &oldArgs, true);
   } else {
     __jsobj_internal_Delete(__jsval_to_object(&__js_Global_ThisBinding), __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
@@ -2203,7 +2240,7 @@ MValue InterSource::FuncCall_JS(__jsobject *fObject, __jsvalue *this_arg, void *
   // MValue ret = maple_invoke_dynamic_method(calleeHeader, isVargs ? nullptr : CreateArgumentsObject(mvArgList, nargs));
   MValue fObjMv = JsvalToMValue(__object_value(fObject));
   MValue ret = maple_invoke_dynamic_method(calleeHeader,  CreateArgumentsObject(mvArgList, nargs, &fObjMv));
-  if (oldArgs.asbits != 0) {
+  if (oldArgs.s.asbits != 0) {
     __jsop_set_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS), &oldArgs);
   } else {
     __jsobj_internal_Delete(__jsval_to_object(&__js_Global_ThisBinding), __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
@@ -2237,13 +2274,14 @@ MValue InterSource::IntrinCCall(MValue *args, int numArgs) {
 
   // make ccall
   __jsvalue res;
-  res.s.tag = JSTYPE_NUMBER;
-  res.s.payload.i32 = funcptr(argsI);
+  res.tag = JSTYPE_NUMBER;
+  res.s.i32 = funcptr(argsI);
 
   SetRetval0(JsvalToMValue(res), true /* dynamic type */ );
   VMFreeNOGC(argsI, argsSize);
   MValue retMval;
   retMval.x.u64 = 0;
+  retMval.ptyp = 0;
   return retMval;
 }
 
@@ -2310,7 +2348,7 @@ void InterSource::JSdoubleConst(uint64_t u64Val, MValue &res) {
   }xx;
   xx.u64 = u64Val;
   MValue mv;
-  SetMValueValue(res, memory_manager->SetF64ToU32(xx.f64));
+  SetMValueValue(res, u64Val);
   SetMValueTag(res, JSTYPE_DOUBLE);
 }
 
@@ -2369,6 +2407,8 @@ extern "C" int64_t EngineShimDynamic(int64_t firstArg, char *appPath) {
     uint16_t globalMemSize = mpljsMdD[0];
     gInterSource = new InterSource();
     gInterSource->gp = (uint8_t *)malloc(globalMemSize);
+    uint8_t *gpMemoryFlagMap = (uint8_t *)calloc(0, globalMemSize/sizeof(void *) * sizeof(uint8_t));
+    memory_manager->SetUpGpMemory(gInterSource->gp, gpMemoryFlagMap);
     memcpy(gInterSource->gp, mpljsMdD + 1, globalMemSize);
     gInterSource->topGp = gInterSource->gp + globalMemSize;
     gInterSource->CreateJsPlugin(appPath);

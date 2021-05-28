@@ -31,19 +31,6 @@ enum ExecStatus {
   Exec_brtostmt,
 };
 
-struct Mval {
-  union {
-    int32_t i32;
-    uint32_t u32;
-    int64_t i64;
-    uint64_t u64;
-    uint64_t asbits;
-    void *asptr;
-    uint32_t val[2];  // for 64bit value manipulation
-  }payload;
-  __jstype tag;
-};
-
 #ifndef RC_NO_MMAP
 struct MMapVal {
   void *ptr1;  // stack/heap address
@@ -52,45 +39,8 @@ struct MMapVal {
 #endif
 
 #ifdef DYNAMICLANG
-inline __jstype GetJSTag(Mval mval) {
-  return mval.tag;
-}
-
-inline void SetJSTag(Mval &mval, __jstype tag) {
-  mval.tag = tag;
-}
-
-inline bool IsMvalObject(Mval mval) {
-  return GetJSTag(mval) == JSTYPE_OBJECT;
-}
-
-inline bool IsMvalString(Mval mval) {
-  return GetJSTag(mval) == JSTYPE_STRING;
-}
-
-inline bool IsMvalEnv(Mval mval) {
-  return GetJSTag(mval) == JSTYPE_ENV;
-}
-
-inline __jsobject *GetMvalObject(Mval mval) {
-  MIR_ASSERT(IsMvalObject(mval));
-  return (__jsobject *)mval.payload.asptr;
-}
-
-inline __jsstring *GetMvalString(Mval mval) {
-  MIR_ASSERT(IsMvalString(mval));
-  return (__jsstring *)mval.payload.asptr;
-}
-
-inline __jsvalue MvalToJsval(Mval mv) {
-  __jsvalue jv;
-  jv.asbits = mv.payload.asbits;
-  jv.s.tag = mv.tag;
-  return jv;
-}
-
-inline uint32_t GetJSTag(MValue mval) {
-  return mval.x.u64 >> 32;
+inline uint8_t GetJSTag(MValue mval) {
+  return mval.ptyp;
 }
 
 inline bool IsMValueObject(MValue mval) {
@@ -107,19 +57,16 @@ inline bool IsMValueEnv(MValue mval) {
 
 inline __jsvalue MValueToJsval(MValue mv) {
   __jsvalue jv;
-  jv.asbits = mv.x.u64;
+  jv.s.asbits = mv.x.u64;
+  jv.tag = (__jstype)mv.ptyp;
   return jv;
 }
 
-inline Mval JsvalToMval(__jsvalue jv) {
-  Mval mv;
-  mv.payload.asbits = jv.asbits;
-  return mv;
-}
 
 inline MValue JsvalToMValue(__jsvalue jv) {
   MValue mv;
-  mv.x.u64 = jv.asbits;
+  mv.x.u64 = jv.s.asbits;
+  mv.ptyp = jv.tag;
   return mv;
 }
 

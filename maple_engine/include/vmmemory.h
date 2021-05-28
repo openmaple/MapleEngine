@@ -36,6 +36,7 @@ enum MemHeadTag {
   MemHeadJSProp,
   MemHeadJSList,
   MemHeadEnv,
+  MemHeadJSIter,
 };
 
 #ifdef MARK_CYCLE_ROOTS
@@ -130,6 +131,7 @@ class MemoryHash {
 class MemoryManager {
  public:
   void *memory_;       // points to the base of the app's heap
+  void *gpMemory;      // points to the global memory
   uint32 total_size_;  // total memory size of the app's heap
   uint32 total_small_size_;
   uint32 heap_free_small_offset_;
@@ -162,6 +164,11 @@ class MemoryManager {
   std::vector<void *> addrMap;  // map the 32 bits address to 64 bits, for 64-bits machine only
   std::vector<double> f64ToU32Vec;  // index to double value
   // std::map<double, uint32_t> f64ToU32Map; // map the double value to index
+  uint8_t *memoryFlagMap;
+  uint8_t *gpMemoryFlagMap;
+  const uint8_t spBaseFlag = (__jstype)JSTYPE_INFINITY + 1;
+  const uint8_t fpBaseFlag = (__jstype)JSTYPE_INFINITY + 2;
+  const uint8_t gpBaseFlag = (__jstype)JSTYPE_INFINITY + 3;
 #endif
 
  public:
@@ -235,11 +242,11 @@ class MemoryManager {
   void GCDecRfJsvalue(__jsvalue jsval) {
     if (TurnoffGC())
       return;
-    __jstype tag = (__jstype)jsval.s.tag;
+    __jstype tag = (__jstype)jsval.tag;
     switch (tag) {
       case JSTYPE_OBJECT:
       case JSTYPE_STRING:
-        GCDecRf(GetRealAddr(jsval.s.payload.u32));
+        GCDecRf((jsval.s.obj));
       default:
         assert(false && "unexpected");
     }
@@ -263,11 +270,11 @@ class MemoryManager {
     }
   }
   void GCIncRfJsvalue(__jsvalue jsval) {
-    __jstype tag = (__jstype)jsval.s.tag;
+    __jstype tag = (__jstype)jsval.tag;
     switch (tag) {
       case JSTYPE_OBJECT:
       case JSTYPE_STRING:
-        GCIncRf(GetRealAddr(jsval.s.payload.u32));
+        GCIncRf((jsval.s.obj));
       default:
         assert(false && "unexpected");
     }
@@ -317,7 +324,45 @@ class MemoryManager {
   __jsvalue GetF64Builtin(uint32_t);
   void SetF64Builtin();
   double GetF64FromU32 (uint32);
-  uint32_t SetF64ToU32 (double);
+  uint64_t SetF64ToU32 (double x) {
+    union{
+      double t;
+      uint64_t t1;
+    }xx;
+    xx.t = x;
+    return xx.t1;
+  }
+  uint8_t GetFlagFromMemory(uint8_t *memory, uint8_t addrType) {
+    uint32_t index;
+    if (addrType == spBaseFlag || addrType == fpBaseFlag || addrType == (uint8_t)JSTYPE_ENV) {
+      index = (memory - (uint8_t *)memory_)/sizeof(void *);
+      return *(memoryFlagMap + index);
+    } else {
+      assert(addrType == gpBaseFlag);
+      index = (memory - (uint8_t *)gpMemory)/sizeof(void *);
+      return *(gpMemoryFlagMap + index);
+    }
+  }
+  void SetFlagFromMemory(uint8_t *mem, uint8_t addrType, uint8_t flg) {
+    if (addrType == spBaseFlag || addrType == fpBaseFlag || addrType == (uint8_t)JSTYPE_ENV) {
+      uint32_t index = (mem - (uint8_t *)memory_)/sizeof(void *);
+      *(memoryFlagMap + index) = flg;
+    } else {
+      assert(addrType == gpBaseFlag);
+      uint32_t index = (mem - (uint8_t *)gpMemory)/sizeof(void *);
+      *(gpMemoryFlagMap + index) = flg;
+    }
+  }
+  void SetUpGpMemory(void *gpMem, uint8_t *gpFlagMem) {
+    gpMemory = gpMem;
+    gpMemoryFlagMap = gpFlagMem;
+  }
+ __jsvalue EmulateLoad(uint64_t *memory, uint8_t addrTy) {
+   __jsvalue retMv;
+   retMv.s.asbits = *((uint64_t *)memory);
+   retMv.tag = (__jstype)GetFlagFromMemory((uint8_t *)memory, addrTy);
+   return retMv;
+ }
 #endif
   bool IsDebugGC() {return false;}
   bool TurnoffGC() {return false;}
@@ -361,12 +406,12 @@ static inline void GCDecRfNoRecall(void *p) {
   memory_manager->GCDecRfNoRecall(p);
 }
 
-static inline void GCCheckAndDecRf(uint64 val) {
+static inline void GCCheckAndDecRf(uint64 val, bool needRc) {
   if (memory_manager->TurnoffGC())
     return;
 #ifdef MACHINE64
-  if (val >> 32 == JSTYPE_OBJECT || val >> 32 == JSTYPE_STRING || val >> 32 == JSTYPE_ENV) {
-    void *ptr = memory_manager->GetRealAddr((uint32_t)(val & 0xffffffff));
+  if (needRc) {
+    void *ptr = (void *)val;
     GCDecRf(ptr);
   }
 #else
@@ -376,13 +421,12 @@ static inline void GCCheckAndDecRf(uint64 val) {
 #endif
 }
 
-static inline void GCCheckAndIncRf(uint64 val) {
+static inline void GCCheckAndIncRf(uint64 val, bool needrc) {
   if (memory_manager->TurnoffGC())
     return;
 #ifdef MACHINE64
-  if (val >> 32 == JSTYPE_OBJECT || val >> 32 == JSTYPE_STRING || val >> 32 == JSTYPE_ENV) {
-    void *ptr = memory_manager->GetRealAddr((uint32_t)(val & 0xffffffff));
-    GCIncRf(ptr);
+  if (needrc) {
+    GCIncRf((void *)val);
   }
 #else
   if (val >> 32 == JSTYPE_OBJECT || val >> 32 == JSTYPE_STRING || val >> 32 == JSTYPE_ENV) {
@@ -411,10 +455,10 @@ static inline void GCUpdateRf(void *laddr, void *raddr) {
   GCDecRf(laddr);
 }
 
-static inline void GCCheckAndUpdateRf(uint64 lval, uint64 rval) {
+static inline void GCCheckAndUpdateRf(uint64 lval, bool lneedrc, uint64 rval, bool rneedrc) {
   // Increase rf-count first. The reason is same as GCUpdateRf.
-  GCCheckAndIncRf(rval);
-  GCCheckAndDecRf(lval);
+  GCCheckAndIncRf(rval, rneedrc);
+  GCCheckAndDecRf(lval, lneedrc);
 }
 
 #else

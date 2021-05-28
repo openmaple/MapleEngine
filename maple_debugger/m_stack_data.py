@@ -224,7 +224,8 @@ class MapleLocalCmd(gdb.Command):
                 continue
 
             if mtype == "JSTYPE_STRING":
-                v = m_info.get_string_value_from_index(v)
+                # if mtype is JSTYPE_STRING, v is then the address of the string other than index
+                v = m_info.get_js_string_value(v)
                 if not v:
                     v = ""
             line = "sp=" + str(count) + ": type=" + str(mtype) + " value=" + str(v)
@@ -272,7 +273,8 @@ class MapleLocalCmd(gdb.Command):
                 continue
 
             if mtype == "JSTYPE_STRING":
-                v = m_info.get_string_value_from_index(v)
+                # if mtype is JSTYPE_STRING, v is then the address of the string other than index
+                v = m_info.get_js_string_value(v)
                 if not v:
                     v = ""
             line = "sp=" + str(count) + ": type=" + str(mtype) + " value=" + str(v)

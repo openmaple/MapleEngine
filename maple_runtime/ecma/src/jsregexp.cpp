@@ -263,10 +263,10 @@ __jsvalue __js_new_regexp_obj(__jsvalue *this_value, __jsvalue *arg_list,
     js_source = __string_value(__jsstr_new_from_char(DEFAULT_REGEXP_PATTERN));
   } else {
     js_source = __string_value(js_pattern);
-  } 
+  }
   __jsobj_helper_init_value_property(obj, JSBUILTIN_STRING_SOURCE,
                                      &js_source, JSPROP_DESC_HAS_VUWUEUC);
-  js_global = __boolean_value(global);  
+  js_global = __boolean_value(global);
   __jsobj_helper_init_value_property(obj, JSBUILTIN_STRING_GLOBAL,
                                      &js_global, JSPROP_DESC_HAS_VUWUEUC);
   js_ignorecase = __boolean_value(ignorecase);
@@ -296,7 +296,7 @@ __jsvalue __jsregexp_Exec(__jsvalue *this_value, __jsvalue *value, uint32_t narg
   // Check if this value is an object.
   if (!__is_js_object(this_value)) {
     MAPLE_JS_TYPEERROR_EXCEPTION();
-  } 
+  }
 
   __jsobject *obj = __jsval_to_object(this_value);
   if (obj->object_class != JSREGEXP) {
@@ -308,7 +308,7 @@ __jsvalue __jsregexp_Exec(__jsvalue *this_value, __jsvalue *value, uint32_t narg
   // Retrieve propereties from this RegExp object.
   bool global = false, ignorecase = false, multiline = false;
 
-  __jsvalue source = __jsop_getprop_by_name(this_value, 
+  __jsvalue source = __jsop_getprop_by_name(this_value,
                         __jsstr_get_builtin(JSBUILTIN_STRING_SOURCE));
   js_pattern = __js_ToString(&source);
 
@@ -363,7 +363,7 @@ __jsvalue __jsregexp_Exec(__jsvalue *this_value, __jsvalue *value, uint32_t narg
   if (global && last_index >= __jsstr_get_length(js_subject)) {
     // Set last index to this object.
     js_last_index = __number_value(0);
-    __jsobj_helper_add_value_property(obj, JSBUILTIN_STRING_LASTINDEX_UL, 
+    __jsobj_helper_add_value_property(obj, JSBUILTIN_STRING_LASTINDEX_UL,
                                       &js_last_index, JSPROP_DESC_HAS_VWUEUC);
     return __null_value();
   }
@@ -390,7 +390,7 @@ __jsvalue __jsregexp_Exec(__jsvalue *this_value, __jsvalue *value, uint32_t narg
   // Prepare for return object.
   int length = num_captures + 1;  // ES5 15.10.6.2 step. 17
   __jsvalue items[length];
-  
+
   for (int i = 0; i < length; i++) {
     int start = vres[i].first, end = vres[i].second;
     if (i >= res) {
@@ -405,7 +405,7 @@ __jsvalue __jsregexp_Exec(__jsvalue *this_value, __jsvalue *value, uint32_t narg
       items[i] = __undefined_value();
     }
   }
-  __jsobject *array_obj = __js_new_arr_elems(items, length);
+  __jsobject *array_obj = __js_new_arr_elems_direct(items, length);
 
   // Set 'index' and 'input' property to return object.
   __jsvalue index = __number_value(vres[0].first);
@@ -418,13 +418,13 @@ __jsvalue __jsregexp_Exec(__jsvalue *this_value, __jsvalue *value, uint32_t narg
 
   // Set 'last_index' to this object.
   js_last_index = __number_value(vres[0].second);
-  __jsobj_helper_add_value_property(obj, JSBUILTIN_STRING_LASTINDEX_UL, 
+  __jsobj_helper_add_value_property(obj, JSBUILTIN_STRING_LASTINDEX_UL,
                                     &js_last_index, JSPROP_DESC_HAS_VWUEUC);
   return __object_value(array_obj);
 }
 
 // ES5 15.10.6.3 RegExp.prototype.test(string)
-__jsvalue __jsregexp_Test(__jsvalue *this_value, __jsvalue *value, 
+__jsvalue __jsregexp_Test(__jsvalue *this_value, __jsvalue *value,
                           uint32_t nargs) {
   if (!__is_js_object(this_value)) {
     MAPLE_JS_TYPEERROR_EXCEPTION();
@@ -450,7 +450,7 @@ __jsvalue __jsregexp_ToString(__jsvalue *this_value) {
   const char slash[] = "/";
   __jsstring *js_slash = __jsstr_new_from_char(slash);
 
-  __jsvalue source = __jsop_getprop_by_name(this_value, 
+  __jsvalue source = __jsop_getprop_by_name(this_value,
                         __jsstr_get_builtin(JSBUILTIN_STRING_SOURCE));
   __jsstring *js_source = __js_ToString(&source);
 
@@ -524,10 +524,10 @@ void CheckAndSetFlagOptions(__jsstring *s, __jsstring *js_pattern,
 // Compile RegExp pattern.
 dart::jscre::JSRegExp *RegExpCompile(__jsstring *js_pattern,
                                      bool ignorecase,
-                                     bool multiline, 
-                                     unsigned * num_captures, 
-                                     const char **error_message, 
-                                     dart::jscre::malloc_t *alloc_func, 
+                                     bool multiline,
+                                     unsigned * num_captures,
+                                     const char **error_message,
+                                     dart::jscre::malloc_t *alloc_func,
                                      dart::jscre::free_t *free_func) {
 
   int len = __jsstr_get_length(js_pattern);
@@ -544,7 +544,7 @@ dart::jscre::JSRegExp *RegExpCompile(__jsstring *js_pattern,
   dart::jscre::JSRegExpMultilineOption multiline_option = multiline ?
       dart::jscre::JSRegExpMultiline : dart::jscre::JSRegExpSingleLine;
 
-  dart::jscre::JSRegExp* regexp = 
+  dart::jscre::JSRegExp* regexp =
       dart::jscre::jsRegExpCompile(pattern, len,
                                    case_option, multiline_option, num_captures,
                                    error_message, alloc_func, free_func);

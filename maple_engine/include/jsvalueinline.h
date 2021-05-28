@@ -20,47 +20,47 @@
 #include "jsobject.h"
 #include "jsnum.h"
 static inline bool __is_null(__jsvalue *data) {
-  return data->s.tag == JSTYPE_NULL;
+  return data->tag == JSTYPE_NULL;
 }
 
 static inline bool __is_undefined(__jsvalue *data) {
-  return data->s.tag == JSTYPE_UNDEFINED;
+  return data->tag == JSTYPE_UNDEFINED;
 }
 
 static inline bool __is_nan(__jsvalue *data) {
-  return data->s.tag == JSTYPE_NAN;
+  return data->tag == JSTYPE_NAN;
 }
 
 static inline bool __is_infinity(__jsvalue *data) {
-  return data->s.tag == JSTYPE_INFINITY;
+  return data->tag == JSTYPE_INFINITY;
 }
 
 static inline bool __is_positive_infinity(__jsvalue *data) {
-  return __is_infinity(data) && (data->s.payload.u32 == 0);
+  return __is_infinity(data) && (data->s.u32 == 0);
 }
 
 static inline bool __is_neg_infinity(__jsvalue *data) {
-  return __is_infinity(data) && (data->s.payload.u32 == 1);
+  return __is_infinity(data) && (data->s.u32 == 1);
 }
 
 static inline bool __is_null_or_undefined(__jsvalue *data) {
-  return (data->s.tag == JSTYPE_NULL) || (data->s.tag == JSTYPE_UNDEFINED);
+  return (data->tag == JSTYPE_NULL) || (data->tag == JSTYPE_UNDEFINED);
 }
 
 static inline bool __is_boolean(__jsvalue *data) {
-  return data->s.tag == JSTYPE_BOOLEAN;
+  return data->tag == JSTYPE_BOOLEAN;
 }
 
 static inline bool __is_string(__jsvalue *data) {
-  return data->s.tag == JSTYPE_STRING;
+  return data->tag == JSTYPE_STRING;
 }
 
 static inline bool __is_number(__jsvalue *data) {
-  return data->s.tag == JSTYPE_NUMBER;
+  return data->tag == JSTYPE_NUMBER;
 }
 
 static inline bool __is_double(__jsvalue *data) {
-  return data->s.tag == JSTYPE_DOUBLE;
+  return data->tag == JSTYPE_DOUBLE;
 }
 
 static inline bool __is_int32(__jsvalue *data) {
@@ -73,11 +73,11 @@ static inline bool __is_primitive(uint32_t tag) {
 }
 
 static inline bool __is_primitive(__jsvalue *data) {
-  return __is_primitive(data->s.tag);
+  return __is_primitive(data->tag);
 }
 
 static inline bool __is_js_object(__jsvalue *data) {
-  return data->s.tag == JSTYPE_OBJECT;
+  return data->tag == JSTYPE_OBJECT;
 }
 
 static inline bool __is_js_object_or_primitive(__jsvalue *data) {
@@ -85,38 +85,50 @@ static inline bool __is_js_object_or_primitive(__jsvalue *data) {
 }
 
 static inline bool __is_positive_zero(__jsvalue *data) {
-  return (data->s.tag == JSTYPE_NUMBER &&
-          data->s.payload.i32 == 0 &&
-          (data->asbits & 0x400000000) == 0x400000000);
+  return (data->tag == JSTYPE_NUMBER && data->s.asbits == 0);
 }
 
 static inline bool __is_negative_zero(__jsvalue *data) {
-  return (data->s.tag == JSTYPE_DOUBLE &&
-          data->s.payload.i32 == 0 &&
-          (data->asbits & 0x900000000) == 0x900000000);
-}
-
-static inline bool __is_pos_zero_num(__jsvalue *data) {
-  return (data->s.tag == JSTYPE_NUMBER &&
-          data->s.payload.i32 == 0 &&
-          (data->asbits & 0x400000000) == 0x400000000);
-}
-
-static inline bool __is_neg_zero_num(__jsvalue *data) {
-  return (data->s.tag == JSTYPE_NUMBER &&
-          data->s.payload.i32 == 0 &&
-          (data->asbits & 0x900000000) == 0x900000000);
+  return (data->tag == JSTYPE_DOUBLE && data->s.asbits == 0);
 }
 
 #if MACHINE64
-__jsstring *__jsval_to_string(__jsvalue *);
-__jsobject *__jsval_to_object(__jsvalue *);
-void __set_string(__jsvalue *, __jsstring *);
-void __set_object(__jsvalue *, __jsobject *);
-bool __is_js_function(__jsvalue *);
-bool __is_js_array(__jsvalue *);
-double __jsval_to_double(__jsvalue *data);
-__jsvalue __double_value(double );
+static inline bool IsNeedRc(uint8_t flag) {
+  __jstype flagt = (__jstype)flag;
+  return flagt == JSTYPE_OBJECT || flagt == JSTYPE_STRING || flagt == JSTYPE_ENV;
+}
+static inline __jsstring *__jsval_to_string(__jsvalue *data) {
+  return (__jsstring *)data->s.str;
+}
+static inline __jsobject *__jsval_to_object(__jsvalue *data) {
+  return data->s.obj;
+}
+static inline void __set_string(__jsvalue *data, __jsstring *str) {
+  data->tag = JSTYPE_STRING;
+  data->s.str = str;
+}
+static inline void __set_object(__jsvalue *data, __jsobject *obj) {
+  data->tag = JSTYPE_OBJECT;
+  data->s.obj = obj;
+}
+static inline bool __is_js_function(__jsvalue *data) {
+  return __is_js_object(data) && (data->s.obj->object_class == JSFUNCTION);
+}
+static inline bool __is_js_array(__jsvalue *data) {
+  return __is_js_object(data) && (data->s.obj->object_class == JSARRAY);
+}
+static inline double __jsval_to_double(__jsvalue *data) {
+  if (__is_number(data))
+    return (double) data->s.i32;
+  MAPLE_JS_ASSERT(__is_double(data));
+  return data->s.f64;
+}
+static inline __jsvalue __double_value(double f64) {
+  __jsvalue jsval;
+  jsval.tag = JSTYPE_DOUBLE;
+  jsval.s.f64 = f64;
+  return jsval;
+}
 #else
 static inline __jsstring *__jsval_to_string(__jsvalue *data) {
   MAPLE_JS_ASSERT(__is_string(data));
@@ -128,11 +140,11 @@ static inline __jsobject *__jsval_to_object(__jsvalue *data) {
   return data->s.payload.obj;
 }
 static inline void __set_string(__jsvalue *data, __jsstring *str) {
-  data->s.tag = JSTYPE_STRING;
+  data->tag = JSTYPE_STRING;
   data->s.payload.str = str;
 }
 static inline void __set_object(__jsvalue *data, __jsobject *obj) {
-  data->s.tag = JSTYPE_OBJECT;
+  data->tag = JSTYPE_OBJECT;
   data->s.payload.obj = obj;
 }
 static inline bool __is_js_function(__jsvalue *data) {
@@ -150,17 +162,17 @@ static inline bool __is_js_array(__jsvalue *data) {
 #endif
 
 static inline bool __is_none(__jsvalue *data) {
-  return data->s.tag == JSTYPE_NONE && data->s.payload.u32 == 0;
+  return data->tag == JSTYPE_NONE && data->s.u32 == 0;
 }
 
 static inline bool __jsval_to_boolean(__jsvalue *data) {
   MAPLE_JS_ASSERT(__is_boolean(data));
-  return (bool)data->s.payload.boo;
+  return (bool)data->s.boo;
 }
 
 static inline int32_t __jsval_to_number(__jsvalue *data) {
   MAPLE_JS_ASSERT(__is_number(data));
-  return data->s.payload.i32;
+  return data->s.i32;
 }
 
 static inline int32_t __jsval_to_int32(__jsvalue *data) {
@@ -180,15 +192,15 @@ static inline uint32_t __jsval_to_uint32(__jsvalue *data) {
 
 static inline __jsvalue __string_value(__jsstring *str) {
   __jsvalue data;
-  data.asbits = 0;
+  data.s.asbits = 0;
   __set_string(&data, str);
   return data;
 }
 
 static inline __jsvalue __undefined_value() {
   __jsvalue data;
-  data.asbits = 0;
-  data.s.tag = JSTYPE_UNDEFINED;
+  data.s.asbits = 0;
+  data.tag = JSTYPE_UNDEFINED;
   return data;
 }
 
@@ -202,27 +214,28 @@ static inline __jsvalue __object_value(__jsobject *obj) {
 }
 
 static inline void __set_boolean(__jsvalue *data, bool b) {
-  data->s.tag = JSTYPE_BOOLEAN;
-  data->s.payload.boo = b;
+  data->tag = JSTYPE_BOOLEAN;
+  data->s.boo = b;
 }
 
 static inline void __set_number(__jsvalue *data, int32_t i) {
-  data->s.tag = JSTYPE_NUMBER;
-  data->s.payload.i32 = i;
+  data->tag = JSTYPE_NUMBER;
+  data->s.asbits = 0;
+  data->s.i32 = i;
 }
 
 
 static inline __jsvalue __null_value() {
   __jsvalue data;
-  data.asbits = 0;
-  data.s.tag = JSTYPE_NULL;
+  data.s.asbits = 0;
+  data.tag = JSTYPE_NULL;
   return data;
 }
 
 
 static inline __jsvalue __boolean_value(bool b) {
   __jsvalue data;
-  data.asbits = 0;
+  data.s.asbits = 0;
   __set_boolean(&data, b);
   return data;
 }
@@ -230,57 +243,57 @@ static inline __jsvalue __boolean_value(bool b) {
 
 static inline __jsvalue __number_value(int32_t i) {
   __jsvalue data;
-  data.asbits = 0;
+  data.s.asbits = 0;
   __set_number(&data, i);
   return data;
 }
 
 static inline __jsvalue __number_infinity() {
   __jsvalue data;
-  data.s.payload.i32 = 0;
-  data.s.tag = JSTYPE_INFINITY;
+  data.s.asbits = 0;
+  data.tag = JSTYPE_INFINITY;
   return data;
 }
 
 static inline __jsvalue __number_neg_infinity() {
   __jsvalue data;
-  data.s.payload.i32 = 1;
-  data.s.tag = JSTYPE_INFINITY;
+  data.s.asbits = 1;
+  data.tag = JSTYPE_INFINITY;
   return data;
 }
 
 static inline __jsvalue __none_value() {
   __jsvalue data;
-  data.s.payload.i32 = 0;
-  data.s.tag = JSTYPE_NONE;
+  data.s.asbits = 0;
+  data.tag = JSTYPE_NONE;
   return data;
 }
 
 static inline __jsvalue __nan_value() {
   __jsvalue data;
-  data.s.payload.i32 = 0;
-  data.s.tag = JSTYPE_NAN;
+  data.s.asbits = 0;
+  data.tag = JSTYPE_NAN;
   return data;
 }
 
 static inline __jsvalue __positive_zero_value() {
   __jsvalue data;
-  data.asbits = 0x400000000;
-  data.s.tag = JSTYPE_NUMBER;
+  data.s.asbits = 0;
+  data.tag = JSTYPE_NUMBER;
   return data;
 }
 
 static inline __jsvalue __negative_zero_value() {
   __jsvalue data;
-  data.asbits = 0x900000000;
-  data.s.tag = JSTYPE_DOUBLE;
+  data.s.f64 = 0;
+  data.tag = JSTYPE_DOUBLE;
   return data;
 }
 
 static inline __jstype __jsval_typeof(__jsvalue *data) {
   MAPLE_JS_ASSERT((__is_js_object_or_primitive(data)
      || __is_none(data) || __is_nan(data) || __is_infinity(data)) && "internal error.");
-  return (__jstype)data->s.tag;
+  return (__jstype)data->tag;
 }
 
 #endif

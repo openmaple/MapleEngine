@@ -22,7 +22,7 @@ done
 
 ps -ef | expand | grep -v grep | grep -v " $$ "| grep "/bash.*debugger-test.sh" && { echo Another test is running.; exit $LINENO; }
 
-TESTROOT="$MAPLE_DEBUGGER_ROOT"/testcases
+TESTROOT="$MAPLE_DEBUGGER_ROOT"/testcases/Java/
 TESTOUT="$MAPLE_BUILD_ROOT"/out/debugger/test
 SPECIFIED="." EXCLUSED="/Regression/"
 [ $# -gt 0 ] && { SPECIFIED="/$1"; EXCLUSED="///"; shift; }
@@ -32,7 +32,7 @@ find -L "$TESTROOT" -maxdepth 2 -name "[A-Z]*[0-9][0-9][0-9][0-9]-*" -type d |
 grep -e "$SPECIFIED/*[^/]*\$" | grep -v "$EXCLUSED" | sort |
 while read d; do
     testcase=$(basename "$d")
-    echo -n Running test case "$testcase"...
+    echo -n Running Java test case "$testcase"...
     cp -aL "$d" "$TESTOUT"/"$testcase" || exit $LINENO
     cd "$TESTOUT"/"$testcase" || exit $LINENO
     [ -f test.cfg ] || { echo FAILED; echo "Error: File $testcase/test.cfg not found" > FAILED; continue; }

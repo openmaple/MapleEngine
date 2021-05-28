@@ -111,7 +111,11 @@ Encode(__jsstring *src_js_str, char *result, const bool *unescapedSet,
           strb += hexchars[(unsigned char)c >> 4];
           strb += hexchars[(unsigned char)c & 0xF];
         } else
-        if (c < 128 && (unescapedSet[c] || (unescapedSet2 && (component ^ unescapedSet2[c])))) {
+        if (c < 128  //Add another MAP for these
+		&& (c !=93) && (c !=91) && (c !=94) && (c !=34) 
+		&& (c !=37) && (c !=60) && (c !=62) && (c !=92) && (c !=96) 
+		&& (c !=123) && (c !=124) && (c !=125) && (c !=127) 
+		&& (unescapedSet[c] || (unescapedSet2 && (component ^ unescapedSet2[c])))) {
 #ifdef DEBUG_E
           printf("Unescaped - {%c}{%d}", (char)c, component);
 #endif
