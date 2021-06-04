@@ -1495,10 +1495,12 @@ label_OP_icall:
     int numArgs = stmt.param.intrinsic.numOpnds;
     MASSERT(numArgs >= 2, "num of args of icall should be gt than 2");
     int i = 0;
-    for (i = 0; i < numArgs; i ++) {
+    for (i = 0; i < numArgs - 1; i ++) {
       args[numArgs - i - 1] = MPOP();
     }
-    MValue retCall = gInterSource->FuncCall((void *)args[0].x.u64, false, nullptr, args, numArgs, 2, -1, false);
+    MValue args0 = MPOP();
+    args[0] = JsvalToMValue(__function_value((void *)args0.x.u64));
+    MValue retCall = gInterSource->FuncCall((void *)args0.x.u64, false, nullptr, args, numArgs, 2, -1, false);
     if (retCall.x.u64 == (uint64_t) Exec_handle_exc && retCall.ptyp == 0) {
       void *newPc = gInterSource->currEH->GetEHpc(&func);
       if (newPc) {

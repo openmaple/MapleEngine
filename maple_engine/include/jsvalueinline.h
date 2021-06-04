@@ -129,6 +129,12 @@ static inline __jsvalue __double_value(double f64) {
   jsval.s.f64 = f64;
   return jsval;
 }
+static inline __jsvalue __function_value (void *addr) {
+  __jsvalue jsval;
+  jsval.tag = JSTYPE_FUNCTION;
+  jsval.s.ptr = addr;
+  return jsval;
+}
 #else
 static inline __jsstring *__jsval_to_string(__jsvalue *data) {
   MAPLE_JS_ASSERT(__is_string(data));

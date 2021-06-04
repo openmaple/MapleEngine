@@ -74,6 +74,7 @@ enum __jstype {
   JSTYPE_SPBASE,
   JSTYPE_FPBASE,
   JSTYPE_GPBASE,
+  JSTYPE_FUNCTION,
 };
 
 enum __jsbuiltin_object_id : uint8_t {  // must in accordance with js_value.h:js_builtin_id in the front-end (js2mpl/include/jsvalue.h)

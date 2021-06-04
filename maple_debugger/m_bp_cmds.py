@@ -219,6 +219,7 @@ class MapleBreakpointCmd(gdb.Command):
             gdb_print(buf)
 
         self.mbp_object.update_mbp()
+        self.mbp_dync_object.update_mbp_dync()
 
     def enable_breakpoint(self, s):
         if not self.mbp_object:
@@ -242,6 +243,7 @@ class MapleBreakpointCmd(gdb.Command):
             gdb_print(buf)
 
         self.mbp_object.update_mbp()
+        self.mbp_dync_object.update_mbp_dync()
 
     def clear_breakpoint(self, s):
         if not self.mbp_object:
@@ -265,6 +267,7 @@ class MapleBreakpointCmd(gdb.Command):
             gdb_print(buf)
 
         self.mbp_object.update_mbp()
+        self.mbp_dync_object.update_mbp_dync()
 
     def ignore_breakpoint(self, s, c):
         if not self.mbp_object:
@@ -296,6 +299,7 @@ class MapleBreakpointCmd(gdb.Command):
         gdb_print ("clear all breakpoint")
         self.mbp_object.clear_all_symbol()
         self.mbp_object.update_mbp()
+        self.mbp_dync_object.update_mbp_dync()
 
     def listall_breakpoint(self):
         if not self.mbp_object:

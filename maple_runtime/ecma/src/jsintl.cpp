@@ -68,7 +68,7 @@ static inline __jsvalue StrVecToVal(std::vector<std::string> strs) {
     items[i] = StrToVal(strs[i]);
 
   }
-  __jsobject *arr_obj = __js_new_arr_elems(items, size);
+  __jsobject *arr_obj = __js_new_arr_elems_direct(items, size);
   return __object_value(arr_obj);
 }
 
@@ -307,7 +307,7 @@ bool IsStructurallyValidLanguageTag(__jsstring *tag) {
                                     + ")";
   __jsstring *duplicate_singleton_str = __jsstr_new_from_char(duplicate_singleton.c_str());
   __jsvalue duplicate_singleton_re = __string_value(duplicate_singleton_str);
-  
+
   // For duplicate variant.
   std::string duplicate_variant = "(" + alpha_num + "{2,8}-)+" + variant + "-("
                                   + alpha_num + "{2,8}-)*\\3(?!" + alpha_num + ")";
@@ -626,10 +626,9 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
     __jsvalue key = __jsop_getprop(relevant_extension_keys, &prop);
     // Step 11b.
     prop = StrToVal("localeData");
-    __jsvalue found_locale_data = __jsop_getprop(locale_data, &prop);
+    __jsvalue found_locale_data = __jsop_getprop(&found_locale, &prop);
     // Step 11c.
-    prop = StrToVal("foundLocaleData");
-    __jsvalue key_locale_data = __jsop_getprop(&found_locale_data, &prop);
+    __jsvalue key_locale_data = __jsop_getprop(&found_locale_data, &key);
     // Step 11d.
     prop = StrToVal("0");
     __jsvalue value = __jsop_getprop(&key_locale_data, &prop);
@@ -958,6 +957,8 @@ void InitializeNumberFormat(__jsvalue *number_format, __jsvalue *locales,
   number_format_obj->object_class = JSINTL;
   number_format_obj->extensible = true;
   number_format_obj->object_type = JSREGULAR_OBJECT;
+  number_format_obj->shared.intl = (__jsintl*) VMMallocGC(sizeof(__jsintl));
+  number_format_obj->shared.intl->kind = JSINTL_NUMBERFORMAT;
   __jsvalue number_format_init = __object_value(number_format_obj);
   // TODO: set 'availableLocales', 'relevantExtensionKeys' as "nu", and 'localeData'.
   InitProperty(&number_format_init, "availableLocales");

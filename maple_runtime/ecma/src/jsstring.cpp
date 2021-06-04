@@ -665,6 +665,7 @@ bool __jsstr_splitMatch(__jsstring *s, uint32_t *q, __jsvalue *separator, uint32
         *q += sm.position(0);
         return true;
       } else {
+        *q = __jsstr_get_length(s) - 1;
         return false;
       }
     } else if (obj->object_class == JSSTRING) {
@@ -745,10 +746,13 @@ __jsvalue __jsstr_split(__jsvalue *this_string, __jsvalue *separator, __jsvalue 
   // step 13:
   uint32_t n = 0;
   __jsstring *t;
+  bool matched = false;
   while (q != sl) {
     if (!__jsstr_splitMatch(s, &q, separator, &e))
       q++;
     else {
+      if (q < sl) // the only match of /$/ does not count as a real match
+        matched = true;
       // step 13.c
       if (e == p)
         q++;
@@ -778,16 +782,18 @@ __jsvalue __jsstr_split(__jsvalue *this_string, __jsvalue *separator, __jsvalue 
       }
     }
   }
-  // step 14:
-  t = __js_new_string_internal(q - p, true);
-  for (uint32_t i = 0; i < q - p; i++) {
-    __jsstr_set_char(t, i, __jsstr_get_char(s, i + p));
+  if (matched || p < sl) {
+    // step 14:
+    t = __js_new_string_internal(q - p, true);
+    for (uint32_t i = 0; i < q - p; i++) {
+      __jsstr_set_char(t, i, __jsstr_get_char(s, i + p));
+    }
+    __set_number(&nv, (int32_t)n);
+    // step 15:
+    v = __string_value(t);
+    __jsobj_helper_add_value_property(a, __js_ToString(&nv), &v, JSPROP_DESC_HAS_VWEC);
+    __jsobj_helper_set_length(a, ++n, true);
   }
-  __set_number(&nv, (int32_t)n);
-  // step 15:
-  v = __string_value(t);
-  __jsobj_helper_add_value_property(a, __js_ToString(&nv), &v, JSPROP_DESC_HAS_VWEC);
-  __jsobj_helper_set_length(a, ++n, true);
   // step 16:
   return __object_value(a);
 }

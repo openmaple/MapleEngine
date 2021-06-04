@@ -354,11 +354,29 @@ bool __js_SameValue(__jsvalue *x, __jsvalue *y) {
   if ((__is_number(x) && __is_number(y))) {
     return x->s.i32 == y->s.i32;
   }
-  if (__jsval_typeof(x) == JSTYPE_STRING)
-    return __jsval_typeof(y) == JSTYPE_STRING && __jsstr_equal(__jsval_to_string(x), __jsval_to_string(y));
-  if (__jsval_typeof(x) == JSTYPE_OBJECT && sizeof(void *) == 8)
-    return __jsval_typeof(y) == JSTYPE_OBJECT &&
-           x->s.obj == y->s.obj;
+  __jstype jstyx = x->tag;
+  __jstype jstyy = y->tag;
+  if (jstyx == JSTYPE_STRING)
+    return jstyy == JSTYPE_STRING && __jsstr_equal(__jsval_to_string(x), __jsval_to_string(y));
+  if (jstyx == JSTYPE_OBJECT && jstyy == JSTYPE_OBJECT) {
+    if (x->s.obj == y->s.obj) {
+        return true;
+    } else if (x->s.obj->object_class == JSFUNCTION && y->s.obj->object_class == JSFUNCTION &&
+        x->s.obj->shared.fun->fp == y->s.obj->shared.fun->fp) {
+        return true;
+    }
+  } else if ((jstyx == JSTYPE_OBJECT && jstyy == JSTYPE_FUNCTION) ||
+             (jstyy == JSTYPE_OBJECT && jstyx == JSTYPE_FUNCTION)){
+    if (jstyy == JSTYPE_OBJECT) {
+      __jsvalue *t = x;
+      x = y;
+      y = t;
+    }
+    if (x->s.obj->object_class == JSFUNCTION &&
+      x->s.obj->shared.fun->fp == y->s.ptr) {
+      return true;
+    }
+  }
   return false;
 }
 
