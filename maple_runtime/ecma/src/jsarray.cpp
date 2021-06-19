@@ -59,7 +59,8 @@ __jsobject *__js_new_arr_elems_direct(__jsvalue *items, uint32_t length) {
   __jsobject *arr = __js_new_arr_internal(length);
   __jsvalue *array_elems = arr->shared.array_props;
   for (uint32_t i = 0; i < length; i++) {
-    __set_regular_elem(array_elems, i, &items[i]);
+    GCCheckAndIncRf(items[i].s.asbits, IsNeedRc(items[i].tag));
+    array_elems[i + 1] = items[i];
   }
   return arr;
 }

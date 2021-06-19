@@ -27,7 +27,12 @@ def get_symbol_address(symbol):
     except:
         return None
 
-    match_pattern = '<' + symbol + '>'
+    # to workaround issue such as add__snid0 would be recognized as add.snid0 once loaded by gdb
+    if "__" in symbol and symbol[0].islower():
+        match_symbol = symbol.split("__")[0] + "." + symbol.split("__")[1]
+    else:
+        match_symbol = symbol
+    match_pattern = '<' + match_symbol + '>'
 
     if result.find(match_pattern) is -1:
         return None
@@ -112,7 +117,12 @@ def get_symbol_name_by_current_frame_args_dync():
         return None, None
 
     if result[0] == '$' and '(maple::DynamicMethodHeaderT *) 0x' in result and '_mirbin_info' in result:
-        return result.split()[4], result.split()[5].rstrip()[1:-1]
+        addr = result.split()[4]
+        func_name = result.split()[5].rstrip()[1:-1]
+        # workaound for issue such as add.snid0 in stack while the real symbol for it is add__snid
+        if "." in func_name:
+            func_name = func_name.replace('.', '__')
+        return addr, func_name
     else:
         return None, None
 

@@ -21,6 +21,7 @@
 #include "vmmemory.h"
 #include "jstycnv.h"
 #include "jsdate.h"
+#include "jsintl.h"
 
 void __jsop_print_item(__jsvalue value) {
   switch (__jsval_typeof(&value)) {
@@ -56,6 +57,22 @@ void __jsop_print_item(__jsvalue value) {
       } else if (obj->object_class == JSDATE) {
         __jsvalue v = __jsdate_ToString(&value);
         __jsop_print_item(v);
+      } else if (obj->object_class == JSINTL) {
+        printf("Intl.");
+        std::string kind;
+        switch (obj->shared.intl->kind) {
+        case JSINTL_NUMBERFORMAT:
+          kind = "NumberFormat";
+          break;
+        case JSINTL_DATETIMEFORMAT:
+          kind = "DateTimeFormat";
+          break;
+        case JSINTL_COLLATOR:
+          kind = "Collator";
+          break;
+        }
+        printf("%s", kind.c_str());
+        break;
       } else {
         __jsvalue v = __js_ToPrimitive(&value, JSTYPE_UNDEFINED /* ??? */);
         __jsop_print_item(v);

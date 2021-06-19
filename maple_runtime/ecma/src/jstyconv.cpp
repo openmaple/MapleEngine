@@ -346,14 +346,12 @@ bool __js_IsCallable(__jsvalue *v) {
 
 // ecma 9.12
 bool __js_SameValue(__jsvalue *x, __jsvalue *y) {
-  if (x->s.asbits == y->s.asbits && x->tag == y->tag)
-    return true;
-  if ((__is_number(x) && __is_boolean(y)) || (__is_number(y) && __is_boolean(x))) {
-    return x->s.u32 == y->s.u32;
-  }
-  if ((__is_number(x) && __is_number(y))) {
+  if ((__is_number(x) || __is_boolean(x)) && (__is_number(y) || __is_boolean(y))) {
     return x->s.i32 == y->s.i32;
   }
+  if (x->s.asbits == y->s.asbits && x->tag == y->tag)
+    return true;
+
   __jstype jstyx = x->tag;
   __jstype jstyy = y->tag;
   if (jstyx == JSTYPE_STRING)

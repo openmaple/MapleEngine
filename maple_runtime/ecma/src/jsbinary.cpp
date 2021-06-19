@@ -40,6 +40,16 @@ static __jsvalue __jsop_add_double(double dx, double dy) {
 // ecma 11.6 Additive Operators
 // ecma 11.6.1 The Addition operator ( + )
 __jsvalue __jsop_add(__jsvalue *x, __jsvalue *y) {
+  if (__is_number(x) && __is_number(y)) {
+    return __number_value(__jsval_to_number(x) + __jsval_to_number(y));
+  } else if (__is_number(x) && __is_double(y)) {
+    return __jsop_add_double((double)__jsval_to_number(x), __jsval_to_double(y));
+  } else if (__is_double(x) && __is_double(y)) {
+    return  __jsop_add_double(__jsval_to_double(x), __jsval_to_double(y));
+  } else if (__is_double(x) && __is_number(y)) {
+    return __jsop_add_double(__jsval_to_double(x), (double)__jsval_to_number(y));
+  }
+
   if(__is_nan(x) || __is_nan(y))
       return __nan_value();
   if (__is_infinity(x) && __is_infinity(y)) {
@@ -81,16 +91,6 @@ __jsvalue __jsop_add(__jsvalue *x, __jsvalue *y) {
       ((__is_null(y) || __is_number(y)) && __is_undefined(x)) ||
       (__is_undefined(y) && __is_undefined(x))) {
     return __nan_value();
-  }
-
-  if (__is_number(x) && __is_number(y)) {
-    return __number_value(__jsval_to_number(x) + __jsval_to_number(y));
-  } else if (__is_number(x) && __is_double(y)) {
-    return __jsop_add_double((double)__jsval_to_number(x), __jsval_to_double(y));
-  } else if (__is_double(x) && __is_double(y)) {
-    return  __jsop_add_double(__jsval_to_double(x), __jsval_to_double(y));
-  } else if (__is_double(x) && __is_number(y)) {
-    return __jsop_add_double(__jsval_to_double(x), (double)__jsval_to_number(y));
   }
 
   __jsvalue lprim;
@@ -734,6 +734,19 @@ __jsvalue __jsop_object_mul(__jsvalue *x, __jsvalue *y) {
 
 // ecma 11.8.5
 bool __js_AbstractRelationalComparison(__jsvalue *x, __jsvalue *y, bool &isAlwaysFalse, bool leftFirst) {
+  if (__is_number(x) && __is_number(y)) {
+    return __jsval_to_number(x) < __jsval_to_number(y);
+  }
+
+  if (__is_double(x) && __is_double(y)) {
+    return __jsval_to_double(x) < __jsval_to_double(y);
+  } else if (__is_double(x) && __is_number(y)) {
+    double dy = (double)__jsval_to_number(y);
+    return __jsval_to_double(x) < dy;
+  } else if (__is_number(x) && __is_double(y)) {
+    double dx = (double)__jsval_to_number(x);
+    return dx < __jsval_to_double(y);
+  }
   // handle special
   if (__is_undefined(x) || __is_undefined(y)) {
     isAlwaysFalse = true;
@@ -747,19 +760,6 @@ bool __js_AbstractRelationalComparison(__jsvalue *x, __jsvalue *y, bool &isAlway
   }
   if (__is_infinity(y)) {
     return !__is_neg_infinity(y);
-  }
-  if (__is_number(x) && __is_number(y)) {
-    return __jsval_to_number(x) < __jsval_to_number(y);
-  }
-
-  if (__is_double(x) && __is_double(y)) {
-    return __jsval_to_double(x) < __jsval_to_double(y);
-  } else if (__is_double(x) && __is_number(y)) {
-    double dy = (double)__jsval_to_number(y);
-    return __jsval_to_double(x) < dy;
-  } else if (__is_number(x) && __is_double(y)) {
-    double dx = (double)__jsval_to_number(x);
-    return dx < __jsval_to_double(y);
   }
 
   // ecma 11.8.5 step 1.

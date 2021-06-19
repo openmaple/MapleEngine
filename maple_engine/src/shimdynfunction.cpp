@@ -85,6 +85,7 @@ InterSource::InterSource() {
   fp = stack;
   heap = 0;
   retVal0.x.u64 = 0;
+  retVal0.ptyp = 0;
   currEH = nullptr;
   EHstackReuseSize = 0;
 
@@ -1409,6 +1410,17 @@ bool InterSource::JSopPrimCmp(Opcode op, MValue &mv0, MValue &mv1, PrimType rpty
 MValue InterSource::JSopCmp(MValue mv0, MValue mv1, Opcode op, PrimType ptyp) {
   uint8_t rpty0 = mv0.ptyp;
   uint8_t rpty1 = mv1.ptyp;
+
+  if (op == OP_eq && (rpty0 == JSTYPE_NUMBER || rpty0 == JSTYPE_BOOLEAN) && (rpty1 == JSTYPE_NUMBER || rpty1 == JSTYPE_BOOLEAN)) { // fast path
+    MValue retVal;
+    retVal.ptyp = (uint8_t)JSTYPE_BOOLEAN;
+    if (mv0.x.i32 == mv1.x.i32)
+      retVal.x.u64 = 1;
+    else
+      retVal.x.u64 = 0;
+    return retVal;
+  }
+
   if ((rpty0!= 0) || (rpty1 != 0)) {
     __jsvalue jsv0 = MValueToJsval(mv0);
     __jsvalue jsv1 = MValueToJsval(mv1);
@@ -1719,11 +1731,14 @@ MValue InterSource::JSopGetProp (MValue &mv0, MValue &mv1) {
 MValue InterSource::JSopGetThisPropByName(MValue &mv1) {
   __jsvalue &v0 = __js_Global_ThisBinding;
   __jsstring *v1 = (__jsstring *) mv1.x.a64;
-  return JsvalToMValue(__jsop_get_this_prop_by_name(&v0, v1, true));
+  return JsvalToMValue(__jsop_get_this_prop_by_name(&v0, v1));
 }
 
 MValue InterSource::JSopGetPropByName(MValue &mv0, MValue &mv1) {
   __jsvalue v0 = MValueToJsval(mv0);
+  if (__is_undefined(&v0)) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
   __jsstring *v1 = (__jsstring *) mv1.x.a64;
   return JsvalToMValue(__jsop_getprop_by_name(&v0, v1));
 }
@@ -1804,6 +1819,9 @@ MValue InterSource::JSBoolean(MValue &mv) {
 }
 
 MValue InterSource::JSNumber(MValue &mv) {
+  if ((__jstype)mv.ptyp == JSTYPE_NUMBER) // fast path
+    return mv;
+
   __jsvalue v0 = MValueToJsval(mv);
   if (__is_undefined(&v0)) {
     return JsvalToMValue(__nan_value());
@@ -2204,12 +2222,14 @@ MValue InterSource::FuncCall(void *callee, bool isIntrinsiccall, void *env, MVal
   // bool isVargs = (passedNargs > 0) && ((calleeHeader->upFormalSize/8 - 1) != passedNargs);
   // MValue ret = maple_invoke_dynamic_method(calleeHeader, !isVargs ? nullptr : CreateArgumentsObject(mvArgs, passedNargs));
   DynMFunction *oldDynFunc = GetCurFunc();
-  MValue ret = maple_invoke_dynamic_method(calleeHeader, CreateArgumentsObject(mvArgs, passedNargs, &args[0]));
+  void* argsObj = CreateArgumentsObject(mvArgs, passedNargs, &args[0]);
+  MValue ret = maple_invoke_dynamic_method(calleeHeader, argsObj);
   if (oldArgs.s.asbits != 0) {
     __jsop_set_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS), &oldArgs, true);
   } else {
     __jsobj_internal_Delete(__jsval_to_object(&__js_Global_ThisBinding), __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
   }
+  GCDecRf(argsObj);
   __js_exit_function(&this_arg, old_this, (calleeHeader->attribute & FUNCATTRSTRICT)|strictP);
   sp -= offset;
   SetCurFunc(oldDynFunc);
@@ -2407,7 +2427,7 @@ extern "C" int64_t EngineShimDynamic(int64_t firstArg, char *appPath) {
     uint16_t globalMemSize = mpljsMdD[0];
     gInterSource = new InterSource();
     gInterSource->gp = (uint8_t *)malloc(globalMemSize);
-    uint8_t *gpMemoryFlagMap = (uint8_t *)calloc(0, globalMemSize/sizeof(void *) * sizeof(uint8_t));
+    uint8_t *gpMemoryFlagMap = (uint8_t *)calloc(1, globalMemSize/sizeof(void *) * sizeof(uint8_t));
     memory_manager->SetUpGpMemory(gInterSource->gp, gpMemoryFlagMap);
     memcpy(gInterSource->gp, mpljsMdD + 1, globalMemSize);
     gInterSource->topGp = gInterSource->gp + globalMemSize;

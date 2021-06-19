@@ -42,24 +42,24 @@ void __jsobj_set_prototype(__jsobject *obj, __jsobject *proto_obj) {
   GCIncRf((void *)proto_obj);
 }
 
-static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, bool createBuiltin = true, bool asciiOnly = false) {
+static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, bool createBuiltin = true) {
 #ifdef USE_PROP_MAP
   if (obj->prop_string_map != NULL) {
-    std::map<std::wstring, __jsprop *>::iterator it;
-    if (asciiOnly) {
-      uint32_t len = __jsstr_get_length(name);
-      wchar_t w_name[len + 1];
-      char *n = name->x.ascii;
-      for (int i = 0; i < len; i++) {
-        w_name[i] = n[i];
-      }
-      w_name[len] = 0;
-      it = obj->prop_string_map->find(w_name);
-    } else {
-      it = obj->prop_string_map->find(__jsstr_to_wstring(name));
-    }
+    std::map<__jsstring *, __jsprop *>::iterator it;
+      it = obj->prop_string_map->find(name);
+    __jsprop *p = NULL;
     if (it != obj->prop_string_map->end()) {
-      __jsprop *p = it->second;
+      p = it->second;
+    } else { // name could be copied to a new string, find by name
+      std::wstring w_name = __jsstr_to_wstring(name);
+      for (it = obj->prop_string_map->begin(); it != obj->prop_string_map->end(); ++it) {
+	if (__jsstr_to_wstring(it->first) == w_name) {
+          p = it->second; // found by name
+          break;
+        }
+      }
+    }
+    if (p) {
         if (__is_undefined_desc(p->desc)) {
           return NULL;
         }
@@ -150,11 +150,12 @@ static void InsertIndexProp(__jsprop *prop, __jsprop **propList, __jsobject *obj
           assert(obj->prop_index_map->empty() && "prop_index_map should be empty at this time");
         (*(obj->prop_index_map))[prop->n.index] = prop;
       } else {
-        if (obj->prop_string_map == NULL)
-          obj->prop_string_map = new std::map<std::wstring, __jsprop *>();
+        if (obj->prop_string_map == NULL) {
+          obj->prop_string_map = new std::map<__jsstring *, __jsprop *>();
+        }
         else
           assert(obj->prop_string_map->empty() && "prop_string_map should be empty at this time");
-        (*(obj->prop_string_map))[__jsstr_to_wstring(prop->n.name)] = prop;
+        (*(obj->prop_string_map))[prop->n.name] = prop;
       }
       // The first entry's prev points to the list entry. The last entry's next is NULL
       prop->prev = prop;
@@ -199,20 +200,19 @@ static void InsertIndexProp(__jsprop *prop, __jsprop **propList, __jsobject *obj
       (*(obj->prop_index_map))[prop->n.index] = prop;
     } else { // !isIndex
       if (obj->prop_string_map == NULL || (*obj->prop_string_map).empty()) {
-        if (obj->prop_string_map == NULL)
-          obj->prop_string_map = new std::map<std::wstring, __jsprop *>();
-        (*(obj->prop_string_map))[__jsstr_to_wstring(prop->n.name)] = prop;
+        if (obj->prop_string_map == NULL) {
+          obj->prop_string_map = new std::map<__jsstring *, __jsprop *>();
+        }
+        (*(obj->prop_string_map))[prop->n.name] = prop;
         prop->prev = (*propList)->prev;
         (*propList)->prev->next = prop;
         (*propList)->prev = prop;
         return;
       }
 
-      std::map<std::wstring, __jsprop *>::iterator it, left, right;
-
-      it = obj->prop_string_map->find(__jsstr_to_wstring(prop->n.name));
+      std::map<__jsstring *, __jsprop *>::iterator it;
+      it = obj->prop_string_map->find(prop->n.name);
       if (it != obj->prop_string_map->end()) {
-        // old property may be marked as deleted, replace it
         __jsprop *old_prop = it->second;
         prop->next = old_prop->next;
         prop->prev = old_prop->prev;
@@ -236,7 +236,7 @@ static void InsertIndexProp(__jsprop *prop, __jsprop **propList, __jsobject *obj
       (*propList)->prev = prop;
       prop->next = nullptr;
 
-      (*(obj->prop_string_map))[__jsstr_to_wstring(prop->n.name)] = prop;
+      (*(obj->prop_string_map))[prop->n.name] = prop;
     }
   }
   return;
@@ -637,6 +637,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_LAST_INDEX_OF_UL, __jsstr_lastIndexOf, ATTRS(2, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_LOCALE_COMPARE_UL, __jsstr_localeCompare, ATTRS(2, 1));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SLICE, __jsstr_slice, ATTRS(2, 2));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUBSTR, __jsstr_substr, ATTRS(2, 2));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SUBSTRING, __jsstr_substring, ATTRS(2, 2));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_LOWER_CASE_UL, __jsstr_toLowerCase, ATTRS(0, 0));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_LOCALE_LOWER_CASE_UL, __jsstr_toLocaleLowerCase, ATTRS(0, 0));
@@ -1647,10 +1648,21 @@ bool __jsobj_internal_Delete(__jsobject *o, __jsstring *p, bool mark_as_deleted,
   bool property_created = false;
   for (;;) {
     if (o->prop_string_map) {
-      std::map<std::wstring, __jsprop *>::iterator it, prev;
-      it = o->prop_string_map->find(__jsstr_to_wstring(p));
+      std::map<__jsstring *, __jsprop *>::iterator it, prev;
+      it = o->prop_string_map->find(p);
+      __jsprop *prop = NULL;
       if (it != o->prop_string_map->end()) {
-        __jsprop *prop = it->second;
+        prop = it->second;
+      } else {
+        std::wstring w_name = __jsstr_to_wstring(p);
+        for (it = o->prop_string_map->begin(); it != o->prop_string_map->end(); ++it) {
+          if (__jsstr_to_wstring(it->first) == w_name) {
+            prop = it->second;
+            break;
+          }
+        }
+      }
+      if (prop) {
         __jsprop_desc desc = prop->desc;
         if (__has_and_configurable(desc)) {
           if (mark_as_deleted) {
@@ -2816,22 +2828,22 @@ __jsvalue __jsop_getprop_by_name(__jsvalue *o, __jsstring *p) {
   }
 }
 
-static __jsprop * __jsop_get_prop_jsobject(__jsobject *obj, __jsstring *name, bool asciiOnly = false) {
+static __jsprop * __jsop_get_prop_jsobject(__jsobject *obj, __jsstring *name) {
   bool isNum;
   uint32 idxNum = __jsstr_is_numidx(name, isNum);
   __jsprop *p = nullptr;
   if (isNum) {
     p = __jsobj_helper_get_propertyByValue(obj, idxNum, false);
   } else {
-    p = __jsobj_helper_get_property(obj, name, false, asciiOnly);
+    p = __jsobj_helper_get_property(obj, name, false);
   }
   return p;
 }
 
 // make things faster
-__jsvalue __jsop_get_this_prop_by_name(__jsvalue *o,  __jsstring *name, bool asciiOnly) {
+__jsvalue __jsop_get_this_prop_by_name(__jsvalue *o,  __jsstring *name) {
   __jsobject *obj = __is_js_object(o) ? __jsval_to_object(o) : __js_ToObject(o);
-  __jsprop *p = __jsobj_helper_get_property(obj, name, false, asciiOnly);
+  __jsprop *p = __jsobj_helper_get_property(obj, name, false);
   if (p) {
     return __jsobj_internal_get_by_desc(obj, p->desc);
   } else {
@@ -2843,14 +2855,14 @@ __jsvalue __jsop_get_this_prop_by_name(__jsvalue *o,  __jsstring *name, bool asc
 }
 
 // make things faster
-void __jsop_set_this_prop_by_name(__jsvalue *o, __jsstring *name, __jsvalue *v, bool noThrowTE, bool asciiOnly) {
+void __jsop_set_this_prop_by_name(__jsvalue *o, __jsstring *name, __jsvalue *v, bool noThrowTE) {
   __jsobject *obj = __is_js_object(o) ? __jsval_to_object(o) : __js_ToObject(o);
   // if name is builtin object like NaN, undefined.. JS will throw a TypeError
   if (__is_global_strict && __jsstr_throw_typeerror(name) && !noThrowTE) {
     MAPLE_JS_TYPEERROR_EXCEPTION();
   }
   // search the prop first
-  __jsprop *p = __jsop_get_prop_jsobject(obj, name, asciiOnly);
+  __jsprop *p = __jsop_get_prop_jsobject(obj, name);
   if (p) {
     __set_value_gc(&p->desc, v);
   } else {

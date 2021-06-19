@@ -85,6 +85,7 @@ __jsvalue __jsstr_indexOf(__jsvalue *this_string, __jsvalue *search, __jsvalue *
 __jsvalue __jsstr_lastIndexOf(__jsvalue *this_string, __jsvalue *search, __jsvalue *pos);
 __jsvalue __jsstr_localeCompare(__jsvalue *this_string, __jsvalue *that);
 __jsvalue __jsstr_slice(__jsvalue *this_string, __jsvalue *start, __jsvalue *end);
+__jsvalue __jsstr_substr(__jsvalue *this_string, __jsvalue *start, __jsvalue *end);
 __jsvalue __jsstr_substring(__jsvalue *this_string, __jsvalue *start, __jsvalue *end);
 __jsvalue __jsstr_toLowerCase(__jsvalue *this_string);
 __jsvalue __jsstr_toLocaleLowerCase(__jsvalue *this_string);

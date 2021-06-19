@@ -120,7 +120,7 @@ static inline bool __is_js_array(__jsvalue *data) {
 static inline double __jsval_to_double(__jsvalue *data) {
   if (__is_number(data))
     return (double) data->s.i32;
-  MAPLE_JS_ASSERT(__is_double(data));
+  //  MAPLE_JS_ASSERT(__is_double(data));
   return data->s.f64;
 }
 static inline __jsvalue __double_value(double f64) {
@@ -172,12 +172,12 @@ static inline bool __is_none(__jsvalue *data) {
 }
 
 static inline bool __jsval_to_boolean(__jsvalue *data) {
-  MAPLE_JS_ASSERT(__is_boolean(data));
+  //  MAPLE_JS_ASSERT(__is_boolean(data));
   return (bool)data->s.boo;
 }
 
 static inline int32_t __jsval_to_number(__jsvalue *data) {
-  MAPLE_JS_ASSERT(__is_number(data));
+  //  MAPLE_JS_ASSERT(__is_number(data));
   return data->s.i32;
 }
 
@@ -191,7 +191,7 @@ static inline uint32_t __jsval_to_uint32(__jsvalue *data) {
   } else if (__is_double(data)) {
     return (uint32_t)__jsval_to_double(data);
   }
-  MAPLE_JS_ASSERT(0 && "__jsval_to_uint32");
+  //  MAPLE_JS_ASSERT(0 && "__jsval_to_uint32");
   return 0;
 }
 
@@ -297,8 +297,8 @@ static inline __jsvalue __negative_zero_value() {
 }
 
 static inline __jstype __jsval_typeof(__jsvalue *data) {
-  MAPLE_JS_ASSERT((__is_js_object_or_primitive(data)
-     || __is_none(data) || __is_nan(data) || __is_infinity(data)) && "internal error.");
+  //  MAPLE_JS_ASSERT((__is_js_object_or_primitive(data)
+  //     || __is_none(data) || __is_nan(data) || __is_infinity(data)) && "internal error.");
   return (__jstype)data->tag;
 }
 

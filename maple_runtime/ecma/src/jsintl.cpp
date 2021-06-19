@@ -17,6 +17,7 @@
 #include <regex>
 #include <unicode/uenum.h>
 #include <unicode/uloc.h>
+#include <unicode/numsys.h>
 #include "jsintl.h"
 #include "jsvalueinline.h"
 #include "jsvalue.h"
@@ -27,14 +28,289 @@
 
 std::string kUnicodeLocaleExtensionSequence = "-u(-[a-z0-9]{2,8})+";
 
-// TODO
 std::unordered_map<std::string,std::string> kTagMappings = {
   {"art-lojban", "jbo"},
+  {"cel-gaulish", "cel-gaulish"},
+  {"en-gb-oed", "en-GB-oed"},
+  {"i-ami", "ami"},
+  {"i-bnn", "bnn"},
+  {"i-default", "i-default"},
+  {"i-enochian", "i-enochian"},
+  {"i-hak", "hak"},
+  {"i-klingon", "tlh"},
+  {"i-lux", "lb"},
+  {"i-mingo", "i-mingo"},
+  {"i-navajo", "nv"},
+  {"i-pwn", "pwn"},
+  {"i-tao", "tao"},
+  {"i-tay", "tay"},
+  {"i-tsu", "tsu"},
+  {"ja-latn-hepburn-heploc", "ja-Latn-alalc97"},
+  {"no-bok", "nb"},
+  {"no-nyn", "nn"},
+  {"sgn-be-fr", "sfb"},
+  {"sgn-be-nl", "vgt"},
+  {"sgn-br", "bzs"},
+  {"sgn-ch-de", "sgg"},
+  {"sgn-co", "csn"},
+  {"sgn-de", "gsg"},
+  {"sgn-dk", "dsl"},
+  {"sgn-es", "ssp"},
+  {"sgn-fr", "fsl"},
+  {"sgn-gb", "bfi"},
+  {"sgn-gr", "gss"},
+  {"sgn-ie", "isg"},
+  {"sgn-it", "ise"},
+  {"sgn-jp", "jsl"},
+  {"sgn-mx", "mfs"},
+  {"sgn-ni", "ncs"},
+  {"sgn-nl", "dse"},
+  {"sgn-no", "nsl"},
+  {"sgn-pt", "psr"},
+  {"sgn-se", "swl"},
+  {"sgn-us", "ase"},
+  {"sgn-za", "sfs"},
+  {"zh-cmn", "cmn"},
+  {"zh-cmn-hans", "cmn-Hans"},
+  {"zh-cmn-hant", "cmn-Hant"},
+  {"zh-gan", "gan"},
+  {"zh-guoyu", "cmn"},
+  {"zh-hakka", "hak"},
+  {"zh-min", "zh-min"},
+  {"zh-min-nan", "nan"},
+  {"zh-wuu", "wuu"},
+  {"zh-xiang", "hsn"},
+  {"zh-yue", "yue"},
 };
 
-// TODO
 std::unordered_map<std::string,std::vector<std::string>> kExtLangMappings = {
   {"aao", {"aao", "ar"}},
+  {"abh", {"abh", "ar"}},
+  {"abv", {"abv", "ar"}},
+  {"acm", {"acm", "ar"}},
+  {"acq", {"acq", "ar"}},
+  {"acw", {"acw", "ar"}},
+  {"acx", {"acx", "ar"}},
+  {"acy", {"acy", "ar"}},
+  {"adf", {"adf", "ar"}},
+  {"ads", {"ads", "sgn"}},
+  {"aeb", {"aeb", "ar"}},
+  {"aec", {"aec", "ar"}},
+  {"aed", {"aed", "sgn"}},
+  {"aen", {"aen", "sgn"}},
+  {"afb", {"afb", "ar"}},
+  {"afg", {"afg", "sgn"}},
+  {"ajp", {"ajp", "ar"}},
+  {"apc", {"apc", "ar"}},
+  {"apd", {"apd", "ar"}},
+  {"arb", {"arb", "ar"}},
+  {"arq", {"arq", "ar"}},
+  {"ars", {"ars", "ar"}},
+  {"ary", {"ary", "ar"}},
+  {"arz", {"arz", "ar"}},
+  {"ase", {"ase", "sgn"}},
+  {"asf", {"asf", "sgn"}},
+  {"asp", {"asp", "sgn"}},
+  {"asq", {"asq", "sgn"}},
+  {"asw", {"asw", "sgn"}},
+  {"auz", {"auz", "ar"}},
+  {"avl", {"avl", "ar"}},
+  {"ayh", {"ayh", "ar"}},
+  {"ayl", {"ayl", "ar"}},
+  {"ayn", {"ayn", "ar"}},
+  {"ayp", {"ayp", "ar"}},
+  {"bbz", {"bbz", "ar"}},
+  {"bfi", {"bfi", "sgn"}},
+  {"bfk", {"bfk", "sgn"}},
+  {"bjn", {"bjn", "ms"}},
+  {"bog", {"bog", "sgn"}},
+  {"bqn", {"bqn", "sgn"}},
+  {"bqy", {"bqy", "sgn"}},
+  {"btj", {"btj", "ms"}},
+  {"bve", {"bve", "ms"}},
+  {"bvl", {"bvl", "sgn"}},
+  {"bvu", {"bvu", "ms"}},
+  {"bzs", {"bzs", "sgn"}},
+  {"cdo", {"cdo", "zh"}},
+  {"cds", {"cds", "sgn"}},
+  {"cjy", {"cjy", "zh"}},
+  {"cmn", {"cmn", "zh"}},
+  {"coa", {"coa", "ms"}},
+  {"cpx", {"cpx", "zh"}},
+  {"csc", {"csc", "sgn"}},
+  {"csd", {"csd", "sgn"}},
+  {"cse", {"cse", "sgn"}},
+  {"csf", {"csf", "sgn"}},
+  {"csg", {"csg", "sgn"}},
+  {"csl", {"csl", "sgn"}},
+  {"csn", {"csn", "sgn"}},
+  {"csq", {"csq", "sgn"}},
+  {"csr", {"csr", "sgn"}},
+  {"czh", {"czh", "zh"}},
+  {"czo", {"czo", "zh"}},
+  {"doq", {"doq", "sgn"}},
+  {"dse", {"dse", "sgn"}},
+  {"dsl", {"dsl", "sgn"}},
+  {"dup", {"dup", "ms"}},
+  {"ecs", {"ecs", "sgn"}},
+  {"esl", {"esl", "sgn"}},
+  {"esn", {"esn", "sgn"}},
+  {"eso", {"eso", "sgn"}},
+  {"eth", {"eth", "sgn"}},
+  {"fcs", {"fcs", "sgn"}},
+  {"fse", {"fse", "sgn"}},
+  {"fsl", {"fsl", "sgn"}},
+  {"fss", {"fss", "sgn"}},
+  {"gan", {"gan", "zh"}},
+  {"gds", {"gds", "sgn"}},
+  {"gom", {"gom", "kok"}},
+  {"gse", {"gse", "sgn"}},
+  {"gsg", {"gsg", "sgn"}},
+  {"gsm", {"gsm", "sgn"}},
+  {"gss", {"gss", "sgn"}},
+  {"gus", {"gus", "sgn"}},
+  {"hab", {"hab", "sgn"}},
+  {"haf", {"haf", "sgn"}},
+  {"hak", {"hak", "zh"}},
+  {"hds", {"hds", "sgn"}},
+  {"hji", {"hji", "ms"}},
+  {"hks", {"hks", "sgn"}},
+  {"hos", {"hos", "sgn"}},
+  {"hps", {"hps", "sgn"}},
+  {"hsh", {"hsh", "sgn"}},
+  {"hsl", {"hsl", "sgn"}},
+  {"hsn", {"hsn", "zh"}},
+  {"icl", {"icl", "sgn"}},
+  {"ils", {"ils", "sgn"}},
+  {"inl", {"inl", "sgn"}},
+  {"ins", {"ins", "sgn"}},
+  {"ise", {"ise", "sgn"}},
+  {"isg", {"isg", "sgn"}},
+  {"isr", {"isr", "sgn"}},
+  {"jak", {"jak", "ms"}},
+  {"jax", {"jax", "ms"}},
+  {"jcs", {"jcs", "sgn"}},
+  {"jhs", {"jhs", "sgn"}},
+  {"jls", {"jls", "sgn"}},
+  {"jos", {"jos", "sgn"}},
+  {"jsl", {"jsl", "sgn"}},
+  {"jus", {"jus", "sgn"}},
+  {"kgi", {"kgi", "sgn"}},
+  {"knn", {"knn", "kok"}},
+  {"kvb", {"kvb", "ms"}},
+  {"kvk", {"kvk", "sgn"}},
+  {"kvr", {"kvr", "ms"}},
+  {"kxd", {"kxd", "ms"}},
+  {"lbs", {"lbs", "sgn"}},
+  {"lce", {"lce", "ms"}},
+  {"lcf", {"lcf", "ms"}},
+  {"liw", {"liw", "ms"}},
+  {"lls", {"lls", "sgn"}},
+  {"lsg", {"lsg", "sgn"}},
+  {"lsl", {"lsl", "sgn"}},
+  {"lso", {"lso", "sgn"}},
+  {"lsp", {"lsp", "sgn"}},
+  {"lst", {"lst", "sgn"}},
+  {"lsy", {"lsy", "sgn"}},
+  {"ltg", {"ltg", "lv"}},
+  {"lvs", {"lvs", "lv"}},
+  {"lzh", {"lzh", "zh"}},
+  {"max", {"max", "ms"}},
+  {"mdl", {"mdl", "sgn"}},
+  {"meo", {"meo", "ms"}},
+  {"mfa", {"mfa", "ms"}},
+  {"mfb", {"mfb", "ms"}},
+  {"mfs", {"mfs", "sgn"}},
+  {"min", {"min", "ms"}},
+  {"mnp", {"mnp", "zh"}},
+  {"mqg", {"mqg", "ms"}},
+  {"mre", {"mre", "sgn"}},
+  {"msd", {"msd", "sgn"}},
+  {"msi", {"msi", "ms"}},
+  {"msr", {"msr", "sgn"}},
+  {"mui", {"mui", "ms"}},
+  {"mzc", {"mzc", "sgn"}},
+  {"mzg", {"mzg", "sgn"}},
+  {"mzy", {"mzy", "sgn"}},
+  {"nan", {"nan", "zh"}},
+  {"nbs", {"nbs", "sgn"}},
+  {"ncs", {"ncs", "sgn"}},
+  {"nsi", {"nsi", "sgn"}},
+  {"nsl", {"nsl", "sgn"}},
+  {"nsp", {"nsp", "sgn"}},
+  {"nsr", {"nsr", "sgn"}},
+  {"nzs", {"nzs", "sgn"}},
+  {"okl", {"okl", "sgn"}},
+  {"orn", {"orn", "ms"}},
+  {"ors", {"ors", "ms"}},
+  {"pel", {"pel", "ms"}},
+  {"pga", {"pga", "ar"}},
+  {"pks", {"pks", "sgn"}},
+  {"prl", {"prl", "sgn"}},
+  {"prz", {"prz", "sgn"}},
+  {"psc", {"psc", "sgn"}},
+  {"psd", {"psd", "sgn"}},
+  {"pse", {"pse", "ms"}},
+  {"psg", {"psg", "sgn"}},
+  {"psl", {"psl", "sgn"}},
+  {"pso", {"pso", "sgn"}},
+  {"psp", {"psp", "sgn"}},
+  {"psr", {"psr", "sgn"}},
+  {"pys", {"pys", "sgn"}},
+  {"rms", {"rms", "sgn"}},
+  {"rsi", {"rsi", "sgn"}},
+  {"rsl", {"rsl", "sgn"}},
+  {"sdl", {"sdl", "sgn"}},
+  {"sfb", {"sfb", "sgn"}},
+  {"sfs", {"sfs", "sgn"}},
+  {"sgg", {"sgg", "sgn"}},
+  {"sgx", {"sgx", "sgn"}},
+  {"shu", {"shu", "ar"}},
+  {"slf", {"slf", "sgn"}},
+  {"sls", {"sls", "sgn"}},
+  {"sqk", {"sqk", "sgn"}},
+  {"sqs", {"sqs", "sgn"}},
+  {"ssh", {"ssh", "ar"}},
+  {"ssp", {"ssp", "sgn"}},
+  {"ssr", {"ssr", "sgn"}},
+  {"svk", {"svk", "sgn"}},
+  {"swc", {"swc", "sw"}},
+  {"swh", {"swh", "sw"}},
+  {"swl", {"swl", "sgn"}},
+  {"syy", {"syy", "sgn"}},
+  {"tmw", {"tmw", "ms"}},
+  {"tse", {"tse", "sgn"}},
+  {"tsm", {"tsm", "sgn"}},
+  {"tsq", {"tsq", "sgn"}},
+  {"tss", {"tss", "sgn"}},
+  {"tsy", {"tsy", "sgn"}},
+  {"tza", {"tza", "sgn"}},
+  {"ugn", {"ugn", "sgn"}},
+  {"ugy", {"ugy", "sgn"}},
+  {"ukl", {"ukl", "sgn"}},
+  {"uks", {"uks", "sgn"}},
+  {"urk", {"urk", "ms"}},
+  {"uzn", {"uzn", "uz"}},
+  {"uzs", {"uzs", "uz"}},
+  {"vgt", {"vgt", "sgn"}},
+  {"vkk", {"vkk", "ms"}},
+  {"vkt", {"vkt", "ms"}},
+  {"vsi", {"vsi", "sgn"}},
+  {"vsl", {"vsl", "sgn"}},
+  {"vsv", {"vsv", "sgn"}},
+  {"wuu", {"wuu", "zh"}},
+  {"xki", {"xki", "sgn"}},
+  {"xml", {"xml", "sgn"}},
+  {"xmm", {"xmm", "ms"}},
+  {"xms", {"xms", "sgn"}},
+  {"yds", {"yds", "sgn"}},
+  {"ysl", {"ysl", "sgn"}},
+  {"yue", {"yue", "zh"}},
+  {"zib", {"zib", "sgn"}},
+  {"zlm", {"zlm", "ms"}},
+  {"zmi", {"zmi", "ms"}},
+  {"zsl", {"zsl", "sgn"}},
+  {"zsm", {"zsm", "ms"}},
 };
 
 std::unordered_map<std::string,std::vector<std::string>> kDateTimeFormatComponents = {
@@ -486,7 +762,7 @@ __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_local
   // Step 1.
   int i = 0;
   // Step 2.
-  int len = __jsarr_getIndex(available_locales);
+  int len = __jsarr_getIndex(requested_locales);
   // Step 3.
   __jsvalue available_locale = __undefined_value();
   // Step 4.
@@ -494,8 +770,8 @@ __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_local
   __jsvalue no_extension_locale;
   while (i < len && __is_undefined(&available_locale)) {
     // Step 4a.
-    __jsobject *o = __jsval_to_object(requested_locales);
-    locale = __jsarr_GetElem(o, i);
+    __jsobject *requested_locales_obj = __jsval_to_object(requested_locales);
+    locale = __jsarr_GetElem(requested_locales_obj, i);
     // Step 4b.
     no_extension_locale = RemoveUnicodeExtensions(&locale);
     // Step 4c.
@@ -568,8 +844,8 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
   __jsvalue matcher_val = __jsop_getprop(options, &prop);
   std::string matcher = ValToStr(&matcher_val);
   // Step 2.
-  __jsobject *r_obj = __js_new_obj_obj_0();
-  __jsvalue r = __object_value(r_obj);
+  //__jsobject *r_obj = __js_new_obj_obj_0();
+  __jsvalue r; // = __object_value(r_obj);
   if (matcher == "lookup") {
     r = LookupMatcher(available_locales, requested_locales);
   } else {
@@ -578,7 +854,7 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
   }
   // Step 4.
   prop = StrToVal("locale");
-  __jsvalue found_locale = __jsop_getprop(&r, &prop);
+  __jsvalue found_locale = __jsop_getprop(&r, &prop); // TODO: check!
   // Step 5a.
   prop = StrToVal("extension");
   __jsvalue extension = __jsop_getprop(&r, &prop);
@@ -622,11 +898,12 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
   // Step 11.
   while (i < len) {
     // Step 11a.
-    prop = StrToVal(std::to_string(i));
-    __jsvalue key = __jsop_getprop(relevant_extension_keys, &prop);
+    //prop = StrToVal(std::to_string(i));
+    //__jsvalue key = __jsop_getprop(relevant_extension_keys, &prop);
+    __jsvalue key = __jsarr_GetElem(__jsval_to_object(relevant_extension_keys), i);
     // Step 11b.
     prop = StrToVal("localeData");
-    __jsvalue found_locale_data = __jsop_getprop(&found_locale, &prop);
+    __jsvalue found_locale_data = __jsop_getprop(&found_locale, &prop); // TODO: failed here.
     // Step 11c.
     __jsvalue key_locale_data = __jsop_getprop(&found_locale_data, &key);
     // Step 11d.
@@ -806,19 +1083,15 @@ __jsvalue SupportedLocales(__jsvalue *available_locales,
 __jsvalue GetOption(__jsvalue *options, __jsvalue *property, __jsvalue *type,
                     __jsvalue *values, __jsvalue *fallback) {
   // Step 1.
-  __jsvalue prop = StrToVal("property");
-  __jsvalue value;
-  if (!__is_null_or_undefined(options)) {
-    value = __jsop_getprop(options, &prop);
-  } else {
-    return *fallback;
-  }
+  __jsvalue value = __jsop_getprop(options, property);
   // Step 2.
   if (!__is_undefined(&value)) {
     // Step 2a.
     __jsstring *jsstr_type = __jsval_to_string(type);
     char *str_type = jsstr_type->x.ascii;
     MAPLE_JS_ASSERT(str_type == "boolean" || str_type == "string");
+    // Step 2b and 2c.
+    // No need to call ToBoolean(value) or ToString(value).
     // Step 2d.
     if (!__is_undefined(values)) {
       __jsvalue idx = __jsarr_pt_indexOf(values, &value, 0);
@@ -1675,12 +1948,16 @@ void InitProperty(__jsvalue *object, std::string prop) {
       // TODO
     } else if (kind == JSINTL_NUMBERFORMAT) {
       __jsvalue p = StrToVal("nu");
+      // Add default system numbering system as the first element of vec.
+      icu::NumberingSystem num_sys;
+      std::string default_nu(num_sys.getName());
       std::vector<std::string> vec = {"arab", "arabext", "bali", "beng",
                                       "deva", "fullwide", "gujr", "guru",
                                       "hanidec", "khmr", "knda", "laoo",
                                       "latn", "limb", "mlym", "mong",
                                       "mymr", "orya", "tamldec", "telu",
                                       "thai", "tibt"};
+      vec.insert(vec.begin(), default_nu);
       __jsvalue v = StrVecToVal(vec);
       __jsop_setprop(object, &p, &v);
     } else if (kind == JSINTL_DATETIMEFORMAT) {

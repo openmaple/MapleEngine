@@ -99,14 +99,14 @@ static void PrintUncaughtException(__jsstring *msg) {
   exit(3);
 }
 
-#define MPUSH(x)   (func.operand_stack.at(++func.sp) = x)
-#define MPOP()     (func.operand_stack.at(func.sp--))
-#define MTOP()     (func.operand_stack.at(func.sp))
+#define MPUSH(x)   (func.operand_stack[++func.sp] = x)
+#define MPOP()     (func.operand_stack[func.sp--])
+#define MTOP()     (func.operand_stack[func.sp])
 
-#define MARGS(x)   (caller->operand_stack.at(caller_args + x))
-#define RETURNVAL  (func.operand_stack.at(0))
-#define THROWVAL   (func.operand_stack.at(1))
-#define MLOCALS(x) (func.operand_stack.at(x))
+#define MARGS(x)   (caller->operand_stack[caller_args + x])
+#define RETURNVAL  (func.operand_stack[0])
+#define THROWVAL   (func.operand_stack[1])
+#define MLOCALS(x) (func.operand_stack[x])
 
 #define ISNONE(x) (x == 0)
 
@@ -189,6 +189,9 @@ static void PrintUncaughtException(__jsstring *msg) {
 #define CATCHINTRINSICOP() \
     catch(const char *estr) { \
       isEhHappend = true; \
+      if (!gInterSource->currEH) { \
+        PrintUncaughtException(__jsstr_new_from_char("intrinsic thrown val nerver caught")); \
+      } \
       if (!strcmp(estr, "callee exception")) { \
         newPc = gInterSource->currEH->GetEHpc(&func); \
       } else { \
@@ -1427,6 +1430,7 @@ label_OP_return:
 
     MValue ret;
     ret.x.u64 = 0; // return 0 means ok
+    ret.ptyp = 0;
     gInterSource->InsertEplog();
     MVALUEBITMASK(ret); // If returning void, it is set to {0x0, PTY_void}
     return ret;

@@ -160,7 +160,7 @@ struct __jsobject {
   __jsprop *prop_list;
 #ifdef USE_PROP_MAP
   std::map<uint32_t, __jsprop *> *prop_index_map;
-  std::map<std::wstring, __jsprop *> *prop_string_map;
+  std::map<__jsstring *, __jsprop *> *prop_string_map;
 #endif
   // The prototype of this object.
   // Use id iff proto_is_builtin is true.

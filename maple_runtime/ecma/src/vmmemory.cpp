@@ -1019,7 +1019,6 @@ void MemoryManager::ManageProp(__jsprop *prop, ManageType flag) {
     ManageChildObj(__get_get(desc), flag);
   }
   if (flag == SWEEP || flag == RECALL) {
-    GCDecRf(prop->n.name);
     RecallMem((void *)prop, sizeof(__jsprop));
   }
 }
@@ -1097,6 +1096,7 @@ void MemoryManager::ManageObject(__jsobject *obj, ManageType flag) {
     case JSREGEXP:
     case JSDATE:
     case JSINTL:
+    case JSARGUMENTS:
       break;
     default:
       MIR_FATAL("manage unknown js object class");

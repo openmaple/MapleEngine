@@ -798,6 +798,7 @@ __jsvalue __jsstr_split(__jsvalue *this_string, __jsvalue *separator, __jsvalue 
   return __object_value(a);
 }
 
+
 // Ecma 15.5.4.15 String.prototype.substring (start, end)
 __jsvalue __jsstr_substring(__jsvalue *this_string, __jsvalue *start, __jsvalue *end) {
   // step 1:
@@ -842,6 +843,15 @@ __jsvalue __jsstr_substring(__jsvalue *this_string, __jsvalue *start, __jsvalue 
   uint32_t span = to - from;
   __jsstring *str = __jsstr_extract(s, from, span);
   return __string_value(str);
+}
+
+__jsvalue __jsstr_substr(__jsvalue *this_string, __jsvalue *start, __jsvalue *end) {
+  CheckObjectCoercible(this_string);
+  __jsstring *s = __js_ToString(this_string);
+  int32_t len = __jsstr_get_length(s);
+  int32_t endIndx = (__is_undefined(end)) ? (len - 1) : (__jsval_to_int32(end) - 1);
+  __jsvalue endX = __number_value(endIndx);
+  return __jsstr_substring(this_string, start, &endX);
 }
 
 // Ecma 15.5.4.16 String.prototype.toLowerCase ( )
@@ -1181,6 +1191,11 @@ static inline void __jsstr_get_replace_value(__jsvalue *func, __jsvalue *this_st
   if (fun == NULL || fun->attrs == 0) {
     val = __undefined_value();
   } else {
+    __jsvalue undf;
+    if (fun->attrs & JSFUNCPROP_STRICT) {
+      undf = __undefined_value();
+      this_string = &undf;
+    }
     val = __jsfun_val_call(func, this_string, &args[0], j);
   }
 }
@@ -1381,20 +1396,28 @@ uint32_t __jsstr_is_numidx(__jsstring *p, bool &isNumidx) {
   uint32_t u;
   isNumidx = false;
   uint32_t len = __jsstr_get_length(p);
-  // TODO:: deal with unicode string
-  if (len == 0 || !__jsstr_is_ascii(p)) {
+  if (len == 0) {
     return 0;
   }
   char chars[len+1];
-  uint32_t i;
-  for (i = 0; i < len; i++) {
-    chars[i] = (char)__jsstr_get_char(p, i);
-  }
-  chars[i] = '\0';
-  // p is negative
-  if (chars[0] == '-' || (chars[0] == '0' && len > 1)) {
+  chars[0] = ((char *)p)[4];
+
+  // p is not a number or is negative
+  if ((uint8_t)chars[0] > '9' || chars[0] == '-') {
     return 0;
   }
+  bool is_ascii = __jsstr_is_ascii(p);
+  uint32_t i;
+  for (i = 1; i < len; i++) {
+    if (is_ascii)
+      chars[i] = ((char *)p)[4 + i];
+    else
+      chars[i] = ((uint16_t *)p)[2 + i];
+    if (i > 1 && (uint8_t)chars[i] > 'f') {
+      return 0;
+    }
+  }
+  chars[i] = '\0';
   // string is 0
   if ((len == 1 && chars[0] == '0') ||
       (len == 2 && chars[0] == '+' && chars[1] == '0') ||

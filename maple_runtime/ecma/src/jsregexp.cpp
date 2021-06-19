@@ -392,10 +392,12 @@ __jsvalue __jsregexp_Exec(__jsvalue *this_value, __jsvalue *value, uint32_t narg
   __jsvalue items[length];
 
   for (int i = 0; i < length; i++) {
-    int start = vres[i].first, end = vres[i].second;
     if (i >= res) {
       items[i] = __undefined_value();
-    } else if (start >= 0 && end - start >= 0) {
+      continue;
+    }
+    int start = vres[i].first, end = vres[i].second;
+    if (start >= 0 && end - start >= 0) {
       __jsvalue subject_val = __string_value(js_subject);
       __jsvalue start_val = __number_value(start);
       __jsvalue end_val = __number_value(end);
