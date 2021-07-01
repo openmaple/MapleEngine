@@ -62,4 +62,6 @@ __jsvalue __js_new_booleanconstructor(__jsvalue *, __jsvalue *, uint32_t);
 __jsvalue __js_new_stringconstructor(__jsvalue *, __jsvalue *, uint32_t);
 __jsvalue __js_new_math_obj(__jsvalue *);
 __jsvalue __js_new_json_obj(__jsvalue *);
+__jsvalue __js_new_arraybufferconstructor(__jsvalue *, __jsvalue *, uint32_t);
+__jsvalue __js_new_dataviewconstructor(__jsvalue *, __jsvalue *, uint32_t);
 #endif

@@ -71,10 +71,11 @@ enum __jstype {
   JSTYPE_DOUBLE,
   JSTYPE_NAN,
   JSTYPE_INFINITY,
+  // the following 3 tags are for address type that is used for jsvalue in memory. because mplbe lower always generate 64-bits value, we need a tag to mark the address type
   JSTYPE_SPBASE,
   JSTYPE_FPBASE,
   JSTYPE_GPBASE,
-  JSTYPE_FUNCTION,
+  JSTYPE_FUNCTION, // for native function that is only given its address
 };
 
 enum __jsbuiltin_object_id : uint8_t {  // must in accordance with js_value.h:js_builtin_id in the front-end (js2mpl/include/jsvalue.h)
@@ -133,6 +134,10 @@ enum __jsbuiltin_object_id : uint8_t {  // must in accordance with js_value.h:js
   JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR,
   JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE,
   JSBUILTIN_CONSOLE,
+  JSBUILTIN_ARRAYBUFFER_CONSTRUCTOR,
+  JSBUILTIN_ARRAYBUFFER_PROTOTYPE,
+  JSBUILTIN_DATAVIEW_CONSTRUCTOR,
+  JSBUILTIN_DATAVIEW_PROTOTYPE,
   JSBUILTIN_LAST_OBJECT,
 };
 

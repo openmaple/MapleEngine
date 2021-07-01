@@ -166,9 +166,9 @@ class MemoryManager {
   // std::map<double, uint32_t> f64ToU32Map; // map the double value to index
   uint8_t *memoryFlagMap;
   uint8_t *gpMemoryFlagMap;
-  const uint8_t spBaseFlag = (__jstype)JSTYPE_INFINITY + 1;
-  const uint8_t fpBaseFlag = (__jstype)JSTYPE_INFINITY + 2;
-  const uint8_t gpBaseFlag = (__jstype)JSTYPE_INFINITY + 3;
+  const uint8_t spBaseFlag = (__jstype)JSTYPE_SPBASE;
+  const uint8_t fpBaseFlag = (__jstype)JSTYPE_FPBASE;
+  const uint8_t gpBaseFlag = (__jstype)JSTYPE_GPBASE;
 #endif
 
  public:

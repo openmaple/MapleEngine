@@ -150,6 +150,14 @@ static __jsfunction *__create_builtin_constructor(__jsbuiltin_object_id id, uint
       fp = (void *)__js_DateTimeFormatConstructor;
       isConstructor = true;
       break;
+    case JSBUILTIN_ARRAYBUFFER_CONSTRUCTOR:
+      fp = (void *)__js_new_arraybufferconstructor;
+      isConstructor = true;
+      break;
+    case JSBUILTIN_DATAVIEW_CONSTRUCTOR:
+      fp = (void *)__js_new_dataviewconstructor;
+      isConstructor = true;
+      break;
     default:
       return NULL;
   }
@@ -220,6 +228,10 @@ static const uint16_t __jsbuiltin_objects_info[JSBUILTIN_LAST_OBJECT] = {
  [JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR] =  JSFUNCTION << 12 | JSGENERIC << 8 | JSBUILTIN_FUNCTIONPROTOTYPE,
  [JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE] =   JSOBJECT << 12 | JSREGULAR_OBJECT << 8 | JSBUILTIN_OBJECTPROTOTYPE,
  [JSBUILTIN_CONSOLE] =                           JSOBJECT << 12 | JSGENERIC << 8 | JSBUILTIN_OBJECTPROTOTYPE,
+ [JSBUILTIN_ARRAYBUFFER_CONSTRUCTOR] =  JSFUNCTION << 12 | JSGENERIC << 8 | JSBUILTIN_FUNCTIONPROTOTYPE,
+ [JSBUILTIN_ARRAYBUFFER_PROTOTYPE] =    JSOBJECT << 12 | JSREGULAR_OBJECT | JSBUILTIN_OBJECTPROTOTYPE,
+ [JSBUILTIN_DATAVIEW_CONSTRUCTOR] =  JSFUNCTION << 12 | JSGENERIC << 8 | JSBUILTIN_FUNCTIONPROTOTYPE,
+ [JSBUILTIN_DATAVIEW_PROTOTYPE] =    JSOBJECT << 12 | JSREGULAR_OBJECT | JSBUILTIN_OBJECTPROTOTYPE,
 };
 
 // map builtin object to its builtin string
@@ -279,6 +291,10 @@ static const __jsbuiltin_string_id __jsbuiltin_object_map_string[JSBUILTIN_LAST_
  [JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR] =  JSBUILTIN_STRING_DATETIMEFORMAT_UL,
  [JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE] =  JSBUILTIN_STRING_EMPTY,
  [JSBUILTIN_CONSOLE]                       =  JSBUILTIN_STRING_CONSOLE_UL,
+ [JSBUILTIN_ARRAYBUFFER_CONSTRUCTOR] =  JSBUILTIN_STRING_ARRAYBUFFER,
+ [JSBUILTIN_ARRAYBUFFER_PROTOTYPE] =    JSBUILTIN_STRING_EMPTY,
+ [JSBUILTIN_DATAVIEW_CONSTRUCTOR] =  JSBUILTIN_STRING_DATAVIEW,
+ [JSBUILTIN_DATAVIEW_PROTOTYPE] =    JSBUILTIN_STRING_EMPTY,
 };
 
 __jsobject *__jsobj_get_or_create_builtin(__jsbuiltin_object_id id) {

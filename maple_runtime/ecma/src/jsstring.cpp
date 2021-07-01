@@ -155,7 +155,7 @@ static const char *builtin_strings[JSBUILTIN_STRING_LAST] = {
 };
 
 __jsstring *__jsstr_get_builtin(__jsbuiltin_string_id id) {
-  MAPLE_JS_ASSERT(id < JSBUILTIN_STRING_LAST);
+  MAPLE_JS_ASSERT(id < JSBUILTIN_STRING_LAST && JSBUILTIN_STRING_LAST < 255);
   return (__jsstring *)builtin_strings[id];
 }
 
@@ -1195,6 +1195,8 @@ static inline void __jsstr_get_replace_value(__jsvalue *func, __jsvalue *this_st
     if (fun->attrs & JSFUNCPROP_STRICT) {
       undf = __undefined_value();
       this_string = &undf;
+    } else {
+      this_string = &__js_Global_ThisBinding;
     }
     val = __jsfun_val_call(func, this_string, &args[0], j);
   }

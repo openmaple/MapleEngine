@@ -464,3 +464,13 @@ __jsvalue __js_escape(__jsvalue *this_object, __jsvalue *str) {
   // TODO
   return *str;
 }
+
+__jsvalue __js_new_arraybufferconstructor(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
+  MAPLE_JS_ASSERT(false);
+  return __null_value();
+}
+
+__jsvalue __js_new_dataviewconstructor(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
+  MAPLE_JS_ASSERT(false);
+  return __null_value();
+}

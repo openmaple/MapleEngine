@@ -75,8 +75,7 @@ __jsvalue __jsintl_CollatorResolvedOptions(__jsvalue *this_arg,
 __jsvalue __jsintl_NumberFormatSupportedLocalesOf(__jsvalue *this_arg,
                                                   __jsvalue *arg_list,
                                                   uint32_t nargs);
-__jsvalue __jsintl_NumberFormatFormat(__jsvalue *this_arg, __jsvalue *arg_list,
-                                      uint32_t nargs);
+__jsvalue __jsintl_NumberFormatFormat(__jsvalue *this_arg, __jsvalue *arg_list);
 __jsvalue __jsintl_NumberFormatResolvedOptions(__jsvalue *this_arg,
                                                __jsvalue *arg_list,
                                                uint32_t nargs);
@@ -94,5 +93,8 @@ __jsvalue BasicFormatMatcher(__jsvalue *options, __jsvalue *formats);
 __jsvalue BestFitFormatMatcher(__jsvalue *options, __jsvalue *formats);
 __jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x);
 void InitProperty(__jsvalue *object, std::string prop);
+
+__jsvalue ToRawPrecision(__jsvalue *x, __jsvalue *min_sd, __jsvalue *max_sd);
+__jsvalue ToRawFixed(__jsvalue *x, __jsvalue *min_id, __jsvalue *max_id);
 
 #endif // JSINTL_H

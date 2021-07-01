@@ -1308,10 +1308,6 @@ extern "C" jclass Ljava_2Flang_2FClass_3B_7CgetSuperclass_7C_28_29Ljava_2Flang_2
 extern "C" jclass Ljava_2Flang_2FClass_3B_7CgetSuperclass_7C_28_29Ljava_2Flang_2FClass_3B (jobject javaThis) {
 return Ljava_2Flang_2FClass_3B_7CgetSuperclass_7C_28_29Ljava_2Flang_2FClass_3B_(javaThis);
 }
-extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisAnonymousClass_7C_28_29Z_(jobject javaThis) ;
-extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisAnonymousClass_7C_28_29Z(jobject javaThis) {
-return Ljava_2Flang_2FClass_3B_7CisAnonymousClass_7C_28_29Z_(javaThis);
-}
 extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisArray_7C_28_29Z_(jobject javaThis) ;
 extern "C" jboolean Ljava_2Flang_2FClass_3B_7CisArray_7C_28_29Z(jobject javaThis) {
 return Ljava_2Flang_2FClass_3B_7CisArray_7C_28_29Z_(javaThis);

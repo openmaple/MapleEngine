@@ -1505,6 +1505,19 @@ label_OP_icall:
     MValue args0 = MPOP();
     args[0] = JsvalToMValue(__function_value((void *)args0.x.u64));
     MValue retCall = gInterSource->FuncCall((void *)args0.x.u64, false, nullptr, args, numArgs, 2, -1, false);
+
+    // decrement RC if local variables of the function have been assigned objects allocated from the heap
+    DynamicMethodHeaderT* calleeHeader = (DynamicMethodHeaderT *)((uint8_t *)args0.x.u64 + 4);
+    int localVariables = calleeHeader->frameSize / sizeof(void *) - 1;
+    if (localVariables > 0) {
+      uint8 *addr = (uint8 *)(gInterSource->GetSPAddr()) - calleeHeader->frameSize - sizeof(void *);
+      for (int i = 0;  i < localVariables; i++) {
+        void **local = (void**)(addr + i * sizeof(void *));
+        if (IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)local, memory_manager->fpBaseFlag)))
+          GCDecRf(*local);
+      }
+    }
+
     if (retCall.x.u64 == (uint64_t) Exec_handle_exc && retCall.ptyp == 0) {
       void *newPc = gInterSource->currEH->GetEHpc(&func);
       if (newPc) {
