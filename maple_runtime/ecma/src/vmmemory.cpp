@@ -23,6 +23,7 @@
 #include "jsarray.h"
 #include "jsiter.h"
 #include "securec.h"
+#include "jsdataview.h"
 #include <cmath>
 // This module performs memory management for both the app's heap space and the
 // VM's own dynamic memory space.  For memory blocks allocated in the app's
@@ -1086,6 +1087,12 @@ void MemoryManager::ManageObject(__jsobject *obj, ManageType flag) {
         }
       }
       break;
+    case JSARRAYBUFFER: {
+      __jsarraybyte *arrayByte = obj->shared.arrayByte;
+      RecallMem((void *)arrayByte, sizeof(uint8_t) * __jsval_to_number(&arrayByte->length));
+    }
+    break;
+    case JSDATAVIEW:
     case JSOBJECT:
     case JSBOOLEAN:
     case JSNUMBER:

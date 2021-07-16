@@ -22,6 +22,7 @@
 #include "jstycnv.h"
 #include "jscontext.h"
 #include "vmmemory.h"
+#include "jsdataview.h"
 // ecma 15.1.4.1 Object ( . . . ), See 15.2.1 and 15.2.2.
 // ecma 15.2.1 Object ( . . . )
 // If value not supplied, return __js_new_obj_obj_0(), else return __js_new_obj_obj_1.
@@ -466,11 +467,50 @@ __jsvalue __js_escape(__jsvalue *this_object, __jsvalue *str) {
 }
 
 __jsvalue __js_new_arraybufferconstructor(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(false);
-  return __null_value();
+  uint32 length = 0;
+  if (nargs == 1) {
+    __jsvalue *lenVal = &arg_list[0];
+    if (!__is_number(&arg_list[0])) {
+      MAPLE_JS_ASSERT(false);
+    } else {
+      length = __js_ToUint32(lenVal);
+    }
+  }
+  __jsobject *arr = __create_object();
+  arr->object_class = JSARRAYBUFFER;
+  arr->extensible = true;
+  __jsobj_set_prototype(arr, JSBUILTIN_ARRAYBUFFER_PROTOTYPE);
+  arr->object_type = JSREGULAR_ARRAY;
+  __jsarraybyte *arrayByte = (__jsarraybyte *)VMMallocGC(sizeof(__jsarraybyte));
+  arrayByte->length = (length > INT32_MAX) ? __double_value((double)length) : __number_value(length);
+  arrayByte->arrayRaw = (uint8_t *)VMMallocGC(sizeof(uint8_t) * length);
+  arr->shared.arrayByte = arrayByte;
+  return __object_value(arr);
 }
 
 __jsvalue __js_new_dataviewconstructor(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
-  MAPLE_JS_ASSERT(false);
-  return __null_value();
+  __jsobject *arr = __create_object();
+  arr->object_class = JSDATAVIEW;
+  arr->extensible = true;
+  __jsobj_set_prototype(arr, JSBUILTIN_DATAVIEW_PROTOTYPE);
+  arr->object_type = JSREGULAR_OBJECT;
+  MAPLE_JS_ASSERT(nargs >= 1 && nargs <= 3);
+  __jsvalue arg0 = arg_list[0];
+  __jsobject *bfObj = __jsval_to_object(&arg0);
+  MAPLE_JS_ASSERT(bfObj->object_class == JSARRAYBUFFER);
+  __jsvalue *lengthVal = (__jsvalue *)bfObj->shared.arrayByte;
+  uint32_t startIdx = 0;
+  uint32_t endIdx = __jsval_to_uint32(lengthVal);
+  if(nargs == 2){
+    startIdx = __jsval_to_uint32(&arg_list[1]);
+  } else {
+    startIdx = __jsval_to_uint32(&arg_list[1]);
+    endIdx = __jsval_to_uint32(&arg_list[2]);
+  }
+  __jsdataview *props =  (__jsdataview *)VMMallocGC(sizeof(__jsdataview));
+  arr->shared.dataView = props;
+  props->arrayByte = bfObj->shared.arrayByte;
+  props->startIndex = startIdx;
+  props->endIndex = endIdx;
+  return __object_value(arr);
 }

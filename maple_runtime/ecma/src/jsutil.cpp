@@ -57,6 +57,7 @@ void __jsop_print_item(__jsvalue value) {
       } else if (obj->object_class == JSDATE) {
         __jsvalue v = __jsdate_ToString(&value);
         __jsop_print_item(v);
+	memory_manager->RecallString(__jsval_to_string(&v));
       } else if (obj->object_class == JSINTL) {
         printf("Intl.");
         std::string kind;

@@ -1510,7 +1510,7 @@ label_OP_icall:
     DynamicMethodHeaderT* calleeHeader = (DynamicMethodHeaderT *)((uint8_t *)args0.x.u64 + 4);
     int localVariables = calleeHeader->frameSize / sizeof(void *) - 1;
     if (localVariables > 0) {
-      uint8 *addr = (uint8 *)(gInterSource->GetSPAddr()) - calleeHeader->frameSize - sizeof(void *);
+      uint8 *addr = (uint8 *)(gInterSource->GetSPAddr()) - calleeHeader->frameSize - ((numArgs - 1) * sizeof(void *));
       for (int i = 0;  i < localVariables; i++) {
         void **local = (void**)(addr + i * sizeof(void *));
         if (IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)local, memory_manager->fpBaseFlag)))
@@ -1983,6 +1983,7 @@ label_OP_cleanuptry:
 {
     DEBUGOPCODE(cleanuptry, Stmt);
     goto_stmt_t &stmt = *(reinterpret_cast<goto_stmt_t *>(func.pc));
+    gInterSource->currEH->FreeEH();
     func.pc += sizeof(base_node_t);
     goto *(labels[*func.pc]);
 }
@@ -2444,7 +2445,8 @@ label_OP_iassignfpoff:
     PrimType ptyp = stmt.primType;
     // memory_manager->UpdateGCReference(addr, mVal);
     gInterSource->EmulateStoreGC(addr, memory_manager->fpBaseFlag, rVal, ptyp);
-    if (!func.is_strict() && offset > 0) {
+    if (!func.is_strict() && offset > 0 &&
+        DynMFunction::is_jsargument(func.header)) {
       gInterSource->UpdateArguments(offset / sizeof(void *) - 1, rVal);
     }
     func.pc += sizeof(base_node_t);

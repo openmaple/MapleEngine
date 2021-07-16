@@ -20,6 +20,7 @@
 #include "jsfunction.h"
 #include "jscontext.h"
 #include "jsintl.h"
+#include "jsdataview.h"
 #include <map>
 #include <string>
 
@@ -129,6 +130,8 @@ enum __jsobj_class : uint8_t {
   JSINTL,
   JSOBJ_CLASS_LAST,
   JSDOUBLE,
+  JSARRAYBUFFER,
+  JSDATAVIEW,
 };
 
 // Implementation-dependent.
@@ -204,6 +207,9 @@ struct __jsobject {
     int32_t prim_bool;
     __jsprop_desc *arr;
     double primDouble;
+    // for ArrayBuffer
+    __jsarraybyte *arrayByte;
+    __jsdataview *dataView;
   } shared;
 };
 

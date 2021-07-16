@@ -567,7 +567,7 @@ const char *Months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", 
 
 
 __jsvalue __jsdate_ToString_Obj(__jsobject *obj) {
-  int64_t time = (int64_t) obj->shared.primDouble + LocalTime((int64_t)obj->shared.primDouble);
+  int64_t time = LocalTime((int64_t) obj->shared.primDouble);
   if (time < -9007199254740992 || time > 9007199254740992)
     MAPLE_JS_RANGEERROR_EXCEPTION();
 

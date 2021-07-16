@@ -121,7 +121,11 @@ namespace maple {
 
             void call_with_ffi(PrimType ret_ptyp, const uint32_t actual_num, ffi_fp_t fp);
     };
+// the following tag is supposed to be synchronized with mapleall/maple_be/include/cg/ark/ark_mir_emit.h
+// FuncAttrJSStrict = 1 << 4
 #define FUNCATTRSTRICT 0x10
+// FuncAttrJSArgument = 1 << 5
+#define FUNCATTRARGUMENT 0x20
 
     class DynMFunction {
       public:
@@ -140,6 +144,9 @@ namespace maple {
      public:
       bool is_strict() { // function is strict
         return header->attribute & FUNCATTRSTRICT;
+      }
+      static bool is_jsargument(DynamicMethodHeaderT * hd) { // function is using jsargument
+        return hd->attribute & FUNCATTRARGUMENT;
       }
       void MarkArgumentsDeleted(uint32_t index) {
         assert(index < 32 && "arguments too much");

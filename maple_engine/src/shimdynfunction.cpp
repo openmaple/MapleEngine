@@ -2218,18 +2218,19 @@ MValue InterSource::FuncCall(void *callee, bool isIntrinsiccall, void *env, MVal
 
   DynamicMethodHeaderT* calleeHeader = (DynamicMethodHeaderT *)((uint8_t *)callee + 4);
   __jsvalue old_this = __js_entry_function(&this_arg, (calleeHeader->attribute & FUNCATTRSTRICT) | strictP);
-  __jsvalue oldArgs = __jsop_get_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
-  // bool isVargs = (passedNargs > 0) && ((calleeHeader->upFormalSize/8 - 1) != passedNargs);
-  // MValue ret = maple_invoke_dynamic_method(calleeHeader, !isVargs ? nullptr : CreateArgumentsObject(mvArgs, passedNargs));
+  MValue ret;
   DynMFunction *oldDynFunc = GetCurFunc();
-  void* argsObj = CreateArgumentsObject(mvArgs, passedNargs, &args[0]);
-  MValue ret = maple_invoke_dynamic_method(calleeHeader, argsObj);
-  if (oldArgs.s.asbits != 0) {
+  if (DynMFunction::is_jsargument(calleeHeader)) {
+    __jsvalue oldArgs = __jsop_get_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
+    // bool isVargs = (passedNargs > 0) && ((calleeHeader->upFormalSize/8 - 1) != passedNargs);
+    // MValue ret = maple_invoke_dynamic_method(calleeHeader, !isVargs ? nullptr : CreateArgumentsObject(mvArgs, passedNargs));
+    void* argsObj = CreateArgumentsObject(mvArgs, passedNargs, &args[0]);
+    ret = maple_invoke_dynamic_method(calleeHeader, argsObj);
     __jsop_set_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS), &oldArgs, true);
+    GCDecRf(argsObj);
   } else {
-    __jsobj_internal_Delete(__jsval_to_object(&__js_Global_ThisBinding), __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
+    ret = maple_invoke_dynamic_method(calleeHeader, NULL);
   }
-  GCDecRf(argsObj);
   __js_exit_function(&this_arg, old_this, (calleeHeader->attribute & FUNCATTRSTRICT)|strictP);
   sp -= offset;
   SetCurFunc(oldDynFunc);
@@ -2252,18 +2253,22 @@ MValue InterSource::FuncCall_JS(__jsobject *fObject, __jsvalue *this_arg, void *
   int32_t offset = PassArguments(JsvalToMValue(*this_arg), env, mvArgList, nargs, func_nargs);
   // Update sp_, set sp_ to sp_ + offset.
   sp += offset;
-  __jsvalue oldArgs = __jsop_get_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
-  DynMFunction *oldDynFunc = GetCurFunc();
-
   DynamicMethodHeaderT* calleeHeader = (DynamicMethodHeaderT*)((uint8_t *)callee + 4);
-  // bool isVargs = (nargs > 0) && ((calleeHeader->upFormalSize/8 - 1) != nargs);
-  // MValue ret = maple_invoke_dynamic_method(calleeHeader, isVargs ? nullptr : CreateArgumentsObject(mvArgList, nargs));
-  MValue fObjMv = JsvalToMValue(__object_value(fObject));
-  MValue ret = maple_invoke_dynamic_method(calleeHeader,  CreateArgumentsObject(mvArgList, nargs, &fObjMv));
-  if (oldArgs.s.asbits != 0) {
-    __jsop_set_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS), &oldArgs);
+  DynMFunction *oldDynFunc = GetCurFunc();
+  MValue ret;
+  if (DynMFunction::is_jsargument(calleeHeader)) {
+    __jsvalue oldArgs = __jsop_get_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
+    // bool isVargs = (nargs > 0) && ((calleeHeader->upFormalSize/8 - 1) != nargs);
+    // MValue ret = maple_invoke_dynamic_method(calleeHeader, isVargs ? nullptr : CreateArgumentsObject(mvArgList, nargs));
+    MValue fObjMv = JsvalToMValue(__object_value(fObject));
+    ret = maple_invoke_dynamic_method(calleeHeader,  CreateArgumentsObject(mvArgList, nargs, &fObjMv));
+    if (oldArgs.s.asbits != 0) {
+      __jsop_set_this_prop_by_name(&__js_Global_ThisBinding, __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS), &oldArgs);
+    } else {
+      __jsobj_internal_Delete(__jsval_to_object(&__js_Global_ThisBinding), __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
+    }
   } else {
-    __jsobj_internal_Delete(__jsval_to_object(&__js_Global_ThisBinding), __jsstr_get_builtin(JSBUILTIN_STRING_ARGUMENTS));
+    ret = maple_invoke_dynamic_method(calleeHeader, NULL);
   }
   // Restore sp_, set sp_ to sp_ - offset.
   sp -= offset;
