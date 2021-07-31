@@ -46,6 +46,8 @@ class JsEh;
 class InterSource {
 public:
   void *memory;  // memory block for APP and VM
+  uint32_t total_memory_size_;
+  uint32_t heap_size_;
   uint32_t stack;
   uint32_t heap;
   uint32_t sp;  // stack pointer

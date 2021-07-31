@@ -658,8 +658,10 @@ __jsvalue __jsdate_ToJSON(__jsvalue *this_date, __jsvalue *value) {
 
 // ES5 15.9.4.4 Date.now()
 __jsvalue __jsdate_Now(__jsvalue *this_date) {
-  // TODO: not implemented yet
-  return __double_value(0);
+  // Basic Date implementation may need more scrutiny
+  struct timeval current_time;
+  gettimeofday(&current_time, NULL);
+  return __double_value((current_time.tv_sec * 1000000 + current_time.tv_usec)/1000);
 }
 
 // ES5 15.9.4.2 Date.parse(string)

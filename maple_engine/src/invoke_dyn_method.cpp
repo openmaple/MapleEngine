@@ -110,6 +110,102 @@ static void PrintUncaughtException(__jsstring *msg) {
 
 #define ISNONE(x) (x == 0)
 
+#define FAST_COMPARE(op) {\
+  if ((mVal0.ptyp == JSTYPE_NUMBER || mVal0.ptyp == JSTYPE_BOOLEAN) && (mVal1.ptyp == JSTYPE_NUMBER || mVal1.ptyp == JSTYPE_BOOLEAN)) {\
+      mVal0.ptyp = JSTYPE_BOOLEAN;\
+      mVal0.x.u64 = (mVal0.x.i32 op mVal1.x.i32);\
+      MPUSH(mVal0);\
+      func.pc += sizeof(mre_instr_t);\
+      goto *(labels[*func.pc]);\
+  } else if (mVal0.ptyp == JSTYPE_DOUBLE && mVal1.ptyp == JSTYPE_DOUBLE) {\
+      mVal0.ptyp = JSTYPE_BOOLEAN;\
+      mVal0.x.u64 = (mVal0.x.f64 op mVal1.x.f64);\
+      MPUSH(mVal0);\
+      func.pc += sizeof(mre_instr_t);\
+      goto *(labels[*func.pc]);\
+  }\
+}
+
+#define FAST_MATH(op) {\
+  if (op1.ptyp == JSTYPE_NUMBER) {\
+    if (op0.ptyp == JSTYPE_NUMBER) {\
+      int64_t r = (int64_t)op0.x.i32 op (int64_t)op1.x.i32;\
+      if (abs(r) >= 0x80000000) {\
+        op0.x.f64 = (double)r;\
+        op0.ptyp = JSTYPE_DOUBLE;\
+      } else \
+        op0.x.i64 = r;\
+      MPUSH(op0);\
+      func.pc += sizeof(binary_node_t);\
+      goto *(labels[*func.pc]);\
+    } else if (op0.ptyp == JSTYPE_DOUBLE) {\
+      double r;\
+      r = op0.x.f64 op (double)op1.x.i32;\
+      if (fabs(r) <= NumberMaxValue && fabs(r) >= NumberMinValue) {\
+        op0.x.f64 = r;\
+        MPUSH(op0);\
+        func.pc += sizeof(binary_node_t);\
+        goto *(labels[*func.pc]);\
+      }\
+    }\
+  } else if (op1.ptyp == JSTYPE_DOUBLE) {\
+    if (op0.ptyp == JSTYPE_DOUBLE || op0.ptyp == JSTYPE_NUMBER) {\
+      double r;\
+      if (op0.ptyp == JSTYPE_DOUBLE) {\
+        r = op0.x.f64 op op1.x.f64;\
+      } else {\
+        r = (double)op0.x.i32 op op1.x.f64;\
+      }\
+      if (fabs(r) <= NumberMaxValue && fabs(r) >= NumberMinValue) {\
+        op1.x.f64 = r;\
+        MPUSH(op1);\
+        func.pc += sizeof(binary_node_t);\
+        goto *(labels[*func.pc]);\
+      }\
+    }\
+  }\
+}
+
+#define FAST_DIVISION() {\
+  if (op1.ptyp == JSTYPE_NUMBER && op1.x.i32 != 0) {\
+    if (op0.ptyp == JSTYPE_NUMBER) {\
+      int64_t r = (int64_t)op0.x.i32 / (int64_t)op1.x.i32;\
+      if (abs(r) >= 0x80000000) {\
+        op0.x.f64 = (double)r;\
+        op0.ptyp = JSTYPE_DOUBLE;\
+      } else \
+        op0.x.i64 = r;\
+      MPUSH(op0);\
+      func.pc += sizeof(binary_node_t);\
+      goto *(labels[*func.pc]);\
+    } else if (op0.ptyp == JSTYPE_DOUBLE) {\
+      double r;\
+      r = op0.x.f64 / (double)op1.x.i32;\
+      if (fabs(r) <= NumberMaxValue && fabs(r) >= NumberMinValue) {\
+        op0.x.f64 = r;\
+        MPUSH(op0);\
+        func.pc += sizeof(binary_node_t);\
+        goto *(labels[*func.pc]);\
+      }\
+    }\
+  } else if (op1.ptyp == JSTYPE_DOUBLE && op1.x.f64 != 0) {\
+    if (op0.ptyp == JSTYPE_DOUBLE || op0.ptyp == JSTYPE_NUMBER) {\
+      double r;\
+      if (op0.ptyp == JSTYPE_DOUBLE) {\
+        r = op0.x.f64 / op1.x.f64;\
+      } else {\
+        r = (double)op0.x.i32 / op1.x.f64;\
+      }\
+      if (fabs(r) <= NumberMaxValue && fabs(r) >= NumberMinValue) {\
+        op1.x.f64 = r;\
+        MPUSH(op1);\
+        func.pc += sizeof(binary_node_t);\
+        goto *(labels[*func.pc]);\
+      }\
+    }\
+  }\
+}
+
 
 #define CHECKREFERENCEMVALUE(mv) \
     if (CHECK_REFERENCE && mv.x.u64 == 0 && mv.ptyp == 0) {\
@@ -255,44 +351,45 @@ extern "C" uint32_t __inc_opcode_cnt_dyn() {
 }
 
 #define DEBUGOPCODE(opc,msg) \
-  __inc_opcode_cnt_dyn(); \
-  if(debug_engine & kEngineDebugInstruction) \
+  if(debug_engine & kEngineDebugInstruction) {\
+    __inc_opcode_cnt_dyn(); \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, op#=%3d,      OP_" \
         #opc ", " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
-        (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
-        flagStr(func.operand_stack.at(func.sp).ptyp), \
-        func.sp - func.header->frameSize/8, *func.pc, *(func.pc+1), *(func.pc+3), __opcode_cnt_dyn)
+        (unsigned long long)(func.operand_stack[func.sp]).x.i64, \
+        flagStr(func.operand_stack[func.sp].ptyp), \
+        func.sp - func.header->frameSize/8, *func.pc, *(func.pc+1), *(func.pc+3), __opcode_cnt_dyn); }
 #define DEBUGCOPCODE(opc,msg) \
-  __inc_opcode_cnt_dyn(); \
-  if(debug_engine & kEngineDebugInstruction) \
+  if(debug_engine & kEngineDebugInstruction) {\
+    __inc_opcode_cnt_dyn(); \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, param=0x%04x, OP_" \
         #opc ", " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
-        (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
-        flagStr(func.operand_stack.at(func.sp).ptyp), \
-        func.sp - func.header->frameSize/8, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), __opcode_cnt_dyn)
+        (unsigned long long)(func.operand_stack[func.sp]).x.i64, \
+        flagStr(func.operand_stack[func.sp].ptyp), \
+        func.sp - func.header->frameSize/8, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), __opcode_cnt_dyn); }
 /*
 #define DEBUGSOPCODE(opc,msg,idx) \
-  __inc_opcode_cnt_dyn(); \
-  if(debug_engine & kEngineDebugInstruction) \
+  if(debug_engine & kEngineDebugInstruction) {\
+    __inc_opcode_cnt_dyn(); \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, param=0x%04x, OP_" \
         #opc " (%s), " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
         (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
         typestr(func.operand_stack.at(func.sp).ptyp), \
         func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), \
         func.var_names == nullptr ? "" : func.var_names + (idx > 0 ? idx - 1 : mir_header->formals_num - idx) * VARNAMELENGTH, \
-        __opcode_cnt_dyn)
+        __opcode_cnt_dyn); }
 */
 #define DEBUGSOPCODE(opc,msg,idx) \
-  __inc_opcode_cnt_dyn(); \
-  if(debug_engine & kEngineDebugInstruction) \
+  if(debug_engine & kEngineDebugInstruction) {\
+    __inc_opcode_cnt_dyn(); \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, param=0x%04x, OP_" \
         #opc ", " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
-        (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
-        flagStr(func.operand_stack.at(func.sp).ptyp), \
+        (unsigned long long)(func.operand_stack[func.sp]).x.i64, \
+        flagStr(func.operand_stack[func.sp].ptyp), \
         func.sp - func.header->frameSize/8, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), \
-        __opcode_cnt_dyn)
+        __opcode_cnt_dyn); }
 
 MValue InvokeInterpretMethod(DynMFunction &func) {
+    uint8_t *frame_pointer = (uint8_t *)gInterSource->GetFPAddr();
     // Array of labels for threaded interpretion
     static void* const labels[] = { // Use GNU extentions
         &&label_OP_Undef,
@@ -445,7 +542,7 @@ label_OP_regread:
         break;
       }
       case -kSregFp: {
-        mval.x.a64 = (uint8_t *)gInterSource->GetFPAddr();
+        mval.x.a64 = frame_pointer;
         mval.ptyp = memory_manager->fpBaseFlag;
         break;
       }
@@ -859,6 +956,7 @@ label_OP_add:
     DEBUGOPCODE(add, Expr);
     MValue &op1 = MPOP();
     MValue &op0 = MPOP();
+    FAST_MATH(+);
     if (ISNONE(op0.ptyp)) {
       CHECKREFERENCEMVALUE(op0);
     }
@@ -883,6 +981,7 @@ label_OP_sub:
     } else {
       MValue &op1 = MPOP();
       MValue &op0 = MPOP();
+      FAST_MATH(-);
       if (ISNONE(op0.ptyp)) {
         CHECKREFERENCEMVALUE(op0);
       }
@@ -911,6 +1010,7 @@ label_OP_mul:
     } else {
       MValue &op1 = MPOP();
       MValue &op0 = MPOP();
+      FAST_MATH(*);
       if (ISNONE(op0.ptyp)) {
         CHECKREFERENCEMVALUE(op0);
       }
@@ -939,6 +1039,7 @@ label_OP_div:
     } else {
       MValue &op1 = MPOP();
       MValue &op0 = MPOP();
+      FAST_DIVISION();
       if (ISNONE(op0.ptyp)) {
         CHECKREFERENCEMVALUE(op0);
       }
@@ -968,6 +1069,12 @@ label_OP_rem:
     } else {
       MValue &op1 = MPOP();
       MValue &op0 = MPOP();
+      if (op1.ptyp == JSTYPE_NUMBER && op0.ptyp == JSTYPE_NUMBER && op1.x.i32 > 0) {
+        op0.x.i32 = op0.x.i32 % op1.x.i32;
+        MPUSH(op0);
+        func.pc += sizeof(binary_node_t);
+        goto *(labels[*func.pc]);
+      }
       if (ISNONE(op0.ptyp)) {
         CHECKREFERENCEMVALUE(op0);
       }
@@ -1057,8 +1164,9 @@ label_OP_eq:
     // Handle expression node: eq
     mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
     DEBUGOPCODE(eq, Expr);
-    MValue  mVal1 = MPOP();
-    MValue  mVal0 = MPOP();
+    MValue  &mVal1 = MPOP();
+    MValue  &mVal0 = MPOP();
+    FAST_COMPARE(==);
     if (ISNONE(mVal1.ptyp)) {
       CHECKREFERENCEMVALUE(mVal1);
     }
@@ -1078,8 +1186,9 @@ label_OP_ge:
     // Handle expression node: ge
     mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
     DEBUGOPCODE(ge, Expr);
-    MValue  mVal1 = MPOP();
-    MValue  mVal0 = MPOP();
+    MValue  &mVal1 = MPOP();
+    MValue  &mVal0 = MPOP();
+    FAST_COMPARE(>=);
     if (ISNONE(mVal1.ptyp)) {
       CHECKREFERENCEMVALUE(mVal1);
     }
@@ -1100,8 +1209,9 @@ label_OP_gt:
     // Handle expression node: gt
     mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
     DEBUGOPCODE(gt, Expr);
-    MValue  mVal1 = MPOP();
-    MValue  mVal0 = MPOP();
+    MValue  &mVal1 = MPOP();
+    MValue  &mVal0 = MPOP();
+    FAST_COMPARE(>);
     if (ISNONE(mVal1.ptyp)) {
       CHECKREFERENCEMVALUE(mVal1);
     }
@@ -1122,8 +1232,9 @@ label_OP_le:
     // Handle expression node: le
     mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
     DEBUGOPCODE(le, Expr);
-    MValue  mVal1 = MPOP();
-    MValue  mVal0 = MPOP();
+    MValue  &mVal1 = MPOP();
+    MValue  &mVal0 = MPOP();
+    FAST_COMPARE(<=);
     if (ISNONE(mVal1.ptyp)) {
       CHECKREFERENCEMVALUE(mVal1);
     }
@@ -1144,8 +1255,9 @@ label_OP_lt:
     // Handle expression node: lt
     mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
     DEBUGOPCODE(lt, Expr);
-    MValue  mVal1 = MPOP();
-    MValue  mVal0 = MPOP();
+    MValue  &mVal1 = MPOP();
+    MValue  &mVal0 = MPOP();
+    FAST_COMPARE(<);
     if (ISNONE(mVal1.ptyp)) {
       CHECKREFERENCEMVALUE(mVal1);
     }
@@ -1166,8 +1278,9 @@ label_OP_ne:
     // Handle expression node: ne
     mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
     DEBUGOPCODE(ne, Expr);
-    MValue  mVal1 = MPOP();
-    MValue  mVal0 = MPOP();
+    MValue  &mVal1 = MPOP();
+    MValue  &mVal0 = MPOP();
+    FAST_COMPARE(!=);
     if (ISNONE(mVal1.ptyp)) {
       CHECKREFERENCEMVALUE(mVal1);
     }
@@ -1508,13 +1621,22 @@ label_OP_icall:
 
     // decrement RC if local variables of the function have been assigned objects allocated from the heap
     DynamicMethodHeaderT* calleeHeader = (DynamicMethodHeaderT *)((uint8_t *)args0.x.u64 + 4);
-    int localVariables = calleeHeader->frameSize / sizeof(void *) - 1;
+    // callee SP
+    //   callee frame
+    // callee FP
+    //   (numArgs-1) arguments
+    // caller SP
+    // Here caller does RC-- for references on callee's frame as well as the arguments
+    int localVariables = calleeHeader->frameSize / sizeof(void *) + numArgs - 1;
     if (localVariables > 0) {
       uint8 *addr = (uint8 *)(gInterSource->GetSPAddr()) - calleeHeader->frameSize - ((numArgs - 1) * sizeof(void *));
       for (int i = 0;  i < localVariables; i++) {
         void **local = (void**)(addr + i * sizeof(void *));
-        if (IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)local, memory_manager->fpBaseFlag)))
-          GCDecRf(*local);
+#ifdef COULD_BE_ADDRESS
+        if (COULD_BE_ADDRESS(*local))
+#endif
+          if (IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)local, memory_manager->fpBaseFlag)))
+            GCDecRf(*local);
       }
     }
 
@@ -1759,8 +1881,42 @@ label_OP_intrinsiccall:
       break;
       case INTRN_JSOP_ADD: {
         assert(numOpnds == 2 && "false");
-        MValue arg1 = MPOP();
-        MValue arg0 = MPOP();
+        MValue &arg1 = MPOP();
+        MValue &arg0 = MPOP();
+        if (arg1.ptyp == JSTYPE_NUMBER) {
+          if (arg0.ptyp == JSTYPE_NUMBER) {
+            int64_t r = (int64_t)arg0.x.i32 + (int64_t)arg1.x.i32;
+            if (abs(r) >= 0x80000000) {
+              arg0.x.f64 = (double)r;
+              arg0.ptyp = JSTYPE_DOUBLE;
+            } else
+              arg0.x.i64 = r;
+            gInterSource->SetRetval0(arg0, true);
+            break;
+          } else if (arg0.ptyp == JSTYPE_DOUBLE) {
+            double r;
+            r = arg0.x.f64 + arg1.x.i32;
+            if (fabs(r) <= NumberMaxValue) {
+              arg0.x.f64 = r;
+              gInterSource->SetRetval0(arg0, true);
+              break;
+            }
+          }
+        } else if (arg1.ptyp == JSTYPE_DOUBLE) {
+          if (arg0.ptyp == JSTYPE_DOUBLE || arg0.ptyp == JSTYPE_NUMBER) {
+            double r;
+            if (arg0.ptyp == JSTYPE_DOUBLE) {
+              r = arg1.x.f64 + arg0.x.f64;
+            } else {
+              r = arg1.x.f64 + arg0.x.i64;
+            }
+            if (fabs(r) <= NumberMaxValue && fabs(r) >= NumberMinValue) {
+              arg1.x.f64 = r;
+              gInterSource->SetRetval0(arg1, true);
+              break;
+            }
+          }
+        }
         if (ISNONE(arg0.ptyp)) {
           CHECKREFERENCEMVALUE(arg0);
         }
@@ -2078,7 +2234,7 @@ label_OP_ireadfpoff: // offset from stack frame
     mre_instr_t &expr = *(reinterpret_cast<mre_instr_t *>(func.pc));
     DEBUGOPCODE(ireadoff, Expr);
     int32_t offset = (int32_t)expr.param.offset;
-    uint8 *addr = (uint8 *)(gInterSource->GetFPAddr()) + offset;
+    uint8 *addr = frame_pointer + offset;
     MValue mv = gInterSource->EmulateLoad(addr, memory_manager->fpBaseFlag, expr.GetPtyp());
     MPUSH(mv);
 
@@ -2441,7 +2597,7 @@ label_OP_iassignfpoff:
       CHECKREFERENCEMVALUE(rVal);
     }
     int32_t offset = (int32_t)stmt.param.offset;
-    uint8 *addr = (uint8 *)(gInterSource->GetFPAddr()) + offset;
+    uint8 *addr = frame_pointer + offset;
     PrimType ptyp = stmt.primType;
     // memory_manager->UpdateGCReference(addr, mVal);
     gInterSource->EmulateStoreGC(addr, memory_manager->fpBaseFlag, rVal, ptyp);
@@ -2870,36 +3026,34 @@ label_OP_iassignfpoff32:
 }
 
 MValue maple_invoke_dynamic_method(DynamicMethodHeaderT *header, void *obj) {
-    DynMFunction func(header, obj);
+    MValue stack[header->frameSize/sizeof(void *) + header->evalStackDepth];
+    DynMFunction func(header, obj, stack);
     gInterSource->InsertProlog(header->frameSize);
     return InvokeInterpretMethod(func);
 }
 
 MValue maple_invoke_dynamic_method_main(uint8_t *mPC, DynamicMethodHeaderT* cheader) {
-    DynMFunction func(mPC, cheader);
+    MValue stack[cheader->frameSize/sizeof(void *) + cheader->evalStackDepth];
+    DynMFunction func(mPC, cheader, stack);
     gInterSource->InsertProlog(cheader->frameSize);
     return InvokeInterpretMethod(func);
 }
 
-DynMFunction::DynMFunction(DynamicMethodHeaderT * cheader, void *obj):
+DynMFunction::DynMFunction(DynamicMethodHeaderT * cheader, void *obj, MValue *stack):
   header(cheader) {
-    uint8_t *addr = (uint8_t *)header;
-    // init operandStack size with localVariableCount + maxEvalStackSize
-    uint32_t operStackSize = (header->frameSize/sizeof(void *)) + header->evalStackDepth;
     argumentsDeleted = 0;
     argumentsObj = obj;
-    pc = addr + *(int32_t*)addr;
+    pc = (uint8_t *)header + *(int32_t*)header;
     sp = 0;
-    operand_stack.resize(operStackSize);
+    operand_stack = stack;
     operand_stack[sp] = {.x.a64 = (uint8_t*)0xcafef00ddeadbeef, PTY_void};
 }
-DynMFunction::DynMFunction(uint8_t *argPC, DynamicMethodHeaderT *cheader):header(cheader) {
-    uint32_t operStackSize = (header->frameSize/sizeof(void *)) + header->evalStackDepth;
+DynMFunction::DynMFunction(uint8_t *argPC, DynamicMethodHeaderT *cheader, MValue *stack):header(cheader) {
     pc = argPC;
     argumentsDeleted = 0;
     argumentsObj = nullptr;
     sp = 0;
-    operand_stack.resize(operStackSize);
+    operand_stack = stack;
     operand_stack[sp] = {.x.a64 = (uint8_t*)0xcafef00ddeadbeef, PTY_void};
 }
 

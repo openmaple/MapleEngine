@@ -34,7 +34,7 @@
 
 namespace maple {
 
-#define MPUSH(x) (shim_caller.operand_stack.at(++shim_caller.sp) = x)
+#define MPUSH(x) (shim_caller.operand_stack[++shim_caller.sp] = x)
 
 JavaScriptGlobal *jsGlobal = NULL;
 uint32_t *jsGlobalMemmap = NULL;
@@ -78,9 +78,26 @@ uint8 InterSource::ptypesizetable[kPtyDerived] = {
 };
 
 InterSource::InterSource() {
-  memory = (void *)malloc(TOTAL_MEMORY_SIZE);
-  void * internalMemory = (void *)((char *)memory + APP_MEMORY_SIZE);
-  stack = STACKOFFSET;
+  const char* heap_size_env = std::getenv("MAPLE_HEAP_SIZE");
+  if (heap_size_env != nullptr) {
+    heap_size_ = atoi(heap_size_env) * 1024 * 1024;
+    if (heap_size_ < HEAP_SIZE)
+      heap_size_ = HEAP_SIZE;
+    else if (heap_size_ > 1024 * 1024 *1024)
+      heap_size_ = 1024 * 1024 *1024;
+
+    total_memory_size_ = heap_size_ + VM_MEMORY_SIZE;
+  } else {
+    total_memory_size_ = HEAP_SIZE + VM_MEMORY_SIZE;
+    heap_size_ = HEAP_SIZE;
+  }
+  memory = (void *)malloc(heap_size_ + VM_MEMORY_SIZE);
+#ifdef COULD_BE_ADDRESS
+  // to test if COULD_BE_ADDRESS(v) stands
+  assert(COULD_BE_ADDRESS(memory));
+#endif
+  void * internalMemory = (void *)((char *)memory + heap_size_);
+  stack = heap_size_/*STACKOFFSET*/;
   sp = stack;
   fp = stack;
   heap = 0;
@@ -91,14 +108,25 @@ InterSource::InterSource() {
 
   // retVal0.payload.asbits = 0;
   memory_manager = new MemoryManager();
-  memory_manager->Init(memory, HEAP_SIZE, internalMemory, VM_MEMORY_SIZE);
+  memory_manager->Init(memory, heap_size_, internalMemory, VM_MEMORY_SIZE);
   gInterSource = this;
   // currEH = NULL;
   // EHstackReuseSize = 0;
 }
 
 void InterSource::SetRetval0 (MValue mval, bool isdyntype) {
-  GCCheckAndUpdateRf(retVal0.x.u64, IsNeedRc(retVal0.ptyp), mval.x.u64, IsNeedRc(mval.ptyp));
+#ifdef COULD_BE_ADDRESS
+  if (COULD_BE_ADDRESS(retVal0.x.u64))
+#endif
+  {
+    GCCheckAndDecRf(retVal0.x.u64, IsNeedRc(retVal0.ptyp));
+  }
+#ifdef COULD_BE_ADDRESS
+  if (COULD_BE_ADDRESS(mval.x.u64))
+#endif
+  {
+    GCCheckAndIncRf(mval.x.u64, IsNeedRc(mval.ptyp));
+  }
   retVal0 = mval;
 }
 
@@ -141,24 +169,28 @@ void InterSource::EmulateStore(uint8_t *memory, uint8_t addrTy, MValue mval, Pri
 
 void InterSource::EmulateStoreGC(uint8_t *memory, uint8_t addrTy, MValue mval, PrimType pty) {
   // GCUpdateRf((void *)(*(uint64_t *)memory), mval.x.a64);
-  uint8_t oldFlg = memory_manager->GetFlagFromMemory(memory, addrTy);
-  GCCheckAndUpdateRf(*((uint64_t *)memory), IsNeedRc(oldFlg), mval.x.u64, IsNeedRc(mval.ptyp));
+  uint64_t oldV = *((uint64_t *)memory);
+#ifdef COULD_BE_ADDRESS
+  if (COULD_BE_ADDRESS(oldV))
+#endif
+  {
+    uint8_t oldFlg = memory_manager->GetFlagFromMemory(memory, addrTy);
+    GCCheckAndDecRf(oldV, IsNeedRc(oldFlg));
+  }
+#ifdef COULD_BE_ADDRESS
+  if (COULD_BE_ADDRESS(mval.x.u64))
+#endif
+  {
+    GCCheckAndIncRf(mval.x.u64, IsNeedRc(mval.ptyp));
+  }
   *(uint64_t *)memory = mval.x.u64;
   memory_manager->SetFlagFromMemory(memory, addrTy, mval.ptyp);
   return;
 }
 
 MValue InterSource::EmulateLoad(uint8_t *memory, uint8_t addrTy, PrimType pty) {
-  uint32 bytesize = ptypesizetable[pty];
   MValue retMv;
-  if (bytesize == 8)
-    retMv.x.u64 =  *((uint64_t *)memory);
-  if (bytesize == 4)
-    retMv.x.u32 = *((uint32_t *)memory);
-  if (bytesize == 2)
-    retMv.x.u16 = *((uint16_t *)memory);
-  if (bytesize == 1)
-    retMv.x.u8 = *memory;
+  retMv.x.u64 =  *((uint64_t *)memory);
   retMv.ptyp = memory_manager->GetFlagFromMemory(memory, addrTy);
   return retMv;
 }
@@ -1410,17 +1442,6 @@ bool InterSource::JSopPrimCmp(Opcode op, MValue &mv0, MValue &mv1, PrimType rpty
 MValue InterSource::JSopCmp(MValue mv0, MValue mv1, Opcode op, PrimType ptyp) {
   uint8_t rpty0 = mv0.ptyp;
   uint8_t rpty1 = mv1.ptyp;
-
-  if (op == OP_eq && (rpty0 == JSTYPE_NUMBER || rpty0 == JSTYPE_BOOLEAN) && (rpty1 == JSTYPE_NUMBER || rpty1 == JSTYPE_BOOLEAN)) { // fast path
-    MValue retVal;
-    retVal.ptyp = (uint8_t)JSTYPE_BOOLEAN;
-    if (mv0.x.i32 == mv1.x.i32)
-      retVal.x.u64 = 1;
-    else
-      retVal.x.u64 = 0;
-    return retVal;
-  }
-
   if ((rpty0!= 0) || (rpty1 != 0)) {
     __jsvalue jsv0 = MValueToJsval(mv0);
     __jsvalue jsv1 = MValueToJsval(mv1);
@@ -1576,7 +1597,19 @@ void InterSource::JSopSetProp(MValue &mv0, MValue &mv1, MValue &mv2) {
         uint32_t numArgs = curFunc->header->upFormalSize/sizeof(void *);
         if (index < numArgs - 1 && !curFunc->IsIndexDeleted(index)) {
           uint64_t *addrFp = (uint64_t *)((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *));
-          GCCheckAndUpdateRf(*(addrFp), IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag)), mv2.x.u64, IsNeedRc(mv2.ptyp));
+#ifdef COULD_BE_ADDRESS
+          if (COULD_BE_ADDRESS(*addrFp))
+#endif
+          {
+            uint8_t oldFlg = memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag);
+            GCCheckAndDecRf(*addrFp, IsNeedRc(oldFlg));
+          }
+#ifdef COULD_BE_ADDRESS
+          if (COULD_BE_ADDRESS(mv2.x.u64))
+#endif
+          {
+            GCCheckAndIncRf(mv2.x.u64, IsNeedRc(mv2.ptyp));
+          }
           EmulateStore((uint8_t *)addrFp, memory_manager->fpBaseFlag, mv2, PTY_u64);
         }
       }
@@ -1600,7 +1633,19 @@ void InterSource::JSopInitProp(MValue &mv0, MValue &mv1, MValue &mv2) {
         uint32_t numArgs = curFunc->header->upFormalSize/sizeof(void *);
         if (index < numArgs - 1 && !curFunc->IsIndexDeleted(index)) {
           uint64_t *addrFp = (uint64_t *)((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *));
-          GCCheckAndUpdateRf(*(addrFp), IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag)), mv2.x.u64, IsNeedRc(mv2.ptyp));
+#ifdef COULD_BE_ADDRESS
+          if (COULD_BE_ADDRESS(*addrFp))
+#endif
+          {
+            uint8_t oldFlg = memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag);
+            GCCheckAndDecRf(*addrFp, IsNeedRc(oldFlg));
+          }
+#ifdef COULD_BE_ADDRESS
+          if (COULD_BE_ADDRESS(mv2.x.u64))
+#endif
+          {
+            GCCheckAndIncRf(mv2.x.u64, IsNeedRc(mv2.ptyp));
+          }
           EmulateStore((uint8_t *)addrFp, memory_manager->fpBaseFlag, mv2, PTY_u64);
         }
       }
@@ -2151,11 +2196,23 @@ MValue InterSource::NativeFuncCall(MIRIntrinsicID id, MValue *args, int numArgs)
             __jsvalue idxValue = __jsobj_GetValueFromPropertyByValue(obj, index);
             if (!__is_undefined(&idxValue) && isOldWritable) {
               uint64_t *addrFp = (uint64_t *)((uint8 *)GetFPAddr() + (index + 1)*sizeof(void *));
-              GCCheckAndUpdateRf(*(addrFp), IsNeedRc(memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag)), idxValue.s.asbits, IsNeedRc(idxValue.tag));
+#ifdef COULD_BE_ADDRESS
+              if (COULD_BE_ADDRESS(*addrFp))
+#endif
+              {
+                uint8_t oldFlg = memory_manager->GetFlagFromMemory((uint8_t *)addrFp, memory_manager->fpBaseFlag);
+                GCCheckAndDecRf(*addrFp, IsNeedRc(oldFlg));
+              }
+#ifdef COULD_BE_ADDRESS
+              if (COULD_BE_ADDRESS(idxValue.s.asbits))
+#endif
+              {
+                GCCheckAndIncRf(idxValue.s.asbits, IsNeedRc(idxValue.tag));
+              }
               EmulateStore((uint8_t *)addrFp, memory_manager->fpBaseFlag, JsvalToMValue(idxValue), PTY_u64);
             }
-           SetRetval0(JsvalToMValue(arg0), true);
-           return JsvalToMValue(arg0);
+            SetRetval0(JsvalToMValue(arg0), true);
+            return JsvalToMValue(arg0);
           }
         }
       }
@@ -2451,6 +2508,9 @@ extern "C" int64_t EngineShimDynamic(int64_t firstArg, char *appPath) {
   assert(header->upFormalSize == 0 && "main function got a frame size?");
   addr += *(int32_t*)addr; // skip to 1st instruction
   val = maple_invoke_dynamic_method_main (addr, header);
+#ifdef MEMORY_LEAK_CHECK
+  memory_manager->AppMemLeakCheck();
+#endif
   return val.x.i64;
 }
 

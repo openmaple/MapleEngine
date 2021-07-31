@@ -21,7 +21,7 @@
 
 #define EXPRUNROP(exprop) \
     do { \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == expr.primType, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.primType); \
         switch(expr.primType) { \
             case PTY_i8:  op0.x.i8  = exprop op0.x.i8;  break; \
@@ -38,7 +38,7 @@
 
 #define EXPRUNRINTOP(exprop) \
     do { \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op0 = func.operand_stack[func.sp]; \
         op0.ptyp = expr.primType; /* MASSERT(op0.ptyp == expr.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.ptyp); Workaround */ \
         switch(expr.primType) { \
             case PTY_i8:  op0.x.i8  = exprop op0.x.i8;  break; \
@@ -53,8 +53,8 @@
 
 #define EXPRBINOP(exprop) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == expr.primType, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.primType); \
         switch(expr.primType) { \
             case PTY_i8:  op0.x.i8  = op0.x.i8  exprop op1.x.i8;  break; \
@@ -72,8 +72,8 @@
 
 #define EXPRPTRBINOP(exprop) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == expr.primType, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.primType); \
         switch(expr.primType) { \
             case PTY_i8:  op0.x.i8  = op0.x.i8  exprop op1.x.i8;  break; \
@@ -91,8 +91,8 @@
 
 #define EXPRBININTOP(exprop) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == expr.primType, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.primType); \
         switch(expr.primType) { \
             case PTY_i8:  op0.x.i8  = op0.x.i8  exprop op1.x.i8;  break; \
@@ -108,8 +108,8 @@
 
 #define EXPRBININTOPUNSIGNED(exprop) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == expr.primType, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.primType); \
         switch(expr.primType) { \
             case PTY_i8:  op0.x.u8  = op0.x.u8  exprop op1.x.u8;  break; \
@@ -125,8 +125,8 @@
 
 #define EXPRREMOP(exprop) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == op1.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, op1.ptyp); \
         MASSERT(op0.ptyp == expr.primType, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.primType); \
         switch(expr.primType) { \
@@ -148,8 +148,8 @@
 
 #define EXPRDIVOP(exprop) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == op1.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, op1.ptyp); \
         MASSERT(op0.ptyp == expr.primType, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.primType); \
         switch(expr.primType) { \
@@ -173,8 +173,8 @@
 
 #define EXPRMAXMINOP(exprop) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == op1.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, op1.ptyp); \
         MASSERT(op0.ptyp == expr.primType, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, expr.primType); \
         switch(expr.primType) { \
@@ -192,8 +192,8 @@
 
 #define EXPRCOMPOP(exprop, resptyp, optype) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         /*MASSERT(op0.ptyp == op1.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, op1.ptyp);*/ \
         switch(optype) { \
             case PTY_i8:  op0.x.i64 = op0.x.i8  exprop op1.x.i8;  break; \
@@ -214,8 +214,8 @@
 
 #define EXPRCMPLGOP(exprop, nanres, resptyp, optype) \
     do { \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op0.ptyp == op1.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, op1.ptyp); \
         switch(optype) { \
             case PTY_i8:  op0.x.i64 = op0.x.i8  == op1.x.i8 ? 0 : (op0.x.i8  < op1.x.i8 ? -1 : 1);  break; \
@@ -238,9 +238,9 @@
 
 #define EXPRSELECTOP() \
     do { \
-        MValue &op2 = func.operand_stack.at(func.sp--); \
-        MValue &op1 = func.operand_stack.at(func.sp--); \
-        MValue &op0 = func.operand_stack.at(func.sp); \
+        MValue &op2 = func.operand_stack[func.sp--]; \
+        MValue &op1 = func.operand_stack[func.sp--]; \
+        MValue &op0 = func.operand_stack[func.sp]; \
         MASSERT(op1.ptyp == op2.ptyp, "Type mismatch: 0x%02x and 0x%02x", op1.ptyp, op2.ptyp); \
         MASSERT(op2.ptyp == expr.primType, "Type mismatch: 0x%02x and result type 0x%02x", op2.ptyp, expr.primType); \
         op0.ptyp = expr.primType; \

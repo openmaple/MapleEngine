@@ -26,6 +26,10 @@
 #include <map>
 using namespace maple;
 
+#if MACHINE64
+#define COULD_BE_ADDRESS(v)  (((uint64_t)(v) & 0xffffc00000000003) == 0x0000400000000000)
+#endif
+
 #define MEMHASHTABLESIZE 0x100
 
 enum MemHeadTag {
@@ -131,6 +135,7 @@ class MemoryHash {
 class MemoryManager {
  public:
   void *memory_;       // points to the base of the app's heap
+  void *heap_end;      // the up limit address the heap
   void *gpMemory;      // points to the global memory
   uint32 total_size_;  // total memory size of the app's heap
   uint32 total_small_size_;
@@ -139,7 +144,10 @@ class MemoryManager {
   MemoryHash *heap_memory_bank_;  // for app need gc
 // MemoryChunk *avail_link_;
 #if MM_DEBUG                 // this macro control the debug informaiton of memory manager
-  uint32 max_app_mem_usage;  // the max heap memory used by current app.
+  uint32 app_mem_usage;  // heap memory used by current app
+  uint32 max_app_mem_usage;  // the max (high water mark) heap memory used by current app.
+  uint32 mem_allocated;  // total allocation
+  uint32 mem_released;  // total release
   void AppMemLeakCheck();
   void AppMemUsageSummary();   // output the memory usage summary of an app.
   void AppMemAccessSummary();  // output the mmap node visiting length summary of an app.
@@ -283,7 +291,7 @@ class MemoryManager {
   AddrMap *GetMMapValList(void *);
 #endif
   bool IsHeap(void *addr) {
-    return (((void *)addr >= memory_) && ((void *)addr < ((void *)((uint8 *)memory_ + HEAP_SIZE))));
+    return (((void *)addr >= memory_) && ((void *)addr < heap_end));
   }
 
   uint32 Bytes4Align(uint32 size) {

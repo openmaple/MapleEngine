@@ -72,11 +72,14 @@ __jsvalue GetNumberOption(__jsvalue *options, __jsvalue *property,
                           __jsvalue *fallback);
 __jsvalue DefaultLocale();
 void InitProperty(__jsvalue *object, std::string prop);
+__jsvalue GetAvailableLocales();
 
 
 // NumberFormat
 void InitializeNumberFormat(__jsvalue *number_format, __jsvalue *locales,
                             __jsvalue *options);
+void InitializeNumberFormatProperties(__jsvalue *number_format, __jsvalue *locales,
+                                     std::vector<std::string> properties);
 __jsvalue CurrencyDigits(__jsvalue *currency);
 __jsvalue __jsintl_NumberFormatSupportedLocalesOf(__jsvalue *this_arg,
                                                   __jsvalue *arg_list,

@@ -359,7 +359,6 @@ std::vector<std::pair<std::string,uint16_t>> kNumberingSystems = {
 
 __jsvalue StrToVal(std::string str) {
   __jsstring *jsstr = __jsstr_new_from_char(str.c_str());
-  int len = __jsstr_get_length(jsstr);
   return __string_value(jsstr);
 }
 
@@ -368,7 +367,6 @@ __jsvalue StrVecToVal(std::vector<std::string> strs) {
   __jsvalue items[size];
   for (int i = 0; i < strs.size(); i++) {
     items[i] = StrToVal(strs[i]);
-
   }
   __jsobject *arr_obj = __js_new_arr_elems_direct(items, size);
   return __object_value(arr_obj);
@@ -384,8 +382,8 @@ std::string ValToStr(__jsvalue *value) {
 std::vector<std::string> VecValToVecStr(__jsvalue *value) {
   std::vector<std::string> res;
 
-  uint32_t size = __jsarr_getIndex(value);
   __jsobject *o = __jsval_to_object(value);
+  uint32_t size = __jsobj_helper_get_length(o);
 
   for (int i = 0; i < size; i++) {
     __jsvalue v = __jsarr_GetElem(o, i);
@@ -618,6 +616,9 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
     locales2 = __object_value(arr_obj);
   }
 
+  if (__is_null(locales)) { // handle the case when locales is null.
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
   // Step 4.
   // Let 'O' be ToObject(locales).
   __jsobject *o = __jsval_to_object(&locales2);
@@ -676,7 +677,7 @@ __jsvalue BestAvailableLocale(__jsvalue *available_locales, __jsvalue *locale) {
   // Step 2.
   while (true) {
     // Step 2a.
-    __jsvalue idx = __jsarr_pt_indexOf(available_locales, &candidate, 0);
+    __jsvalue idx = __jsarr_pt_indexOf(available_locales, &candidate, 1); // 1: argNum of 'candidate'
     if (__jsval_to_number(&idx) != -1) {
       return candidate;
     }
@@ -707,6 +708,7 @@ __jsvalue RemoveUnicodeExtensions(__jsvalue *locale) {
   __jsstring *loc_str = __jsval_to_string(locale);
   int len = __jsstr_get_length(loc_str);
   loc.assign(loc_str->x.ascii, len);
+  loc += '\0';
 
   // "Unicode locale extension sequence" defined as:
   // "any substring of a langauge tag that starts with a separator '-' and
@@ -715,9 +717,10 @@ __jsvalue RemoveUnicodeExtensions(__jsvalue *locale) {
   std::regex re(kUnicodeLocaleExtensionSequence);
   std::smatch sm;
   std::string res;
-  std::regex_search(loc, sm, re);
-  if (sm.ready()) {
+  if (std::regex_search(loc, sm, re)) {
     res = sm.prefix().str(); // TODO: double-check!
+  } else {
+    res = loc;
   }
   __jsstring *js_res = __jsstr_new_from_char(res.c_str());
   return __string_value(js_res);
@@ -732,7 +735,8 @@ __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_local
   // Step 1.
   int i = 0;
   // Step 2.
-  int len = __jsarr_getIndex(requested_locales);
+  __jsobject *o = __jsval_to_object(requested_locales);
+  uint32 len = __jsobj_helper_get_length(o);
   // Step 3.
   __jsvalue available_locale = __undefined_value();
   // Step 4.
@@ -745,7 +749,9 @@ __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_local
     // Step 4b.
     no_extension_locale = RemoveUnicodeExtensions(&locale);
     // Step 4c.
-    __jsvalue available_locale = BestAvailableLocale(available_locales, &no_extension_locale);
+    // Let 'availableLocale' be the result of calling the 'BestAvailableLocale'
+    // abstract operation with arguments 'availableLocales' and 'noExtensionLocale'.
+    available_locale = BestAvailableLocale(available_locales, &no_extension_locale);
     // Step 4d.
     i--;
   }
@@ -754,11 +760,13 @@ __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_local
   __jsvalue result = __object_value(result_obj);
 
   // Step 6.
+  // If 'availableLocale' is not undefined, then
   __jsvalue prop;
   if (!__is_undefined(&available_locale)) {
     // Step 6a.
+    // Set result.[[locale]] to 'availableLocale'.
     prop = StrToVal("locale");
-    __jsop_setprop(&result, &prop, available_locales);
+    __jsop_setprop(&result, &prop, &available_locale);
     // Step 6b.
     __jsstring *locale_str = __jsval_to_string(&locale);
     __jsstring *no_extension_locale_str = __jsval_to_string(&no_extension_locale);
@@ -767,6 +775,7 @@ __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_local
       std::string loc;
       int len = __jsstr_get_length(locale_str);
       loc.assign(locale_str->x.ascii, len);
+      loc += '\0';
 
       // Step 6b ii.
       std::regex re(kUnicodeLocaleExtensionSequence);
@@ -790,6 +799,10 @@ __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_local
     }
   } else {
     // Step 7.
+    // Else
+    // Step 7a.
+    // Set result.[[locale]] to the value returned by the DefaultLocale abstract
+    // operation.
     prop = StrToVal("locale");
     __jsvalue default_locale = DefaultLocale();
     __jsop_setprop(&result, &prop, &default_locale);
@@ -838,14 +851,19 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
   if (!__is_undefined(&extension)) {
     // Step 5b.
     prop = StrToVal("extensionIndex");
+    // Let 'extensionIndex' be the value of r.[[extensionIndex]].
     extension_index = __jsop_getprop(&r, &prop);
     // Step 5c-5d.
     __jsvalue separator = StrToVal("-");
     __jsvalue limit = __undefined_value();
     extension_subtags = __jsstr_split(&extension, &separator, &limit);
-    prop = StrToVal("length");
-    extension_subtags = __jsop_getprop(&extension_subtags, &prop);
+    // Let 'extensionSubtags' be the result of calling the [[Call]]
+    // internal method of 'split' with 'extension'a as the this value
+    // and an argument list containing the single item "-".
     // Step 5e.
+    // Let 'extensionSubtagsLength' be the result of calling the [[Get]]
+    // internal method of 'extensionSubtags' with argument "length".
+    prop = StrToVal("length");
     extension_subtags_length = __jsop_getprop(&extension_subtags, &prop);
   }
   // Step 6.
@@ -877,8 +895,12 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
     // Step 11b.
     __jsvalue found_locale_data = __jsop_getprop(locale_data, &found_locale);
     // Step 11c.
+    // Let 'keyLocaleData' be the result of calling the [[Get]] internal method
+    // of 'foundLocaleData' with the argument 'key'.
     __jsvalue key_locale_data = __jsop_getprop(&found_locale_data, &key);
     // Step 11d.
+    // Let 'value' be the result of calling the [[Get]] internal method of 'keyLocaleData'
+    // with argument "0".
     __jsobject *o = __jsval_to_object(&key_locale_data);
     __jsvalue value = __jsarr_GetElem(o, 0);
     // Step 11e.
@@ -886,7 +908,11 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
     // Step 11g.
     if (!__is_undefined(&extension_subtags)) {
       // Step 11g i.
-      __jsvalue key_pos = __jsstr_indexOf(&extension_subtags, &key, 0);
+      // Let 'keyPos' be the result of calling the [[Call]] internal method of
+      // 'indexOf' with 'extensionSubtags' as the 'this' value and an argument
+      // list containing the single item 'key'.
+      __jsvalue pos_val = __number_value(0);
+      __jsvalue key_pos = __jsstr_indexOf(&extension_subtags, &key, &pos_val);
       // Step 11g ii.
       int pos = __jsval_to_number(&key_pos);
       if (pos != -1) {
@@ -974,23 +1000,29 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
 __jsvalue LookupSupportedLocales(__jsvalue *available_locales,
                                 __jsvalue *requested_locales) {
   // Step 1.
-  int len = __jsarr_getIndex(requested_locales);
+  // Let 'len' be the number of elements in 'requestedLocales'.
+  //int len = __jsarr_getIndex(requested_locales);
+  __jsobject *o = __jsval_to_object(requested_locales);
+  uint32_t len = __jsobj_helper_get_length(o);
   // Step 2.
+  // Let 'subset' be a new empty List.
   __jsvalue subset = __object_value(__js_new_arr_internal(0));
   // Step 3.
   int k = 0;
   // Step 4.
   while (k < len) {
     // Step 4a.
-    __jsobject *o = __jsval_to_object(requested_locales);
-    __jsvalue locale = __jsarr_GetElem(o, 0);
+    // Let 'locale' be the element of 'requestedLocales' at 0-origined list position k.
+    //__jsobject *o = __jsval_to_object(requested_locales);
+    __jsvalue locale = __jsarr_GetElem(o, k);
     // Step 4b.
     __jsvalue no_extensions_locale = RemoveUnicodeExtensions(&locale);
     // Step 4c.
     __jsvalue available_locale = BestAvailableLocale(available_locales, &no_extensions_locale);
     // Step 4d.
+    // If 'availableLocale' is not undefined, then append 'locale' to the end of 'subset'.
     if (!__is_undefined(&available_locale)) {
-      __jsarr_pt_concat(&subset, &locale, 1);
+      __jsarr_pt_push(&subset, &locale, 1);
     }
     // Step 4e.
     k++;
@@ -1031,7 +1063,7 @@ __jsvalue SupportedLocales(__jsvalue *available_locales,
     }
   }
   // Step 2.
-  __jsvalue subset;
+  __jsvalue subset = __undefined_value();
   if (__is_undefined(&matcher) || matcher_str == "best fit") {
     // Step 2a.
     subset = BestFitSupportedLocales(available_locales, requested_locales);
@@ -1040,17 +1072,25 @@ __jsvalue SupportedLocales(__jsvalue *available_locales,
     subset = LookupSupportedLocales(available_locales, requested_locales);
   }
   // Step 4.
+  // For named own property name 'P' of 'subset',
   __jsvalue list = __jsobj_getOwnPropertyNames(&subset, &subset); // 1st arguement not used.
-  int size = __jsarr_getIndex(&list);
+  __jsobject *list_object = __jsval_to_object(&list);
+  uint32_t size = __jsobj_helper_get_length(list_object);
+  __jsobject *subset_object = __jsval_to_object(&subset);
   for (int i = 0; i < size; i++) {
     // Step 4a.
-    __jsobject *o = __jsval_to_object(&subset);
-    __jsvalue p = __jsarr_GetElem(o, i);
-    //__jsprop_desc d = __jsobj_internal_GetProperty(o, &p);
+    // Let 'desc' be the result of calling the [[GetOwnProperty]] internal method of 'subset' with 'P'.
+    __jsvalue p = __jsarr_GetElem(list_object, i);
     // Step 4b-4c.
-    __jsvalue attrs = __number_value(JSPROP_DESC_HAS_VWUEUC); // TODO: check!
+    __jsprop_desc desc = __jsobj_internal_GetProperty(subset_object, &p);
+    // Set desc.[[Writable]] to false.
+    // Set desc.[[Configurable]] to false.
+    __set_writable(&desc, true);
+    __set_configurable(&desc, false);
     // Step 4d.
-    __jsobj_defineProperty(&subset, &subset, &p, &attrs); // 1st argument not used.
+    // Call the [[DefineOwnProperty]] internal method of 'subset' with 'P', 'desc',
+    // and true as arguments.
+    __jsobj_internal_DefineOwnProperty(subset_object, &p, desc, true);
   }
   // Step 5.
   return subset;
@@ -1065,14 +1105,23 @@ __jsvalue GetOption(__jsvalue *options, __jsvalue *property, __jsvalue *type,
   // Step 2.
   if (!__is_undefined(&value)) {
     // Step 2a.
+    // Assert: 'type' is "boolean" or "string".
     __jsstring *jsstr_type = __jsval_to_string(type);
     std::string string_type_str = "string";
     __jsstring *string_type = __jsstr_new_from_char(string_type_str.c_str());
     std::string boolean_type_str = "boolean";
     __jsstring *boolean_type = __jsstr_new_from_char(boolean_type_str.c_str());
     MAPLE_JS_ASSERT(__jsstr_equal(jsstr_type, string_type) || __jsstr_equal(jsstr_type, boolean_type));
-    // Step 2b and 2c.
-    // No need to call ToBoolean(value) or ToString(value).
+    // Step 2b.
+    // If 'type' is "boolean", then let 'value' to be ToBoolean(value).
+    if (__jsstr_equal(jsstr_type, boolean_type)) {
+      value = __boolean_value(__jsval_to_boolean(&value));
+    }
+    // Step 2c.
+    // If 'type' is "string", then let 'value' to be ToString(value).
+    if (__jsstr_equal(jsstr_type, string_type)) {
+      value = __string_value(__jsval_to_string(&value));
+    }
     // Step 2d.
     // If 'values' is not undefined, then
     if (!__is_undefined(values)) {
@@ -1135,15 +1184,8 @@ void InitProperty(__jsvalue *object, std::string prop) {
   obj->object_type = JSREGULAR_OBJECT;
 
   if (prop == "availableLocales") {
-    int n = uloc_countAvailable();
-    std::vector<std::string> locs;
-    for (int i = 0; i < n; i++) {
-      std::string str(uloc_getAvailable(i));
-      std::replace(str.begin(), str.end(), '_', '-');
-      locs.push_back(str);
-    }
     __jsvalue p = StrToVal(prop);
-    __jsvalue v = StrVecToVal(locs);
+    __jsvalue v = GetAvailableLocales();
     __jsop_setprop(object, &p, &v);
   } else if (prop == "relevantExtensionKeys") {
     __jsvalue p = StrToVal(prop);
@@ -1209,4 +1251,17 @@ void InitProperty(__jsvalue *object, std::string prop) {
   } else if (prop == "searchLocaleData") {
     // TODO
   }
+}
+
+// Return the value of 'availableLocales' property of the standard built-in object.
+__jsvalue GetAvailableLocales() {
+  int num_locales = uloc_countAvailable();
+  std::vector<std::string> locales;
+  for (int i = 0; i < num_locales; i++) {
+    std::string str(uloc_getAvailable(i));
+    std::replace(str.begin(), str.end(), '_', '-');
+    locales.push_back(str);
+  }
+  __jsvalue value = StrVecToVal(locales);
+  return value;
 }

@@ -69,24 +69,24 @@ extern "C" uint32_t __inc_opcode_cnt() {
   if(debug_engine & kEngineDebugInstruction) \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, op#=%2d,       OP_" \
         #opc ", " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
-        (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
-        typestr(func.operand_stack.at(func.sp).ptyp), \
+        (unsigned long long)(func.operand_stack[func.sp]).x.i64, \
+        typestr(func.operand_stack[func.sp].ptyp), \
         func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *(func.pc+3), __opcode_cnt)
 #define DEBUGCOPCODE(opc,msg) \
   __inc_opcode_cnt(); \
   if(debug_engine & kEngineDebugInstruction) \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, param=0x%04x, OP_" \
         #opc ", " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
-        (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
-        typestr(func.operand_stack.at(func.sp).ptyp), \
+        (unsigned long long)(func.operand_stack[func.sp]).x.i64, \
+        typestr(func.operand_stack[func.sp].ptyp), \
         func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), __opcode_cnt)
 #define DEBUGSOPCODE(opc,msg,idx) \
   __inc_opcode_cnt(); \
   if(debug_engine & kEngineDebugInstruction) \
     fprintf(stderr, "Debug [%ld] 0x%lx:%04lx: 0x%016llx, %s, sp=%-2ld: op=0x%02x, ptyp=0x%02x, param=0x%04x, OP_" \
         #opc " (%s), " #msg ", %d\n", gettid(), (uint8_t*)func.header - func.lib_addr, func.pc - (uint8_t*)func.header - func.header->header_size, \
-        (unsigned long long)(func.operand_stack.at(func.sp)).x.i64, \
-        typestr(func.operand_stack.at(func.sp).ptyp), \
+        (unsigned long long)(func.operand_stack[func.sp]).x.i64, \
+        typestr(func.operand_stack[func.sp].ptyp), \
         func.sp - func.header->locals_num, *func.pc, *(func.pc+1), *((uint16_t*)(func.pc+2)), \
         func.var_names == nullptr ? "" : func.var_names + (idx > 0 ? idx - 1 : mir_header->formals_num - idx) * VARNAMELENGTH, \
         __opcode_cnt)
@@ -95,7 +95,7 @@ extern "C" uint32_t __inc_opcode_cnt() {
             int argc = mir_header->formals_num; \
             int loc = snprintf(buffer, 1023, "Debug [%ld] %d Args:", gettid(), argc); \
             for(int i = 0; i < argc; ++i) { \
-                MValue &arg = caller->operand_stack.at(caller_args + i + 1); \
+                MValue &arg = caller->operand_stack[caller_args + i + 1]; \
                 loc += snprintf(buffer + loc, 1023 - loc, " %d: %s, %s, 0x%llx ", i + 1, \
                         func.var_names == nullptr ? "" : func.var_names + i * VARNAMELENGTH, \
                         typestr(arg.ptyp), (unsigned long long)arg.x.i64); \
@@ -104,18 +104,18 @@ extern "C" uint32_t __inc_opcode_cnt() {
        } while(0)
 #define DEBUGUNINITIALIZED(x) if(debug_engine & kEngineDebugInstruction) \
     do { \
-           if(func.operand_stack.at(x).ptyp == PTY_void) \
+           if(func.operand_stack[x].ptyp == PTY_void) \
                fprintf(stderr, "Debug [%ld] === USE OF UNINITIALIZED LOCAL %d\n", gettid(), x); \
        } while(0)
 
-#define MPUSH(x)   (func.operand_stack.at(++func.sp) = x)
-#define MPOP()     (func.operand_stack.at(func.sp--))
-#define MTOP()     (func.operand_stack.at(func.sp))
+#define MPUSH(x)   (func.operand_stack[++func.sp] = x)
+#define MPOP()     (func.operand_stack[func.sp--])
+#define MTOP()     (func.operand_stack[func.sp])
 
-#define MARGS(x)   (caller->operand_stack.at(caller_args + x))
-#define RETURNVAL  (func.operand_stack.at(0))
-#define THROWVAL   (func.operand_stack.at(1))
-#define MLOCALS(x) (func.operand_stack.at(x))
+#define MARGS(x)   (caller->operand_stack[caller_args + x])
+#define RETURNVAL  (func.operand_stack[0])
+#define THROWVAL   (func.operand_stack[1])
+#define MLOCALS(x) (func.operand_stack[x])
 
 #define THROWJAVAEXCEPTION_WITH_MSG(ex, msg) \
     do { \

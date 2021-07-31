@@ -344,7 +344,7 @@ void MemoryManager::ReleaseVariables(uint8_t *base, uint8_t *typetagged, uint8_t
   }
 }
 
-#if 0
+#ifdef MM_DEBUG
 // A VM self-check for memory-leak.
 // When exit the app, stack-variables have been released. Only global-variables
 // and builtin-variables may refer to a heap-object or a heap-string.
@@ -352,10 +352,18 @@ void MemoryManager::ReleaseVariables(uint8_t *base, uint8_t *typetagged, uint8_t
 // memory used.
 void MemoryManager::AppMemLeakCheck() {
 #ifdef MEMORY_LEAK_CHECK
+
+#if 0
   GCCheckAndDecRf(ginterpreter->retval0_.u64);
   ReleaseVariables(ginterpreter->gp_, ginterpreter->gp_typetagged_, ginterpreter->gp_refcounted_,
                    BlkSize2BitvectorSize(ginterpreter->gp_size_), false /* offset is positive */);
+#endif
+
+  printf("before release builtin, app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
+
   __jsobj_release_builtin();
+
+  printf("after release builtin, app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
 
 #ifdef MARK_CYCLE_ROOTS
   RecallCycle();
@@ -363,9 +371,10 @@ void MemoryManager::AppMemLeakCheck() {
 #else
   MarkAndSweep();
 #endif
+  printf("after reclaim, app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
 
-  if (max_app_mem_usage != 0) {
-    printf("[Memory Manager] %d Bytes heap memory leaked!\n", max_app_mem_usage);
+  if (app_mem_usage != 0) {
+    printf("[Memory Manager] %d Bytes heap memory leaked!\n", app_mem_usage);
     MIR_FATAL("memory leak.\n");
   }
 #endif
@@ -373,7 +382,7 @@ void MemoryManager::AppMemLeakCheck() {
 
 void MemoryManager::AppMemUsageSummary() {
   printf("\n");
-  printf("[Memory Manager] max app heap memory usage is %d Bytes\n", max_app_mem_usage);
+  printf("[Memory Manager] max app heap memory usage is %d Bytes\n", app_mem_usage);
   printf("[Memory Manager] vm internal memory usage is %d Bytes\n\n",
          vm_free_small_offset_ + (vm_free_big_offset_ - vm_memory_small_size_));
 }
@@ -472,12 +481,13 @@ MemoryChunk *MemoryManager::NewMemoryChunk(uint32 offset, uint32 size, MemoryChu
 
 void MemoryManager::Init(void *app_memory, uint32 app_memory_size, void *vm_memory, uint32 vm_memory_size) {
   memory_ = app_memory;
-  memoryFlagMap = (uint8_t *)calloc(TOTAL_MEMORY_SIZE / sizeof(void *), sizeof(uint8_t));
-  total_small_size_ = HEAP_SMALL_SIZE;
+  memoryFlagMap = (uint8_t *)calloc((app_memory_size + vm_memory_size) / sizeof(void *), sizeof(uint8_t));
+  total_small_size_ = app_memory_size / 2;
 #if DEBUGGC
-  assert((HEAP_SMALL_SIZE % 4) == 0 && (VM_MEMORY_SIZE % 4) == 0 && "make sure HEAP SIZE is aligned to 4B");
+  assert((total_small_size_ % 4) == 0 && (VM_MEMORY_SIZE % 4) == 0 && "make sure HEAP SIZE is aligned to 4B");
 #endif
   total_size_ = app_memory_size;
+  heap_end = (void *)((uint8 *)memory_ + app_memory_size);
   vm_memory_ = vm_memory;
   vm_memory_size_ = vm_memory_size;
   vm_memory_small_size_ = VM_MEMORY_SMALL_SIZE;
@@ -507,7 +517,10 @@ void MemoryManager::Init(void *app_memory, uint32 app_memory_size, void *vm_memo
   }
 
 #if MM_DEBUG
+  app_mem_usage = 0;
   max_app_mem_usage = 0;
+  mem_allocated = 0;
+  mem_released = 0;
 #endif  // MM_DEBUG
 #ifdef MACHINE64
   addrMap.push_back(NULL);
@@ -518,7 +531,10 @@ void MemoryManager::Init(void *app_memory, uint32 app_memory_size, void *vm_memo
 void *MemoryManager::Malloc(uint32 size, bool init_p) {
   MemoryChunk *mchunk;
 #if MM_DEBUG
-  max_app_mem_usage += size;
+  app_mem_usage += size;
+  mem_allocated += size;
+  if(app_mem_usage > max_app_mem_usage)
+    max_app_mem_usage = app_mem_usage;
 #endif  // MM_DEBUG
 #if DEBUGGC
   assert((IsAlignedBy4(size)) && "memory doesn't align by 4 bytes");
@@ -542,7 +558,14 @@ void *MemoryManager::Malloc(uint32 size, bool init_p) {
       }
     } else {
       if (size + heap_free_small_offset_ > total_small_size_) {
-        MIR_FATAL("TODO run out of VM heap memory.\n");
+        // try to use big size heap space if it has not been used
+        if (heap_free_big_offset_ == total_small_size_ &&
+            heap_free_big_offset_ < total_size_ - (1024 * 1024)) {
+            total_small_size_ += 1024 * 1024;
+            heap_free_big_offset_ = total_small_size_;
+        } else {
+          MIR_FATAL("TODO run out of VM heap memory.\n");
+        }
       }
       heap_free_offset = heap_free_small_offset_;
       heap_free_small_offset_ += size;
@@ -643,7 +666,8 @@ void MemoryManager::RecallMem(void *mem, uint32 size) {
   heap_memory_bank_->PutFreeChunk(mchunk);
 
 #if MM_DEBUG
-  max_app_mem_usage -= (alignedsize + head_size);
+  app_mem_usage -= (alignedsize + head_size);
+  mem_released += (alignedsize + head_size);
 #endif  // MM_DEBUG
 }
 

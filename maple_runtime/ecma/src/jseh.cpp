@@ -70,6 +70,9 @@ void *JsEh::GetEHpc(DynMFunction *callerFunc) {
 }
 
 void JsEh::FreeEH() {
+  if (gInterSource->currEH == NULL)
+    return;
+
   while (!gosubStack.IsEmpty()) {
     PopGosub();
   }

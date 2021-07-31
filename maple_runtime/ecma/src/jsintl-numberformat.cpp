@@ -13,6 +13,7 @@
  * See the MulanPSL - 2.0 for more details.
  */
 
+#include <unicode/numsys.h>
 #include "jsvalueinline.h"
 #include "jsvalue.h"
 #include "jsobject.h"
@@ -22,6 +23,35 @@
 
 extern __jsvalue __js_ThisBinding;
 extern std::vector<std::pair<std::string,uint16_t>> kNumberingSystems;
+
+std::map<std::string,int> kCurrencyDigits = {
+    {"BHD", 3},
+    {"BIF", 0},
+    {"BYR", 0},
+    {"CLF", 0},
+    {"CLP", 0},
+    {"DJF", 0},
+    {"IQD", 3},
+    {"GNF", 0},
+    {"ISK", 0},
+    {"JOD", 3},
+    {"JPY", 0},
+    {"KMF", 0},
+    {"KRW", 0},
+    {"KWD", 3},
+    {"LYD", 3},
+    {"OMR", 3},
+    {"PYG", 0},
+    {"RWF", 0},
+    {"TND", 3},
+    {"UGX", 0},
+    {"UYI", 0},
+    {"VND", 0},
+    {"VUV", 0},
+    {"XAF", 0},
+    {"XOF", 0},
+    {"XPF", 0},
+};
 
 // ECMA-402 1.0 11.1.3.1 The Intl.NumberFormat Constructor
 __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
@@ -103,11 +133,12 @@ void InitializeNumberFormat(__jsvalue *this_number_format, __jsvalue *locales,
   number_format_obj->shared.intl->kind = JSINTL_NUMBERFORMAT;
   __jsvalue number_format = __object_value(number_format_obj);
 
-  InitProperty(&number_format, "availableLocales");
-  InitProperty(&number_format, "relevantExtensionKeys");
-  InitProperty(&number_format, "localeData");
+  InitializeNumberFormatProperties(&number_format, &requested_locales,
+      {"availableLocales", "relevantExtensionKeys", "localeData"});
 
   // Step 10.
+  // Let 'localeData' be the value of the [[localeData]] internal property of
+  // Intl.NumberFormat.
   prop = StrToVal("localeData");
   __jsvalue locale_data = __jsop_getprop(&number_format, &prop);
   // Step 11.
@@ -136,6 +167,7 @@ void InitializeNumberFormat(__jsvalue *this_number_format, __jsvalue *locales,
   prop = StrToVal("numberingSystem");
   __jsop_setprop(this_number_format, &prop, &value);
   // Step 14.
+  // Let 'dataLocale' be the value of r.[[dataLocale]].
   prop = StrToVal("dataLocale");
   __jsvalue data_locale = __jsop_getprop(&r, &prop);
   // Step 15.
@@ -269,10 +301,11 @@ void InitializeNumberFormat(__jsvalue *this_number_format, __jsvalue *locales,
   prop = StrToVal("useGrouping");
   __jsop_setprop(this_number_format, &prop, &g);
   // Step 36.
-  prop = StrToVal("dataLocale");
+  // Let 'dataLocaleData' be the result of calling the [[Get]] internal method
+  // of 'localeData' with argument 'dataLocale'.
   __jsvalue data_locale_data = __undefined_value();
   if (!__is_undefined(&locale_data)) {
-    data_locale_data = __jsop_getprop(&locale_data, &prop);
+    data_locale_data = __jsop_getprop(&locale_data, &data_locale);
   }
   // Step 37.
   prop = StrToVal("patterns");
@@ -320,9 +353,19 @@ void InitializeNumberFormat(__jsvalue *this_number_format, __jsvalue *locales,
 }
 
 // ECMA-402 1.0 11.1.1.1
+// If the ISO 4217 currency and funds code list contains 'currency' as an
+// alphabetic code, then return the minor unit value corresponding to the
+// 'currency' from the list; else return 2.
 __jsvalue CurrencyDigits(__jsvalue *currency) {
-  // TODO: not implemented yet.
-  return __null_value();
+  __jsstring *currency_str = __jsval_to_string(currency);
+  for (auto it = kCurrencyDigits.begin(); it != kCurrencyDigits.end(); it++) {
+    std::string str = it->first;
+    __jsstring *cur = __jsstr_new_from_char(str.c_str());
+    if (__jsstr_equal(currency_str, cur)) {
+      return __number_value(it->second);
+    }
+  }
+  return __number_value(2);
 }
 
 // ECMA-402 1.0 11.2.2
@@ -338,12 +381,17 @@ __jsvalue __jsintl_NumberFormatSupportedLocalesOf(__jsvalue *number_format,
     options = locales[1];
   }
   // Step 2.
-  __jsvalue p = StrToVal("availableLocales");
-  __jsvalue available_locales = __jsop_getprop(number_format, &p); // TODO: check!
+  __jsvalue available_locales = GetAvailableLocales();
   // Step 3.
   __jsvalue requested_locales = CanonicalizeLocaleList(locales);
   // Step 4.
-  return SupportedLocales(&available_locales, &requested_locales, &options);
+  __jsvalue locale = SupportedLocales(&available_locales, &requested_locales, &options);
+  // The value of 'length' property of the 'supportedLocalesOf' method is 1.
+  __jsvalue p = StrToVal("length");
+  __jsvalue v = __number_value(1);
+  __jsop_setprop(&locale, &p, &v);
+
+  return locale;
 }
 
 // ECMA-402 11.3.2
@@ -355,21 +403,32 @@ __jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x_val) {
   __jsvalue negative = __boolean_value(false);
   __jsvalue n = __undefined_value();
   // Step 2.
+  // If the result of isFinite(x) is false, then
   if (__is_infinity(x_val) == true) {
     // Step 2a.
+    // If x is NaN, then let 'n' be an ILD String value indicating the NaN value.
     if (__is_nan(x_val)) {
-      n = __nan_value();
+      std::string s = "NaN";
+      n = __string_value(__jsstr_new_from_char(s.c_str()));
     } else { // Step 2b.
-      n = __number_infinity();
-      if (__jsval_to_double(x_val) < 0) {
+      // Step 2b i.
+      // Let 'n' be an ILD String value indicating infinity.
+      __jsstring *s = __js_new_string_internal(1, true);
+      __jsstr_set_char(s, 0, 0x221E);
+      n = __string_value(s);
+      // Step 2b ii.
+      // If x < 0, then let 'negative' be true.
+      if (__jsval_to_double(x_val) < 0 || __is_neg_infinity(x_val)) { // handling '-Infinity' as well.
         negative = __boolean_value(true);
       }
     }
   } else { // Step 3.
     // Step 3a.
+    // If x < 0, then
     double x = __jsval_to_double(x_val);
-    if (x < 0) {
+    if (x < 0 || __is_negative_zero(x_val)) {  // handling '-0' as well.
       // Step 3a i.
+      // Let 'negative' is true,
       negative = __boolean_value(true);
       // Step 3a ii.
       x = -x;
@@ -571,7 +630,7 @@ __jsvalue __jsintl_NumberFormatFormat(__jsvalue *number_format, __jsvalue *value
 #define ATTRS(nargs, length) \
   ((uint32_t)(uint8_t)(nargs == UNCERTAIN_NARGS ? 1: 0) << 24 | (uint32_t)(uint8_t)nargs << 16 | \
    (uint32_t)(uint8_t)length << 8 | JSFUNCPROP_NATIVE)
-    f = __js_new_function((void*)FormatNumber, NULL, ATTRS(2, 2));
+    f = __js_new_function((void*)FormatNumber, NULL, ATTRS(2, 1));
     // Step 1b- 1c.
     // Let bf b the result of calling the [[Call]] internal method of 'bind' with F
     // as 'this' value and an argument list containing the single item 'this'.
@@ -634,4 +693,68 @@ __jsvalue __jsintl_NumberFormatResolvedOptions(__jsvalue *number_format) {
   __jsop_setprop(&nf, &p, &v);
 
   return nf;
+}
+
+void InitializeNumberFormatProperties(__jsvalue *number_format, __jsvalue *locales,
+                                     std::vector<std::string> properties) {
+  __jsvalue p, v;
+  for (int i = 0; i < properties.size(); i++) {
+    if (properties[i] == "availableLocales") {
+      p = StrToVal(properties[i]);
+      v = GetAvailableLocales();
+
+      __jsop_setprop(number_format, &p, &v);
+
+    } else if (properties[i] == "relevantExtensionKeys") {
+      p = StrToVal(properties[i]);
+      std::vector<std::string> values = {"nu"};
+      v = StrVecToVal(values);
+
+      __jsop_setprop(number_format, &p, &v);
+
+    } else if (properties[i] == "localeData") {
+      // [[localeData]][locale]['nu']
+      __jsobject *locale_object = __create_object();
+      __jsvalue locale = __object_value(locale_object);
+      locale_object->object_class = JSOBJECT;
+      locale_object->extensible = true;
+      locale_object->object_type = JSREGULAR_OBJECT;
+
+      // Add default system numbering system as the first element of vec.
+      std::vector<std::string> vec;
+      for (int j = 0; j < kNumberingSystems.size(); j++) {
+        vec.push_back(kNumberingSystems[j].first);
+      }
+      icu::NumberingSystem num_sys;
+      std::string default_numsys(num_sys.getName());
+      vec.insert(vec.begin(), default_numsys);
+
+      v = StrVecToVal(vec);
+      p = StrToVal("nu");
+      __jsop_setprop(&locale, &p, &v);  // Set "nu" to locale.
+
+      __jsobject *locale_data_object = __create_object();
+      __jsvalue locale_data = __object_value(locale_data_object);
+      locale_data_object->object_class = JSOBJECT;
+      locale_data_object->extensible = true;
+      locale_data_object->object_type = JSREGULAR_OBJECT;
+
+      __jsobject *locales_object = __jsval_to_object(locales);
+      uint32_t size = __jsobj_helper_get_length(locales_object);
+      for (int j = 0; j < size; j++) {
+        p = __jsarr_GetElem(locales_object, j);
+        // locale should be includled in available_locales.
+        __jsvalue available_locales = GetAvailableLocales();
+        p = BestAvailableLocale(&available_locales, &p);
+        __jsop_setprop(&locale_data, &p, &locale); // Set locale to localeData.
+      }
+      if (size == 0) { // when locale is not specified, use default one.
+        p = DefaultLocale();
+        __jsop_setprop(&locale_data, &p, &locale);
+      }
+
+      p = StrToVal(properties[i]);
+      __jsop_setprop(number_format, &p, &locale_data); // Set localeData to number_format object.
+    }
+  }
 }

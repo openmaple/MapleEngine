@@ -145,10 +145,12 @@ static __jsfunction *__create_builtin_constructor(__jsbuiltin_object_id id, uint
     case JSBUILTIN_INTL_NUMBERFORMAT_CONSTRUCTOR:
       fp = (void *)__js_NumberFormatConstructor;
       isConstructor = true;
+      *length = 0;
       break;
     case JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR:
       fp = (void *)__js_DateTimeFormatConstructor;
       isConstructor = true;
+      *length = 0;
       break;
     case JSBUILTIN_ARRAYBUFFER_CONSTRUCTOR:
       fp = (void *)__js_new_arraybufferconstructor;

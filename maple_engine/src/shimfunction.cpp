@@ -20,7 +20,7 @@
 
 namespace maple {
 
-#define MPUSH(x) (shim_caller.operand_stack.at(++shim_caller.sp) = x)
+#define MPUSH(x) (shim_caller.operand_stack[++shim_caller.sp] = x)
 
 // For instance method, the first argument is the "this" ref
 // For static method, the first argument is its class object ref

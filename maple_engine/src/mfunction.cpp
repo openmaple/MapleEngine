@@ -26,12 +26,12 @@
 #include "mprimtype.h"
 #include "massert.h" // for MASSERT
 
-#define MPUSH(x) (operand_stack.at(++sp) = x)
-#define MPOP()   (operand_stack.at(sp--))
-#define MTOP()   (operand_stack.at(sp))
+#define MPUSH(x) (operand_stack[++sp] = x)
+#define MPOP()   (operand_stack[sp--])
+#define MTOP()   (operand_stack[sp])
 
-#define RETURNVAL  (operand_stack.at(0))
-#define THROWVAL   (operand_stack.at(1))
+#define RETURNVAL  (operand_stack[0])
+#define THROWVAL   (operand_stack[1])
 
 #define INTERNALFUNC(x) extern "C" void x();
 #include "internal_functions.def"
@@ -137,7 +137,7 @@ namespace maple {
 
     void MFunction::indirect_call(PrimType ret_ptyp, const uint32_t arg_num) {
         const uint32_t actual_num = arg_num - 1;
-        uint8_t *fp = operand_stack.at(sp - actual_num).x.a64;
+        uint8_t *fp = operand_stack[sp - actual_num].x.a64;
         MASSERT(fp != nullptr, "Indirect call with nullptr");
         if(*(uint32_t*)(fp + MPLI_OFFSET) == 0x494c504d) {
             method_header_t *header = (method_header_t *)(fp + MPLI_OFFSET + 4);
