@@ -41,6 +41,9 @@ enum MemHeadTag {
   MemHeadJSList,
   MemHeadEnv,
   MemHeadJSIter,
+#ifdef MM_DEBUG
+  MemHeadLast,
+#endif
 };
 
 #ifdef MARK_CYCLE_ROOTS
@@ -143,15 +146,32 @@ class MemoryManager {
   uint32 heap_free_big_offset_;   // for gc
   MemoryHash *heap_memory_bank_;  // for app need gc
 // MemoryChunk *avail_link_;
-#if MM_DEBUG                 // this macro control the debug informaiton of memory manager
+#ifdef MM_DEBUG                 // this macro control the debug informaiton of memory manager
   uint32 app_mem_usage;  // heap memory used by current app
   uint32 max_app_mem_usage;  // the max (high water mark) heap memory used by current app.
   uint32 mem_allocated;  // total allocation
   uint32 mem_released;  // total release
+  uint32 mem_alloc_bytes_by_type[MemHeadLast];  // total allocated bytes
+  uint32 mem_alloc_count_by_type[MemHeadLast];  // total count of allocations
+  uint32 mem_release_bytes_by_type[MemHeadLast];
+  uint32 mem_release_count_by_type[MemHeadLast];
+
+  void* mainSP;
+  void* mainFP;
+
+  uint32 max_rc0_by_type[MemHeadLast];
   void AppMemLeakCheck();
   void AppMemUsageSummary();   // output the memory usage summary of an app.
   void AppMemAccessSummary();  // output the mmap node visiting length summary of an app.
   void AppMemShapeSummary();   // output the mmap shape summary of an app.
+
+  std::map<void*, int> live_objects;  // map live object to max RC
+  std::map<int, uint32> max_rc_histogram;
+  uint32 num_Malloc_calls;
+  uint32 num_Realloc_calls;
+  uint64_t num_rcinc;
+  uint64_t num_rcdec;
+
 #endif                         // MM_DEBUG
 
   // Internal VM memory management
@@ -275,6 +295,11 @@ class MemoryManager {
       MemHeader &header = GetMemHeader(addr);
       if(header.refcount < UINT14_MAX)
         header.refcount++;
+#ifdef MM_DEBUG
+      num_rcinc++;
+      live_objects[addr]++;
+//printf("addr= %p RC incto= %d\n", addr, live_objects[addr]);
+#endif
     }
   }
   void GCIncRfJsvalue(__jsvalue jsval) {

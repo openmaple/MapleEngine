@@ -31,7 +31,7 @@ __jsstring *__jsnum_integer_encode(int value, int base);
 __jsvalue __jsnum_pt_toString(__jsvalue *this_object, __jsvalue *radix);
 
 // ecma 15.7.4.3
-__jsvalue __jsnum_pt_toLocaleString(__jsvalue *this_object);
+__jsvalue __jsnum_pt_toLocaleString(__jsvalue *this_object, __jsvalue *args, uint32_t num_args);
 
 // ecma 15.7.4.4
 __jsvalue __jsnum_pt_valueOf(__jsvalue *this_object);

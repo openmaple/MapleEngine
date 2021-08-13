@@ -47,7 +47,10 @@ __jsobject *__js_new_arr_elems(__jsvalue *items, uint32_t length) {
   __jsobject *arr = __js_new_arr_internal(length);
   __jsvalue *array_elems = arr->shared.array_props;
   for (uint32_t i = 0; i < length; i++) {
-    __jsvalue itVt = memory_manager->EmulateLoad(((uint64_t *)items->s.ptr + i), items->tag);
+//    __jsvalue itVt = memory_manager->EmulateLoad(((uint64_t *)items->s.ptr + i), items->tag);
+    __jsvalue  itVt;
+    itVt.s.asbits =  *((uint64_t *)items->s.ptr + i);
+    mDecode(itVt);
     __set_regular_elem(array_elems, i, &itVt);
   }
   return arr;

@@ -22,16 +22,6 @@
 #include "jsvalue.h"
 #include "jsstring.h"
 
-enum __jsintl_type : uint8_t {
-  JSINTL_COLLATOR       = 0x01,
-  JSINTL_NUMBERFORMAT   = 0x02,
-  JSINTL_DATETIMEFORMAT = 0x04,
-};
-
-typedef struct {
-  __jsintl_type kind  : 8;
-} __jsintl;
-
 // Helper
 __jsvalue StrToVal(std::string str);
 __jsvalue StrVecToVal(std::vector<std::string> strs);
@@ -71,8 +61,8 @@ __jsvalue GetNumberOption(__jsvalue *options, __jsvalue *property,
                           __jsvalue *minimum, __jsvalue *maximum,
                           __jsvalue *fallback);
 __jsvalue DefaultLocale();
-void InitProperty(__jsvalue *object, std::string prop);
 __jsvalue GetAvailableLocales();
+std::vector<std::string> GetNumberingSystems();
 
 
 // NumberFormat
@@ -84,8 +74,8 @@ __jsvalue CurrencyDigits(__jsvalue *currency);
 __jsvalue __jsintl_NumberFormatSupportedLocalesOf(__jsvalue *this_arg,
                                                   __jsvalue *arg_list,
                                                   uint32_t nargs);
-__jsvalue __jsintl_NumberFormatFormat(__jsvalue *this_arg, __jsvalue *arg_list);
-__jsvalue __jsintl_NumberFormatResolvedOptions(__jsvalue *this_arg);
+__jsvalue __jsintl_NumberFormatFormat(__jsvalue *number_format, __jsvalue *value);
+__jsvalue __jsintl_NumberFormatResolvedOptions(__jsvalue *number_format);
 __jsvalue ToDateTimeOptions(__jsvalue *options, __jsvalue *required, __jsvalue *defaults);
 __jsvalue BasicFormatMatcher(__jsvalue *options, __jsvalue *formats);
 __jsvalue BestFitFormatMatcher(__jsvalue *options, __jsvalue *formats);
@@ -96,24 +86,28 @@ __jsvalue ToRawFixed(__jsvalue *x, __jsvalue *min_integer,
 
 // Collator
 void InitializeCollator(__jsvalue *collator, __jsvalue *locales, __jsvalue *options);
+void InitializeCollatorProperties(__jsvalue *collator, __jsvalue *locales, std::vector<std::string> propertie);
 __jsvalue __jsintl_CollatorSupportedLocalesOf(__jsvalue *this_arg,
                                               __jsvalue *arg_list,
                                               uint32_t nargs);
 __jsvalue __jsintl_CollatorCompare(__jsvalue *this_arg, __jsvalue *arg_list,
                                    uint32_t nargs);
-__jsvalue __jsintl_CollatorResolvedOptions(__jsvalue *this_arg,
-                                           __jsvalue *arg_list, uint32_t nargs);
+__jsvalue __jsintl_CollatorResolvedOptions(__jsvalue *collator);
+std::vector<std::string> GetCollations();
 
 // DateTimeFormat
 void InitializeDateTimeFormat(__jsvalue *date_time_format, __jsvalue *locales,
                               __jsvalue *options);
-__jsvalue __jsintl_DateTimeFormatSupportedLocalesOf(__jsvalue *locales,
+void InitializeDateTimeFormatProperties(__jsvalue *date_time_format, __jsvalue *locales,
+                                     std::vector<std::string> properties);
+__jsvalue __jsintl_DateTimeFormatSupportedLocalesOf(__jsvalue *date_time_format,
                                                     __jsvalue *arg_list,
                                                     uint32_t nargs);
-__jsvalue __jsintl_DateTimeFormatFormat(__jsvalue *this_arg,
-                                        __jsvalue *arg_list, uint32_t nargs);
-__jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *this_arg,
-                                                 __jsvalue *arg_list,
-                                                 uint32_t nargs);
+__jsvalue __jsintl_DateTimeFormatFormat(__jsvalue *date_time_format, __jsvalue *date);
+__jsvalue FormatDateTime(__jsvalue *date_time_format, __jsvalue *x);
+__jsvalue ToLocalTime(__jsvalue *x, __jsvalue *calendar, __jsvalue *time_zone);
+__jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *date_time_format);
+std::vector<std::string> GetAvailableCalendars();
+std::string ToBCP47CalendarName(const char* name);
 
 #endif // JSINTL_H

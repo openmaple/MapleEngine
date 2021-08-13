@@ -28,6 +28,7 @@
 #include "jstycnv.h"
 #include "jsstring.h"
 #include "vmmemory.h"
+#include "jsintl.h"
 
 double __js_toDecimal(uint16_t *start, uint16_t *end, int base, uint16_t **pos) {
   MAPLE_JS_ASSERT(start <= end);
@@ -595,9 +596,28 @@ __jsvalue __jsnum_pt_toString(__jsvalue *this_number, __jsvalue *radix) {
 
 // ecma 15.7.4.3
 // Locale-specific, implement it if really needed.
-__jsvalue __jsnum_pt_toLocaleString(__jsvalue *this_number) {
-  MAPLE_JS_ASSERT(false && "NIY: Number.prototype.toLocaleString");
-  return __undefined_value();
+// ECMA 13.2.1 Number.prototype.toLocaleString([locales [,options]])
+__jsvalue __jsnum_pt_toLocaleString(__jsvalue *this_number, __jsvalue *args, uint32_t num_args) {
+  //MAPLE_JS_ASSERT(false && "NIY: Number.prototype.toLocaleString");
+  //return __undefined_value();
+  // Step 1.
+  __jsvalue x = *this_number;
+  // Step 2-3.
+  __jsvalue locales = __undefined_value(), options = __undefined_value();
+  if (num_args == 0) {
+    // Do nothing.
+  } else if (num_args == 1) {
+    locales = args[0];
+  } else if (num_args == 2) {
+    locales = args[0];
+    options = args[1];
+  }
+  // Step 4.
+  __jsvalue undefined = __undefined_value();
+  __jsvalue arg_list[] = {locales, options};
+  __jsvalue number_format = __js_NumberFormatConstructor(&undefined, arg_list, 2);
+
+  return FormatNumber(&number_format, &x);
 }
 
 // ecma 15.7.4.4

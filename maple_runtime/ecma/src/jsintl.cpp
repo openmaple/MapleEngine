@@ -24,6 +24,7 @@
 #include "jsobjectinline.h"
 #include "jsarray.h"
 #include "jsmath.h"
+#include "jsintl.h"
 
 std::string kUnicodeLocaleExtensionSequence = "-u(-[a-z0-9]{2,8})+";
 
@@ -365,7 +366,7 @@ __jsvalue StrToVal(std::string str) {
 __jsvalue StrVecToVal(std::vector<std::string> strs) {
   int size = strs.size();
   __jsvalue items[size];
-  for (int i = 0; i < strs.size(); i++) {
+  for (int i = 0; i < size; i++) {
     items[i] = StrToVal(strs[i]);
   }
   __jsobject *arr_obj = __js_new_arr_elems_direct(items, size);
@@ -606,14 +607,13 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
 
   // Step 3.
   // If 'locales' is String value, then
-  __jsvalue locales2 = *locales;
   if (__is_string(locales)) {
     // Step 3a.
     // Let 'locales' be a new array created as if by the expression 'new Array(locales)'
     // where 'Array' is the standard built-in constructor with the name and
     // 'locales' is the value of 'locales'.
-    __jsobject *arr_obj = __js_new_arr_elems_direct(locales, 1);
-    locales2 = __object_value(arr_obj);
+    __jsobject *locales_arr_obj = __js_new_arr_elems_direct(locales, 1); // 1st argument does not matter.
+    *locales = __object_value(locales_arr_obj);
   }
 
   if (__is_null(locales)) { // handle the case when locales is null.
@@ -621,7 +621,7 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
   }
   // Step 4.
   // Let 'O' be ToObject(locales).
-  __jsobject *o = __jsval_to_object(&locales2);
+  __jsobject *o = __jsval_to_object(locales);
 
   // Step 5.
   // Let 'lenValue' be the result of calling the [[Get]] internal method of 'O'
@@ -649,17 +649,17 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
         MAPLE_JS_TYPEERROR_EXCEPTION();
       }
       // Step 8c iii.
-      __jsstring *tag = __jsval_to_string(&k_value);
+      __jsstring *tag_str = __jsval_to_string(&k_value);
       // Step 8c iv.
-      if (!IsStructurallyValidLanguageTag(tag)) {
+      if (!IsStructurallyValidLanguageTag(tag_str)) {
         MAPLE_JS_RANGEERROR_EXCEPTION();
       }
       // Step 8c v.
-      __jsvalue tag2 = CanonicalizeLanguageTag(tag);
+      __jsvalue tag = CanonicalizeLanguageTag(tag_str);
       // step 8c vi.
-      __jsvalue idx = __jsarr_pt_indexOf(&seen, &tag2, 0);
+      __jsvalue idx = __jsarr_pt_indexOf(&seen, &tag, 0);
       if (__js_ToNumber(&idx) == -1) {
-        seen = __jsarr_pt_concat(&seen, &tag2, 1);
+        seen = __jsarr_pt_concat(&seen, &tag, 1);
       }
     }
     // Step 8d.
@@ -682,6 +682,8 @@ __jsvalue BestAvailableLocale(__jsvalue *available_locales, __jsvalue *locale) {
       return candidate;
     }
     // Step 2b.
+    // Let 'pos' be the character index of the last occurence of "-" (U+002D)
+    // within 'candidate'. If that character does not occur, return undefined.
     __jsvalue search_element = StrToVal("-");
     __jsvalue from_index = __number_value(0);
     __jsvalue pos = __jsstr_lastIndexOf(&candidate, &search_element, &from_index);
@@ -940,7 +942,8 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
         } else {
           // Step 11g ii 2a.
           prop = StrToVal("true");
-          __jsvalue value_pos = __jsstr_indexOf(&key_locale_data, &prop, 0);
+          __jsvalue zero_idx = __number_value(0);
+          __jsvalue value_pos = __jsstr_indexOf(&key_locale_data, &prop, &zero_idx);
           // Step 11g ii 2b.
           if (__jsval_to_number(&value_pos) != -1) {
             // Step 11g ii 2b i.
@@ -1002,8 +1005,8 @@ __jsvalue LookupSupportedLocales(__jsvalue *available_locales,
   // Step 1.
   // Let 'len' be the number of elements in 'requestedLocales'.
   //int len = __jsarr_getIndex(requested_locales);
-  __jsobject *o = __jsval_to_object(requested_locales);
-  uint32_t len = __jsobj_helper_get_length(o);
+  __jsobject *requested_locales_obj = __jsval_to_object(requested_locales);
+  uint32_t len = __jsobj_helper_get_length(requested_locales_obj);
   // Step 2.
   // Let 'subset' be a new empty List.
   __jsvalue subset = __object_value(__js_new_arr_internal(0));
@@ -1014,7 +1017,7 @@ __jsvalue LookupSupportedLocales(__jsvalue *available_locales,
     // Step 4a.
     // Let 'locale' be the element of 'requestedLocales' at 0-origined list position k.
     //__jsobject *o = __jsval_to_object(requested_locales);
-    __jsvalue locale = __jsarr_GetElem(o, k);
+    __jsvalue locale = __jsarr_GetElem(requested_locales_obj, k);
     // Step 4b.
     __jsvalue no_extensions_locale = RemoveUnicodeExtensions(&locale);
     // Step 4c.
@@ -1046,7 +1049,7 @@ __jsvalue SupportedLocales(__jsvalue *available_locales,
                            __jsvalue *requested_locales, __jsvalue *options) {
   // Step 1.
   __jsvalue prop;
-  __jsvalue matcher;
+  __jsvalue matcher = __undefined_value();
   std::string matcher_str;
   if (!__is_undefined(options)) {
     // Step 1a-1b.
@@ -1178,81 +1181,6 @@ __jsvalue DefaultLocale() {
   return CanonicalizeLanguageTag(jsstr_locale);
 }
 
-void InitProperty(__jsvalue *object, std::string prop) {
-  __jsobject *obj = __jsval_to_object(object);
-  obj->extensible = true;
-  obj->object_type = JSREGULAR_OBJECT;
-
-  if (prop == "availableLocales") {
-    __jsvalue p = StrToVal(prop);
-    __jsvalue v = GetAvailableLocales();
-    __jsop_setprop(object, &p, &v);
-  } else if (prop == "relevantExtensionKeys") {
-    __jsvalue p = StrToVal(prop);
-    std::vector<std::string> values;
-    switch (obj->shared.intl->kind) {
-      case JSINTL_COLLATOR:
-        values = {"co", "kn", "kf"};
-        break;
-      case JSINTL_NUMBERFORMAT:
-        values = {"nu"};
-        break;
-      case JSINTL_DATETIMEFORMAT:
-        values = {"ca", "nu"};
-        break;
-    }
-    __jsvalue v = StrVecToVal(values);
-    __jsop_setprop(object, &p, &v);
-  } else if (prop == "localeData") {
-    // [[localeData]][locale]['nu']
-    __jsintl_type kind = obj->shared.intl->kind;
-    if (kind == JSINTL_NUMBERFORMAT) {
-      // Create an object for '<locale>'.
-      __jsvalue locale_name = DefaultLocale();
-      __jsobject *locale_obj = __create_object();
-      locale_obj->object_class = JSOBJECT;
-      locale_obj->extensible = true;
-      locale_obj->object_type = JSREGULAR_OBJECT;
-      __jsvalue locale = __object_value(locale_obj);
-      // Add default system numbering system as the first element of vec.
-      std::vector<std::string> vec;
-      for (int i = 0; i < kNumberingSystems.size(); i++) {
-        vec.push_back(kNumberingSystems[i].first);
-      }
-      icu::NumberingSystem num_sys;
-      std::string default_nu(num_sys.getName());
-      vec.insert(vec.begin(), default_nu);
-
-      __jsvalue v = StrVecToVal(vec);
-      __jsvalue p = StrToVal("nu");
-      __jsop_setprop(&locale, &p, &v);  // Set nu to locale.
-
-      __jsobject *locale_data_obj = __create_object();
-      locale_data_obj->object_class = JSOBJECT;
-      locale_data_obj->extensible = true;
-      locale_data_obj->object_type = JSREGULAR_OBJECT;
-      __jsvalue locale_data = __object_value(locale_data_obj);
-
-      __jsop_setprop(&locale_data, &locale_name, &locale); // Set locale to localeData.
-
-      p = StrToVal(prop);
-      __jsop_setprop(object, &p, &locale_data); // Set localeData to object.
-
-    } else if (kind == JSINTL_DATETIMEFORMAT) {
-      for (auto it = kDateTimeFormatComponents.begin();
-          it != kDateTimeFormatComponents.end(); it++) {
-        __jsvalue p = StrToVal(it->first);
-        __jsvalue v = StrVecToVal(it->second);
-        __jsop_setprop(object, &p, &v);
-      }
-    }
-  } else if (prop == "sortLocaleData") {
-    // TODO
-  } else if (prop == "searchLocaleData") {
-    // TODO
-  }
-}
-
 // Return the value of 'availableLocales' property of the standard built-in object.
 __jsvalue GetAvailableLocales() {
   int num_locales = uloc_countAvailable();
@@ -1264,4 +1192,16 @@ __jsvalue GetAvailableLocales() {
   }
   __jsvalue value = StrVecToVal(locales);
   return value;
+}
+
+std::vector<std::string> GetNumberingSystems() {
+  std::vector<std::string> vec;
+  for (int i = 0; i < kNumberingSystems.size(); i++) {
+    vec.push_back(kNumberingSystems[i].first);
+  }
+  icu::NumberingSystem num_sys;
+  std::string default_numsys(num_sys.getName());
+  vec.insert(vec.begin(), default_numsys);
+
+  return vec;
 }

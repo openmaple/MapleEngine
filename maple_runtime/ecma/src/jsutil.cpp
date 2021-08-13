@@ -27,6 +27,7 @@ void __jsop_print_item(__jsvalue value) {
   switch (__jsval_typeof(&value)) {
     case JSTYPE_UNDEFINED:
     case JSTYPE_NONE:
+    case JSTYPE_NONE_:
       printf("undefined");
       break;
     case JSTYPE_NULL:
@@ -58,22 +59,6 @@ void __jsop_print_item(__jsvalue value) {
         __jsvalue v = __jsdate_ToString(&value);
         __jsop_print_item(v);
 	memory_manager->RecallString(__jsval_to_string(&v));
-      } else if (obj->object_class == JSINTL) {
-        printf("Intl.");
-        std::string kind;
-        switch (obj->shared.intl->kind) {
-        case JSINTL_NUMBERFORMAT:
-          kind = "NumberFormat";
-          break;
-        case JSINTL_DATETIMEFORMAT:
-          kind = "DateTimeFormat";
-          break;
-        case JSINTL_COLLATOR:
-          kind = "Collator";
-          break;
-        }
-        printf("%s", kind.c_str());
-        break;
       } else {
         __jsvalue v = __js_ToPrimitive(&value, JSTYPE_UNDEFINED /* ??? */);
         __jsop_print_item(v);

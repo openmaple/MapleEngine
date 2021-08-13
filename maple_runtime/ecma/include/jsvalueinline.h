@@ -68,8 +68,8 @@ static inline bool __is_int32(__jsvalue *data) {
 }
 
 static inline bool __is_primitive(uint32_t tag) {
-  return (tag != JSTYPE_NONE && tag < JSTYPE_OBJECT) || (tag == JSTYPE_UNDEFINED)
-         || tag == JSTYPE_DOUBLE || tag == JSTYPE_NAN || tag == JSTYPE_INFINITY;
+  return tag == JSTYPE_NUMBER || tag == JSTYPE_STRING || tag == JSTYPE_BOOLEAN || tag == JSTYPE_UNDEFINED
+         || tag == JSTYPE_DOUBLE || tag == JSTYPE_NAN || tag == JSTYPE_INFINITY || tag == JSTYPE_NULL;
 }
 
 static inline bool __is_primitive(__jsvalue *data) {
@@ -93,10 +93,13 @@ static inline bool __is_negative_zero(__jsvalue *data) {
 }
 
 #if MACHINE64
+#define IsNeedRc(v) (((uint8_t)v & 0x4) == 4)
+/*
 static inline bool IsNeedRc(uint8_t flag) {
   __jstype flagt = (__jstype)flag;
   return flagt == JSTYPE_OBJECT || flagt == JSTYPE_STRING || flagt == JSTYPE_ENV;
 }
+*/
 static inline __jsstring *__jsval_to_string(__jsvalue *data) {
   return (__jsstring *)data->s.str;
 }

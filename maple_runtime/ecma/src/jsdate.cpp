@@ -24,6 +24,7 @@
 #include "jsdate.h"
 #include "jsfunction.h"
 #include "vmmemory.h"
+#include "jsintl.h"
 
 __jsvalue  __js_ToDate(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nargs) {
   return __js_new_date_obj(this_object, arg_list, nargs);
@@ -528,10 +529,40 @@ __jsvalue __jsdate_ToLocaleDateString(__jsvalue *this_date) {
 }
 
 // ES5 15.9.5.5 Date.prototype.toLocaleString()
-__jsvalue __jsdate_ToLocaleString(__jsvalue *this_date) {
-  // TODO: not implemented yet
-  __jsobject *obj = __jsdata_value_to_obj(this_date);
-  return __object_value(obj);
+// ECMA-402 13.3.1 Date.prototype.toLocaleString([locales [, options]])
+__jsvalue __jsdate_ToLocaleString(__jsvalue *this_date, __jsvalue *arg_list, uint32_t nargs) {
+  __jsvalue locales, options;
+
+  if (nargs == 1) {
+    locales = arg_list[0];
+  } else if (nargs == 2) {
+    locales = arg_list[0];
+    options = arg_list[1];
+  }
+  // Step 1.
+  __jsvalue x = *this_date;
+  // Step 2.
+  if (__is_nan(&x)) {
+    return StrToVal("Invalid Date");
+  }
+  // Step 3.
+  if (nargs < 2) {
+    locales = __undefined_value();
+  }
+  // Step 4.
+  if (nargs < 3) {
+    options = __undefined_value();
+  }
+  // Step 5.
+  __jsvalue required = StrToVal("any");
+  __jsvalue defaults = StrToVal("all");
+  options = ToDateTimeOptions(&options, &required, &defaults);
+  // Step 6.
+  __jsvalue undefined_val = __undefined_value();
+  __jsvalue args[] = {locales, options};
+  __jsvalue date_time_format = __js_DateTimeFormatConstructor(&undefined_val, args, 2);
+  // Step 7.
+  return FormatDateTime(&date_time_format, &x);
 }
 
 // ES5 15.9.5.7 Date.prototype.toLocaleTimeString()

@@ -20,6 +20,7 @@
 #include "jsobjectinline.h"
 #include "jsarray.h"
 #include "jsmath.h"
+#include "jsintl.h"
 
 extern __jsvalue __js_ThisBinding;
 extern std::vector<std::pair<std::string,uint16_t>> kNumberingSystems;
@@ -61,8 +62,6 @@ __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
   obj->object_class = JSINTL;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
-  obj->shared.intl = (__jsintl*) VMMallocGC(sizeof(__jsintl));
-  obj->shared.intl->kind = JSINTL_NUMBERFORMAT;
   __jsvalue obj_val = __object_value(obj);
 
   __jsvalue prop = StrToVal("InitializedIntlObject");
@@ -129,8 +128,6 @@ void InitializeNumberFormat(__jsvalue *this_number_format, __jsvalue *locales,
   number_format_obj->object_class = JSINTL;
   number_format_obj->extensible = true;
   number_format_obj->object_type = JSREGULAR_OBJECT;
-  number_format_obj->shared.intl = (__jsintl*) VMMallocGC(sizeof(__jsintl));
-  number_format_obj->shared.intl->kind = JSINTL_NUMBERFORMAT;
   __jsvalue number_format = __object_value(number_format_obj);
 
   InitializeNumberFormatProperties(&number_format, &requested_locales,
@@ -385,13 +382,7 @@ __jsvalue __jsintl_NumberFormatSupportedLocalesOf(__jsvalue *number_format,
   // Step 3.
   __jsvalue requested_locales = CanonicalizeLocaleList(locales);
   // Step 4.
-  __jsvalue locale = SupportedLocales(&available_locales, &requested_locales, &options);
-  // The value of 'length' property of the 'supportedLocalesOf' method is 1.
-  __jsvalue p = StrToVal("length");
-  __jsvalue v = __number_value(1);
-  __jsop_setprop(&locale, &p, &v);
-
-  return locale;
+  return SupportedLocales(&available_locales, &requested_locales, &options);
 }
 
 // ECMA-402 11.3.2
@@ -404,7 +395,7 @@ __jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x_val) {
   __jsvalue n = __undefined_value();
   // Step 2.
   // If the result of isFinite(x) is false, then
-  if (__is_infinity(x_val) == true) {
+  if (__is_infinity(x_val) || __is_neg_infinity(x_val)) {
     // Step 2a.
     // If x is NaN, then let 'n' be an ILD String value indicating the NaN value.
     if (__is_nan(x_val)) {
@@ -501,7 +492,7 @@ __jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x_val) {
       n = __string_value(n_jsstr);
     } else {
       // Step 3f-3h.
-      // TODO
+      // TODO: not implemented yet.
     }
   }
   // Step 4.
@@ -524,7 +515,7 @@ __jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x_val) {
   } else {
     result = n;
   }
-
+  // TODO: not implemented yet.
   // Step 5-6.
 
   // Step 7.
@@ -669,8 +660,6 @@ __jsvalue __jsintl_NumberFormatResolvedOptions(__jsvalue *number_format) {
   nf_obj->object_class = JSINTL;
   nf_obj->extensible = true;
   nf_obj->object_type = JSREGULAR_OBJECT;
-  nf_obj->shared.intl = (__jsintl*) VMMallocGC(sizeof(__jsintl));
-  nf_obj->shared.intl->kind = JSINTL_NUMBERFORMAT;
   __jsvalue nf = __object_value(nf_obj);
 
   std::vector<std::string> props = {"locale", "numberingSystem", "style",
@@ -721,14 +710,7 @@ void InitializeNumberFormatProperties(__jsvalue *number_format, __jsvalue *local
       locale_object->object_type = JSREGULAR_OBJECT;
 
       // Add default system numbering system as the first element of vec.
-      std::vector<std::string> vec;
-      for (int j = 0; j < kNumberingSystems.size(); j++) {
-        vec.push_back(kNumberingSystems[j].first);
-      }
-      icu::NumberingSystem num_sys;
-      std::string default_numsys(num_sys.getName());
-      vec.insert(vec.begin(), default_numsys);
-
+      std::vector<std::string> vec = GetNumberingSystems();
       v = StrVecToVal(vec);
       p = StrToVal("nu");
       __jsop_setprop(&locale, &p, &v);  // Set "nu" to locale.

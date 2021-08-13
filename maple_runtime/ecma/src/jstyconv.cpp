@@ -295,6 +295,8 @@ __jsstring *__js_ToStringSlow(__jsvalue *v) {
       return __jsstr_get_builtin(JSBUILTIN_STRING_NAN);
     case JSTYPE_INFINITY:{
       return __jsstr_get_builtin(__is_neg_infinity(v) ? JSBUILTIN_STRING_NEG_INFINITY_UL: JSBUILTIN_STRING_INFINITY_UL);
+    case JSTYPE_NONE_:
+      return __jsstr_get_builtin(JSBUILTIN_STRING_EMPTY);
     }
     default:
       MAPLE_JS_ASSERT(false && "unreachable.");

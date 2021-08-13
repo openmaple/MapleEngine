@@ -83,6 +83,12 @@ void *VMMallocGC(uint32 size, MemHeadTag tag, bool init_p) {
   if (memory_manager->IsDebugGC()) {
     printf("memory %p was allocated with header %d size %d\n", ((void *)((uint8 *)memory + head_size)), tag, alignedsize);
   }
+#ifdef MM_DEBUG
+  memory_manager->mem_alloc_bytes_by_type[(int)tag] += alignedsize + head_size;
+  memory_manager->mem_alloc_count_by_type[(int)tag]++;
+  memory_manager->live_objects[(void*)((uint8_t*)memory + head_size)] = 0;
+  // printf("in VMMallocGC, addr= %p size= %u tag= %d\n", (void*)((uint8_t*)memory + head_size), alignedsize + head_size, tag);
+#endif
   return (void *)((uint8 *)memory + head_size);
 }
 
@@ -90,6 +96,13 @@ void *VMReallocGC(void *origptr, uint32 origsize, uint32 newsize) {
   uint32 alignedorigsize = memory_manager->Bytes4Align(origsize);
   uint32 alignednewsize = memory_manager->Bytes4Align(newsize);
   void *memory = memory_manager->Realloc(origptr, alignedorigsize, alignednewsize);
+#ifdef MM_DEBUG
+  int tag = memory_manager->GetMemHeader((uint8*)memory+MALLOCHEADSIZE).memheadtag;
+  memory_manager->mem_alloc_bytes_by_type[(int)tag] += alignednewsize + MALLOCHEADSIZE;
+  memory_manager->mem_alloc_count_by_type[tag]++;
+  memory_manager->live_objects[(void*)((uint8_t*)memory + MALLOCHEADSIZE)] = 0;
+  //printf("in VMReallocGC, addr= %p size= %u tag= %d\n", (void*)((uint8_t*)memory + MALLOCHEADSIZE), (uint32)(alignednewsize + MALLOCHEADSIZE), tag);
+#endif
   return (void *)((uint8 *)memory + MALLOCHEADSIZE);
 }
 
@@ -359,12 +372,100 @@ void MemoryManager::AppMemLeakCheck() {
                    BlkSize2BitvectorSize(ginterpreter->gp_size_), false /* offset is positive */);
 #endif
 
-  printf("before release builtin, app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
+  printf("Releasing builtin, app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
+  uint32 released_b4 = mem_released;
 
   __jsobj_release_builtin();
 
-  printf("after release builtin, app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
+  printf("After releasing builtin, app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
+  printf("  Released builtin: %u B\n", mem_released - released_b4);
 
+  printf("Releasing local variables in main()\n");
+  released_b4 = mem_released;
+  size_t live_objs_b4 =  live_objects.size();
+  uint8 *addr = (uint8*)mainSP;
+  while(addr < mainFP) {
+    void **local = (void**)addr;
+#ifdef COULD_BE_ADDRESS
+    if (COULD_BE_ADDRESS((void*)((long)*local & PAYLOAD_MASK)))
+#endif
+      if (IS_NEEDRC((long)(*local))) {
+        GCDecRf(*local);
+      }
+    addr += sizeof(void*);
+  }
+
+  printf("After releasing main(), app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
+  printf("  Released main() variables: %u B released objects= %lu\n", mem_released - released_b4, live_objs_b4 - live_objects.size());
+
+
+  printf("Num Malloc calls= %u including Realloc calls= %u\n", num_Malloc_calls, num_Realloc_calls);
+  printf("Mem allocation by type:\n");
+  uint32 ta_size = 0;
+  uint32 ta_count = 0;
+  for(int i=0; i<MemHeadLast; i++) {
+    printf("tag= %d alloc_size= %10u alloc_count= %u\n", i, mem_alloc_bytes_by_type[i], mem_alloc_count_by_type[i]);
+    ta_size += mem_alloc_bytes_by_type[i];
+    ta_count += mem_alloc_count_by_type[i];
+  }
+  printf("total: alloc_size= %10u alloc_count= %u\n", ta_size, ta_count);
+
+  uint32 tr_size = 0;
+  uint32 tr_count = 0;
+  for(int i=0; i<MemHeadLast; i++) {
+    printf("tag= %d release_size= %10u release_count= %u\n", i, mem_release_bytes_by_type[i], mem_release_count_by_type[i]);
+    tr_size += mem_release_bytes_by_type[i];
+    tr_count += mem_release_count_by_type[i];
+  }
+  printf("total: release_size= %10u release_count= %u\n", tr_size, tr_count);
+
+  // dump RC histogram
+  printf("Max RC histogram for released objects:\n");
+  for(auto m : max_rc_histogram) {
+    printf("%5d: %6u\n", m.first, m.second);
+  }
+
+  uint32_t t_max_rc0_released = 0;
+  printf("Num of objects with max RC=0 by type:\n");
+  for(int i=0; i<MemHeadLast; i++) {
+    printf("tag= %d count= %d\n", i, max_rc0_by_type[i]);
+    t_max_rc0_released += max_rc0_by_type[i];
+  }
+
+  //------------------------------------------------
+  //live objects
+  //------------------------------------------------
+  printf("\nLive objects: %lu\n", live_objects.size());
+#if 1
+  for(auto iter : live_objects) {
+    printf("%p: maxRC= %u tag= %d rc= %d\n", iter.first, iter.second, GetMemHeader(iter.first).memheadtag, GCGetRf(iter.first));
+  }
+#endif
+  int live_by_type[MemHeadLast];
+  for(int i=0; i<MemHeadLast; i++)
+    live_by_type[i] = 0;
+
+  uint32_t t_max_rc0_live = 0;
+  std::map<int, uint32_t> max_rc_histogram_live;
+  for(auto iter : live_objects) {
+    live_by_type[GetMemHeader(iter.first).memheadtag]++;
+    if(iter.second == 0)
+      t_max_rc0_live++;
+    max_rc_histogram_live[iter.second]++;
+  }
+
+  printf("Live object count by type:\n");
+  for(int i=0; i<MemHeadLast; i++)
+    printf("tag= %d count= %d\n", i, live_by_type[i]);
+
+  printf("Max RC histogram for live objects:\n");
+  for(auto m : max_rc_histogram_live) {
+    printf("%5d %6u\n", m.first, m.second);
+  }
+
+  printf("Num of objects with MaxRC=0: released= %u live= %u total= %u\n", t_max_rc0_released, t_max_rc0_live, t_max_rc0_released + t_max_rc0_live);
+  printf("Num of alloc count excluding those with MaxRC=0: %u\n", ta_count - t_max_rc0_released - t_max_rc0_live);
+  printf("RCInc= %lu RCDec= %lu total= %lu\n", num_rcinc, num_rcdec, num_rcinc + num_rcdec);
 #ifdef MARK_CYCLE_ROOTS
   RecallCycle();
   RecallRoots(cycle_roots);
@@ -516,11 +617,23 @@ void MemoryManager::Init(void *app_memory, uint32 app_memory_size, void *vm_memo
     MIR_FATAL("call memset_s secondly failed in MemoryManager::Init");
   }
 
-#if MM_DEBUG
+#ifdef MM_DEBUG
   app_mem_usage = 0;
   max_app_mem_usage = 0;
   mem_allocated = 0;
   mem_released = 0;
+  for(int i=0; i<MemHeadLast; i++) {
+    mem_alloc_bytes_by_type[i] = 0;
+    mem_alloc_count_by_type[i] = 0;
+    mem_release_bytes_by_type[i] = 0;
+    mem_release_count_by_type[i] = 0;
+
+    max_rc0_by_type[i] = 0;
+  }
+  num_Malloc_calls = 0;
+  num_Realloc_calls = 0;
+  num_rcinc = 0;
+  num_rcdec = 0;
 #endif  // MM_DEBUG
 #ifdef MACHINE64
   addrMap.push_back(NULL);
@@ -530,11 +643,12 @@ void MemoryManager::Init(void *app_memory, uint32 app_memory_size, void *vm_memo
 
 void *MemoryManager::Malloc(uint32 size, bool init_p) {
   MemoryChunk *mchunk;
-#if MM_DEBUG
+#ifdef MM_DEBUG
   app_mem_usage += size;
   mem_allocated += size;
   if(app_mem_usage > max_app_mem_usage)
     max_app_mem_usage = app_mem_usage;
+  num_Malloc_calls++;
 #endif  // MM_DEBUG
 #if DEBUGGC
   assert((IsAlignedBy4(size)) && "memory doesn't align by 4 bytes");
@@ -590,6 +704,10 @@ void *MemoryManager::Malloc(uint32 size, bool init_p) {
 void *MemoryManager::Realloc(void *origptr, uint32 origsize, uint32 newsize) {
 #if DEBUGGC
   assert((IsAlignedBy4(origsize) && IsAlignedBy4(newsize)) && "memory doesn't align by 4 bytes");
+#endif
+
+#ifdef MM_DEBUG
+  num_Realloc_calls++;
 #endif
   void *newptr = Malloc(newsize + MALLOCHEADSIZE);
   if (!newptr) {
@@ -661,14 +779,25 @@ void MemoryManager::RecallMem(void *mem, uint32 size) {
 #endif
   MIR_ASSERT(offset < total_size_);
 
+#ifdef MM_DEBUG
+  app_mem_usage -= (alignedsize + head_size);
+  mem_released += (alignedsize + head_size);
+  int tag = GetMemHeader(mem).memheadtag;
+  if(tag < (int)MemHeadLast) {
+    mem_release_bytes_by_type[tag] += alignedsize + head_size;
+    mem_release_count_by_type[tag]++;
+  }
+printf("RecallMem mem= %p tag= %d\n", mem, tag);
+  max_rc_histogram[live_objects[mem]]++;
+  if(live_objects[mem] == 0)
+    max_rc0_by_type[tag]++;
+  live_objects.erase(mem);
+#endif  // MM_DEBUG
+
   MemoryChunk *mchunk = NewMemoryChunk(offset, alignedsize + head_size, NULL);
   // InsertMemoryChunk(mchunk);
   heap_memory_bank_->PutFreeChunk(mchunk);
 
-#if MM_DEBUG
-  app_mem_usage -= (alignedsize + head_size);
-  mem_released += (alignedsize + head_size);
-#endif  // MM_DEBUG
 }
 
 void MemoryManager::RecallString(__jsstring *str) {
@@ -737,34 +866,38 @@ void MemoryManager::RecallList(__json_list *list) {
 void MemoryManager::GCDecRf(void *addr) {
   if (TurnoffGC())
     return;
-  if (!IsHeap(addr)) {
+  void *true_addr = (void*)((long)addr & PAYLOAD_MASK);
+  if (!IsHeap(true_addr)) {
     return;
   }
-  MemHeader &header = GetMemHeader(addr);
+#ifdef MM_DEBUG
+  num_rcdec++;
+#endif
+  MemHeader &header = GetMemHeader(true_addr);
   MIR_ASSERT(header.refcount > 0);  // must > 0
   if(header.refcount < UINT14_MAX)
     header.refcount--;
   // DEBUG
-  // printf("address: 0x%x   rf - to: %d\n", addr, header.refcount);
+  // printf("address: 0x%x   rf - to: %d\n", true_addr, header.refcount);
   if (header.refcount == 0) {
     switch (header.memheadtag) {
       case MemHeadJSObj: {
-        __jsobject *obj = (__jsobject *)addr;
+        __jsobject *obj = (__jsobject *)true_addr;
         ManageObject(obj, RECALL);
         return;
       }
       case MemHeadJSString: {
-        __jsstring *str = (__jsstring *)addr;
+        __jsstring *str = (__jsstring *)true_addr;
         RecallString(str);
         return;
       }
       case MemHeadEnv: {
-        ManageEnvironment(addr, RECALL);
+        ManageEnvironment(true_addr, RECALL);
         return;
       }
       case MemHeadJSIter: {
-        MemHeader &header = memory_manager->GetMemHeader(addr);
-        RecallMem(addr, sizeof(__jsiterator));
+        MemHeader &header = memory_manager->GetMemHeader(true_addr);
+        RecallMem(true_addr, sizeof(__jsiterator));
         return;
       }
       default:

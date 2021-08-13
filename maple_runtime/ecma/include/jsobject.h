@@ -19,7 +19,6 @@
 #include "jsstring.h"
 #include "jsfunction.h"
 #include "jscontext.h"
-#include "jsintl.h"
 #include "jsdataview.h"
 #include <map>
 #include <string>
@@ -197,8 +196,6 @@ struct __jsobject {
     __jsvalue *array_props;
     // For function objects.
     __jsfunction *fun;
-    // For Intl objects.
-    __jsintl *intl;
     // Primitive Value for string-object.
     __jsstring *prim_string;
     // Primitive Value for number-object.

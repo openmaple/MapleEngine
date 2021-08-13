@@ -59,16 +59,16 @@ inline void MAPLE_JS_REFERENCEERROR_EXCEPTION() {
 }
 
 enum __jstype {
-  JSTYPE_NONE = 0,
+  JSTYPE_NONE_ = 0,
   JSTYPE_NULL,
   JSTYPE_BOOLEAN,
-  JSTYPE_STRING,
   JSTYPE_NUMBER,
+  JSTYPE_STRING,
   JSTYPE_OBJECT,
   JSTYPE_ENV,
   JSTYPE_UNKNOWN,
   JSTYPE_UNDEFINED,
-  JSTYPE_DOUBLE,
+  JSTYPE_NONE,
   JSTYPE_NAN,
   JSTYPE_INFINITY,
   // the following 3 tags are for address type that is used for jsvalue in memory. because mplbe lower always generate 64-bits value, we need a tag to mark the address type
@@ -76,7 +76,67 @@ enum __jstype {
   JSTYPE_FPBASE,
   JSTYPE_GPBASE,
   JSTYPE_FUNCTION, // for native function that is only given its address
+  JSTYPE_DOUBLE,
 };
+
+#define IS_DOUBLE(V)     ((V & 0x7FF0000000000000) != 0x7FF0000000000000)
+#define IS_NUMBER(V)     ((V & 0x7FFF000000000000) == 0x7FF3000000000000)  //JSTYPE_NUMBER = 3
+#define IS_INFINITY(V)   ((V & 0x7FFF000000000000) == 0x7FF0000000000000)
+#define IS_NEEDRC(V)     ((V & 0x7FFC000000000000) == 0x7FF4000000000000)  //JSTYPE_STRING or JSTYPE_OBJECT or JSTYPE_ENV
+
+#define NAN_BASE     0x7ff0
+#define PAYLOAD_MASK 0x0000FFFFFFFFFFFF
+
+#define mEncode(v) {\
+  if (v.ptyp < JSTYPE_DOUBLE) {\
+    v.x.u64 &= 0x8000FFFFFFFFFFFF;\
+    v.x.u64 |= ((uint64_t)(v.ptyp + NAN_BASE) << 48);\
+  }\
+}
+
+#define mDecodeValue(v) {\
+  if (!IS_DOUBLE(v.x.u64)) {\
+    if (IS_NUMBER(v.x.u64)) {\
+      if ((v.x.u64 & 0x8000000000000000) == 0)\
+        v.x.u64 &= PAYLOAD_MASK;\
+      else\
+        v.x.u64 |= ~PAYLOAD_MASK;\
+    } else {\
+      v.x.u64 &= PAYLOAD_MASK;\
+    }\
+  }\
+}
+
+#define mDecodeType(v) {\
+  if (IS_DOUBLE(v.x.u64)) {\
+    v.ptyp = JSTYPE_DOUBLE;\
+  } else if (IS_NUMBER(v.x.u64)) {\
+    v.ptyp = JSTYPE_NUMBER;\
+  } else if (IS_INFINITY(v.x.u64)) {\
+    v.ptyp = JSTYPE_INFINITY;\
+  } else {\
+    v.ptyp = (v.x.u64 >> 48) - NAN_BASE;\
+  }\
+}
+
+#define mDecode(v) {\
+  if (IS_DOUBLE(v.s.asbits)) {\
+    v.tag = JSTYPE_DOUBLE;\
+  } else if (IS_INFINITY(v.s.asbits)) {\
+    v.tag = JSTYPE_INFINITY;\
+  } else {\
+    if (IS_NUMBER(v.s.asbits)) {\
+      if ((v.s.asbits & 0x8000000000000000) == 0)\
+        v.s.asbits &= PAYLOAD_MASK;\
+      else\
+        v.s.asbits |= ~PAYLOAD_MASK;\
+      v.tag = JSTYPE_NUMBER;\
+    } else {\
+      v.tag = (__jstype)((v.s.asbits >> 48) - NAN_BASE);\
+      v.s.asbits &= PAYLOAD_MASK;\
+    }\
+  }\
+}
 
 enum __jsbuiltin_object_id : uint8_t {  // must in accordance with js_value.h:js_builtin_id in the front-end (js2mpl/include/jsvalue.h)
   JSBUILTIN_GLOBALOBJECT = 0,

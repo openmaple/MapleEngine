@@ -102,7 +102,7 @@ InterSource::InterSource() {
   fp = stack;
   heap = 0;
   retVal0.x.u64 = 0;
-  retVal0.ptyp = 0;
+  retVal0.ptyp = JSTYPE_NONE;
   currEH = nullptr;
   EHstackReuseSize = 0;
 
@@ -114,26 +114,33 @@ InterSource::InterSource() {
   // EHstackReuseSize = 0;
 }
 
-void InterSource::SetRetval0 (MValue mval, bool isdyntype) {
+void InterSource::SetRetval0 (MValue mval, bool encode) {
+/*
 #ifdef COULD_BE_ADDRESS
   if (COULD_BE_ADDRESS(retVal0.x.u64))
 #endif
   {
     GCCheckAndDecRf(retVal0.x.u64, IsNeedRc(retVal0.ptyp));
   }
+*/
+  if (IS_NEEDRC(retVal0.x.u64))
+    GCCheckAndDecRf((retVal0.x.u64 & PAYLOAD_MASK), true);
+
 #ifdef COULD_BE_ADDRESS
   if (COULD_BE_ADDRESS(mval.x.u64))
 #endif
   {
     GCCheckAndIncRf(mval.x.u64, IsNeedRc(mval.ptyp));
   }
+  if (encode)
+    mEncode(mval);
   retVal0 = mval;
 }
 
 void InterSource::SetRetval0Object (void *obj, bool isdyntype) {
   GCIncRf(obj);
   GCCheckAndDecRf(retVal0.x.u64, IsNeedRc(retVal0.ptyp));
-  retVal0.x.a64 = (uint8_t *)obj;
+  retVal0.x.a64 = (uint8_t *)((uint64_t)obj + JSTYPE_OBJECT + NAN_BASE);
 }
 
 void InterSource::SetRetval0NoInc (uint64_t val) {
@@ -143,6 +150,7 @@ void InterSource::SetRetval0NoInc (uint64_t val) {
 
 void InterSource::EmulateStore(uint8_t *memory, uint8_t addrTy, MValue mval, PrimType pty) {
   // TODO: setup flag of *((uint64_t *)memory)
+/*
   uint32_t bytesize = ptypesizetable[pty];
   switch (bytesize) {
     case 8: {
@@ -164,7 +172,10 @@ void InterSource::EmulateStore(uint8_t *memory, uint8_t addrTy, MValue mval, Pri
     default:
       assert(false && "unexpected size");
   }
-  memory_manager->SetFlagFromMemory(memory, addrTy, mval.ptyp);
+*/
+  mEncode(mval);
+  *(uint64_t *)memory = mval.x.u64;
+//  memory_manager->SetFlagFromMemory(memory, addrTy, mval.ptyp);
 }
 
 void InterSource::EmulateStoreGC(uint8_t *memory, uint8_t addrTy, MValue mval, PrimType pty) {
@@ -183,8 +194,9 @@ void InterSource::EmulateStoreGC(uint8_t *memory, uint8_t addrTy, MValue mval, P
   {
     GCCheckAndIncRf(mval.x.u64, IsNeedRc(mval.ptyp));
   }
+  mEncode(mval);
   *(uint64_t *)memory = mval.x.u64;
-  memory_manager->SetFlagFromMemory(memory, addrTy, mval.ptyp);
+//  memory_manager->SetFlagFromMemory(memory, addrTy, mval.ptyp);
   return;
 }
 
@@ -226,7 +238,8 @@ int32_t InterSource::PassArguments(MValue this_arg, void *env, MValue *arg_list,
     offset -= MVALSIZE;
     ALIGNMENTNEGOFFSET(offset, MVALSIZE);
     EmulateStore(spaddr + offset, memory_manager->spBaseFlag, actual, PTY_u64);
-    GCCheckAndIncRf(actual.x.u64, IsNeedRc(actual.ptyp));
+    if (IsNeedRc(actual.ptyp))
+      GCCheckAndIncRf((actual.x.u64 & 0x0000ffffffffffff), true);
   }
   if (env) {
     offset -= PTRSIZE + MVALSIZE;
@@ -271,7 +284,7 @@ MValue InterSource::PrimAdd(MValue mv0, MValue mv1, PrimType ptyp) {
       if (mv0.ptyp == memory_manager->spBaseFlag || mv0.ptyp == memory_manager->fpBaseFlag
         || mv0.ptyp == memory_manager->gpBaseFlag) {
         tag = mv0.ptyp;
-        assert(mv1.ptyp == (uint8_t)JSTYPE_NUMBER || mv1.ptyp == 0);
+        assert(mv1.ptyp == (uint8_t)JSTYPE_NUMBER || mv1.ptyp == JSTYPE_NONE);
       }
       res.x.a64 = mv0.x.a64 + mv1.x.i64;
       break;
@@ -1449,7 +1462,7 @@ MValue InterSource::JSopCmp(MValue mv0, MValue mv1, Opcode op, PrimType ptyp) {
     resvalue.tag = JSTYPE_BOOLEAN;
     // SetMValueTag(resvalue, JSTYPE_BOOLEAN);
     if (__is_nan(&jsv0) || __is_nan(&jsv1)) {
-      resvalue.s.u32 = (op == OP_ne);
+      resvalue.s.asbits = (op == OP_ne);
     } else {
       bool isAlwaysFalse = false; // there are some weird comparison to be alwasy false for JS
       bool resCmp = false;
@@ -2363,7 +2376,7 @@ MValue InterSource::IntrinCCall(MValue *args, int numArgs) {
   VMFreeNOGC(argsI, argsSize);
   MValue retMval;
   retMval.x.u64 = 0;
-  retMval.ptyp = 0;
+  retMval.ptyp = JSTYPE_NONE;
   return retMval;
 }
 
