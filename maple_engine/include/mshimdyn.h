@@ -71,9 +71,8 @@ public:
   void SetRetval0(MValue, bool);
   void SetRetval0Object(void *, bool);
   void SetRetval0NoInc (uint64_t);
-  void EmulateStore(uint8_t *, uint8_t,  MValue, PrimType);
-  void EmulateStoreGC(uint8 *, uint8_t, MValue, PrimType);
-  MValue EmulateLoad(uint8 *, uint8, PrimType);
+  void EmulateStore(uint8_t *, MValue);
+  MValue EmulateLoad(uint8 *, uint32, PrimType);
   int32_t PassArguments(MValue , void *, MValue *, int32_t, int32_t);
   inline void *GetSPAddr() {return (void *) (sp + (uint8 *)memory);}
   inline void *GetFPAddr() {return (void *) (fp + (uint8 *)memory);}
@@ -158,7 +157,7 @@ private:
   bool JSopPrimCmp(Opcode, MValue &, MValue &, PrimType);
 };
 
-inline uint8_t GetTagFromPtyp (PrimType ptyp) {
+inline uint32_t GetTagFromPtyp (PrimType ptyp) {
   switch(ptyp) {
         case PTY_dynnone:     return JSTYPE_NONE;
         case PTY_dynnull:  return JSTYPE_NULL;
@@ -187,23 +186,26 @@ inline uint8_t GetTagFromPtyp (PrimType ptyp) {
     };
 }
 
+/*
 inline bool IsPrimitiveDyn(PrimType ptyp) {
   // return ptyp >= PTY_simplestr && ptyp <= PTY_dynnone;
   return ptyp >= PTY_dynany && ptyp <= PTY_dynnone;
 }
+*/
+#define IsPrimitiveDyn(ptyp) (ptyp >= PTY_dynany && ptyp <= PTY_dynnone)
 
 inline uint32_t GetMvalueValue(MValue &mv) {
   return mv.x.u32;
 }
-inline uint8_t GetMValueTag(MValue &mv) {
+inline uint32_t GetMValueTag(MValue &mv) {
   return (mv.ptyp);
 }
 
 inline void SetMValueValue (MValue &mv, uint64_t val) {
   mv.x.u64 = val;
 }
-inline void SetMValueTag (MValue &mv, uint32_t tag) {
-  mv.ptyp = tag;
+inline void SetMValueTag (MValue &mv, uint32_t ptyp) {
+  mv.ptyp = ptyp;
 }
 extern JavaScriptGlobal *jsGlobal;
 extern uint32_t *jsGlobalMemmap;

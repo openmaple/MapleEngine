@@ -19,9 +19,9 @@
 
 namespace maple {
 
-    int debug_engine;
+    int debug_engine = kEngineDebugNone;
     extern "C" void __initialize_debug_kind() {
-        debug_engine = kEngineDebugNone;
+        //debug_engine = kEngineDebugNone;
         const char* debug_env = std::getenv("MAPLE_ENGINE_DEBUG");
         if(debug_env == nullptr)
             return;

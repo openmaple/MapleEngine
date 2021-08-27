@@ -33,10 +33,10 @@ void dumpJSString(uint16_t *ptr) {
 
 void dumpJSValue(__jsvalue *jsval) {
 #if MIR_FEATURE_FULL | MIR_DEBUG
-  printf("tag is %x, value is %x\n", jsval->tag, jsval->s.i32);
+  printf("ptyp is %x, value is %x\n", jsval->ptyp, jsval->x.i32);
   if (__is_string(jsval)) {
-    // dumpJSString((uint16_t *) memory_manager->GetRealAddr(jsval->s.payload.ptr));
-    dumpJSString((uint16_t *) (jsval->s.str));
+    // dumpJSString((uint16_t *) memory_manager->GetRealAddr(jsval->x.payload.ptr));
+    dumpJSString((uint16_t *) (jsval->x.str));
   }
 #endif  // MIR_FEATURE_FULL
 }
@@ -53,32 +53,32 @@ uint32_t __jsop_length(__jsvalue *v) {
 #if 0
 __jsstring *__jsval_to_string(__jsvalue *data) {
   MAPLE_JS_ASSERT(__is_string(data));
-  // return (__jsstring *)memory_manager->GetRealAddr(data->s.payload.str);
-  return (__jsstring *)(data->s.str);
+  // return (__jsstring *)memory_manager->GetRealAddr(data->x.payload.str);
+  return (__jsstring *)(data->x.str);
 }
 
 __jsobject *__jsval_to_object(__jsvalue *data) {
   MAPLE_JS_ASSERT(__is_js_object(data));
-  return (__jsobject *)(data->s.obj);
+  return (__jsobject *)(data->x.obj);
 }
 void __set_string(__jsvalue *data, __jsstring *str) {
-  data->s.tag = JSTYPE_STRING;
-  data->s.payload.str = memory_manager->MapRealAddr(str);
+  data->x.ptyp = JSTYPE_STRING;
+  data->x.payload.str = memory_manager->MapRealAddr(str);
 }
 void __set_object(__jsvalue *data, __jsobject *obj) {
-  data->s.tag = JSTYPE_OBJECT;
-  data->s.payload.obj = memory_manager->MapRealAddr(obj);
+  data->x.ptyp = JSTYPE_OBJECT;
+  data->x.payload.obj = memory_manager->MapRealAddr(obj);
 }
 bool __is_js_function(__jsvalue *data) {
   if (__is_js_object(data)) {
-    __jsobject *obj = (__jsobject *)((data->s.obj));
+    __jsobject *obj = (__jsobject *)((data->x.obj));
     return obj->object_class == JSFUNCTION;
   }
   return false;
 }
 bool __is_js_array(__jsvalue *data) {
   if (__is_js_object(data)) {
-    __jsobject *obj = (__jsobject *)((data->s.obj));
+    __jsobject *obj = (__jsobject *)((data->x.obj));
     return obj->object_class == JSARRAY;
   }
   return false;
@@ -87,13 +87,13 @@ double __jsval_to_double(__jsvalue *data) {
   if (__is_number(data))
     return (double) __jsval_to_number(data);
   MAPLE_JS_ASSERT(__is_double(data));
-  return memory_manager->GetF64FromU32(data->s.payload.u32);
+  return memory_manager->GetF64FromU32(data->x.payload.u32);
 }
 
 __jsvalue __double_value(double x) {
   __jsvalue jsval;
-  jsval.s.tag = JSTYPE_DOUBLE;
-  jsval.s.payload.u32 = memory_manager->SetF64ToU32(x);
+  jsval.x.ptyp = JSTYPE_DOUBLE;
+  jsval.x.payload.u32 = memory_manager->SetF64ToU32(x);
   return jsval;
 }
 #endif

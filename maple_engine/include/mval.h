@@ -39,39 +39,39 @@ struct MMapVal {
 #endif
 
 #ifdef DYNAMICLANG
-inline uint8_t GetJSTag(MValue mval) {
+/*
+inline uint32_t GetJSTag(MValue mval) {
   return mval.ptyp;
 }
-
+*/
 inline bool IsMValueObject(MValue mval) {
-  return GetJSTag(mval) == JSTYPE_OBJECT;
+  return mval.ptyp == JSTYPE_OBJECT;
 }
 
 inline bool IsMValueString(MValue mval) {
-  return GetJSTag(mval) == JSTYPE_STRING;
+  return mval.ptyp == JSTYPE_STRING;
 }
 
 inline bool IsMValueEnv(MValue mval) {
-  return GetJSTag(mval) == JSTYPE_ENV;
+  return mval.ptyp == JSTYPE_ENV;
 }
-
+/*
 inline __jsvalue MValueToJsval(MValue mv) {
   __jsvalue jv;
-  jv.s.asbits = mv.x.u64;
-  jv.tag = (__jstype)mv.ptyp;
+  jv.x.asbits = mv.x.u64;
+  jv.ptyp = (__jstype)mv.ptyp;
   return jv;
 }
 
-
 inline MValue JsvalToMValue(__jsvalue jv) {
   MValue mv;
-  mv.x.u64 = jv.s.asbits;
-  mv.ptyp = jv.tag;
+  mv.x.u64 = jv.x.asbits;
+  mv.ptyp = jv.ptyp;
   return mv;
 }
-
+*/
 inline MValue NullPointValue() {
-  return JsvalToMValue(__null_value());
+  return __null_value();
 }
 
 #endif

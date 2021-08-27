@@ -27,7 +27,6 @@ void __jsop_print_item(__jsvalue value) {
   switch (__jsval_typeof(&value)) {
     case JSTYPE_UNDEFINED:
     case JSTYPE_NONE:
-    case JSTYPE_NONE_:
       printf("undefined");
       break;
     case JSTYPE_NULL:
@@ -68,7 +67,7 @@ void __jsop_print_item(__jsvalue value) {
       break;
     }
     case JSTYPE_DOUBLE: {
-      printf("%.16g", (value.s.f64));
+      printf("%.16g", (value.x.f64));
       break;
     }
     case JSTYPE_NAN: {

@@ -374,6 +374,9 @@ __jsvalue StrVecToVal(std::vector<std::string> strs) {
 }
 
 std::string ValToStr(__jsvalue *value) {
+  if (!__is_string(value)) {
+    MAPLE_JS_ASSERT(false && "not string type");
+  }
   __jsstring *jsstr = __jsval_to_string(value);
   int len = __jsstr_get_length(jsstr);
   std::string res(jsstr->x.ascii, len);
@@ -1130,8 +1133,8 @@ __jsvalue GetOption(__jsvalue *options, __jsvalue *property, __jsvalue *type,
     if (!__is_undefined(values)) {
       // Step 2d i.
       // If 'values' does not contain an element equal to 'value', then throw a 'RangeError' exception.
-      __jsvalue idx = __jsarr_pt_indexOf(values, &value, 0);
-      if (__jsval_to_number(&idx) != -1) {
+      __jsvalue idx = __jsarr_pt_indexOf(values, &value, 1);
+      if (__jsval_to_number(&idx) == -1) {
         MAPLE_JS_RANGEERROR_EXCEPTION();
       }
     }

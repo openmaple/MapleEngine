@@ -20,6 +20,7 @@
 #include <cassert>
 #include <cmath>
 #include "mir_config.h"
+#include "mvalue.h"
 
 #if MIR_FEATURE_FULL || MIR_DEBUG
 #include <cstdio>
@@ -58,19 +59,18 @@ inline void MAPLE_JS_REFERENCEERROR_EXCEPTION() {
   throw "ReferenceError";
 }
 
-enum __jstype {
-  JSTYPE_NONE_ = 0,
+enum __jstype : uint32_t {
+  JSTYPE_INFINITY = 0x0,
   JSTYPE_NULL,
   JSTYPE_BOOLEAN,
   JSTYPE_NUMBER,
   JSTYPE_STRING,
   JSTYPE_OBJECT,
   JSTYPE_ENV,
-  JSTYPE_UNKNOWN,
+  JSTYPE_UNKNOWN = 0x8,
   JSTYPE_UNDEFINED,
   JSTYPE_NONE,
   JSTYPE_NAN,
-  JSTYPE_INFINITY,
   // the following 3 tags are for address type that is used for jsvalue in memory. because mplbe lower always generate 64-bits value, we need a tag to mark the address type
   JSTYPE_SPBASE,
   JSTYPE_FPBASE,
@@ -80,61 +80,41 @@ enum __jstype {
 };
 
 #define IS_DOUBLE(V)     ((V & 0x7FF0000000000000) != 0x7FF0000000000000)
+#define NOT_DOUBLE(V)    ((V & 0x7FF0000000000000) == 0x7FF0000000000000)
+#define IS_BOOLEAN(V)    ((V & 0x7FFF000000000000) == 0x7FF2000000000000)  //JSTYPE_BOOLEAN = 2
 #define IS_NUMBER(V)     ((V & 0x7FFF000000000000) == 0x7FF3000000000000)  //JSTYPE_NUMBER = 3
-#define IS_INFINITY(V)   ((V & 0x7FFF000000000000) == 0x7FF0000000000000)
-#define IS_NEEDRC(V)     ((V & 0x7FFC000000000000) == 0x7FF4000000000000)  //JSTYPE_STRING or JSTYPE_OBJECT or JSTYPE_ENV
+#define IS_NONE(V)       ((V & 0x7FFF000000000000) == 0x7FFA000000000000)  //JSTYPE_NONE = 10
+#define IS_NEEDRC(V)     (((uint64_t)V & 0x7FFC000000000000) == 0x7FF4000000000000)  //JSTYPE_STRING or JSTYPE_OBJECT or JSTYPE_ENV
 
 #define NAN_BASE     0x7ff0
 #define PAYLOAD_MASK 0x0000FFFFFFFFFFFF
 
 #define mEncode(v) {\
   if (v.ptyp < JSTYPE_DOUBLE) {\
-    v.x.u64 &= 0x8000FFFFFFFFFFFF;\
-    v.x.u64 |= ((uint64_t)(v.ptyp + NAN_BASE) << 48);\
+    v.x.c.type = v.ptyp | NAN_BASE;\
   }\
 }
 
 #define mDecodeValue(v) {\
-  if (!IS_DOUBLE(v.x.u64)) {\
-    if (IS_NUMBER(v.x.u64)) {\
-      if ((v.x.u64 & 0x8000000000000000) == 0)\
-        v.x.u64 &= PAYLOAD_MASK;\
-      else\
-        v.x.u64 |= ~PAYLOAD_MASK;\
-    } else {\
-      v.x.u64 &= PAYLOAD_MASK;\
-    }\
+  if (NOT_DOUBLE(v.x.u64)) {\
+    v.x.u64 &= PAYLOAD_MASK;\
   }\
 }
 
 #define mDecodeType(v) {\
-  if (IS_DOUBLE(v.x.u64)) {\
-    v.ptyp = JSTYPE_DOUBLE;\
-  } else if (IS_NUMBER(v.x.u64)) {\
-    v.ptyp = JSTYPE_NUMBER;\
-  } else if (IS_INFINITY(v.x.u64)) {\
-    v.ptyp = JSTYPE_INFINITY;\
+  if (NOT_DOUBLE(v.x.u64)) {\
+    v.ptyp = v.x.c.type & ~NAN_BASE;\
   } else {\
-    v.ptyp = (v.x.u64 >> 48) - NAN_BASE;\
+    v.ptyp = JSTYPE_DOUBLE;\
   }\
 }
 
 #define mDecode(v) {\
-  if (IS_DOUBLE(v.s.asbits)) {\
-    v.tag = JSTYPE_DOUBLE;\
-  } else if (IS_INFINITY(v.s.asbits)) {\
-    v.tag = JSTYPE_INFINITY;\
+  if (NOT_DOUBLE(v.x.u64)){\
+    v.ptyp = v.x.c.type & ~NAN_BASE;\
+    v.x.u64 &= PAYLOAD_MASK;\
   } else {\
-    if (IS_NUMBER(v.s.asbits)) {\
-      if ((v.s.asbits & 0x8000000000000000) == 0)\
-        v.s.asbits &= PAYLOAD_MASK;\
-      else\
-        v.s.asbits |= ~PAYLOAD_MASK;\
-      v.tag = JSTYPE_NUMBER;\
-    } else {\
-      v.tag = (__jstype)((v.s.asbits >> 48) - NAN_BASE);\
-      v.s.asbits &= PAYLOAD_MASK;\
-    }\
+    v.ptyp = JSTYPE_DOUBLE;\
   }\
 }
 
@@ -229,6 +209,8 @@ const double NumberMinValue = 5e-324;
 #define MATH_LAST_INDEX NUMBER_MIN_VALUE
 
 #ifdef MACHINE64
+typedef maple::MValue __jsvalue;
+/*
 struct __jsvalue {
   union {
     int32_t i32;
@@ -239,9 +221,10 @@ struct __jsvalue {
     __jsobject *obj;
     double f64;
     uint64_t asbits;
-  } s;
-  __jstype tag;
+  } x;
+  __jstype ptyp;
 };
+*/
 #else
 union __jsvalue {
   uint64_t asbits;

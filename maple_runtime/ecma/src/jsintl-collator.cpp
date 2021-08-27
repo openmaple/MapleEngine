@@ -273,14 +273,13 @@ __jsvalue __jsintl_CollatorSupportedLocalesOf(__jsvalue *collator,
 // Intl.Collator.prototype.compare
 __jsvalue __jsintl_CollatorCompare(__jsvalue *this_arg, __jsvalue *arg_list,
                                    uint32_t nargs) {
-  // TODO: not implemented yet.
+  MAPLE_JS_ASSERT(false && "NIY: __jsintl_CollatorCompare");
   return __null_value();
 }
 
 // ECMA-402 1.0 10.3.3
 // Intl.Collator.prototype.resolvedOptions()
 __jsvalue __jsintl_CollatorResolvedOptions(__jsvalue *collator) {
-  // TODO: not implemented yet.
   __jsobject *col_obj = __create_object();
   __jsobj_set_prototype(col_obj, JSBUILTIN_INTL_COLLATOR_PROTOTYPE);
   col_obj->object_class = JSINTL;

@@ -40,7 +40,7 @@ __jsvalue __js_ToPrimitive(__jsvalue *v, __jstype preferred_type) {
 }
 
 __jsvalue __js_ToPrimitive2(__jsvalue *v) {
-  if (v->tag == JSTYPE_OBJECT) {
+  if (v->ptyp == JSTYPE_OBJECT) {
     __jsobject *obj = __jsval_to_object(v);
     uint8_t oClass = obj->object_class;
     if (oClass == JSNUMBER || oClass == JSBOOLEAN) {
@@ -101,9 +101,9 @@ int32_t __js_ToNumberSlow(__jsvalue *v) {
       break;
     case JSTYPE_OBJECT: {
       __jsvalue prim_value = __js_ToPrimitive(v, JSTYPE_NUMBER);
-      GCCheckAndIncRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
+      GCCheckAndIncRf(prim_value.x.asbits, IsNeedRc(prim_value.ptyp));
       int32_t num = __js_ToNumber(&prim_value);
-      GCCheckAndDecRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
+      GCCheckAndDecRf(prim_value.x.asbits, IsNeedRc(prim_value.ptyp));
       return num;
     } break;
     case JSTYPE_DOUBLE: {
@@ -151,7 +151,7 @@ __jsvalue __js_ToNumberSlow2(__jsvalue *v, bool &isConvertible) {
     }
     case JSTYPE_BOOLEAN: {
       isConvertible = true;
-      return __number_value(v->s.i32);
+      return __number_value(v->x.i32);
     }
     case JSTYPE_STRING: {
       __jsvalue jsDv = __js_str2double(__jsval_to_string(v), isConvertible);
@@ -175,7 +175,7 @@ __jsvalue __js_ToNumberSlow2(__jsvalue *v, bool &isConvertible) {
         return __js_ToNumberSlow2(&prim_value, isConvertible);
       } else if (__is_boolean(&prim_value)) {
         isConvertible = true;
-        return __number_value(prim_value.s.i32);
+        return __number_value(prim_value.x.i32);
       } else {
         isConvertible = true; // TODO: depends
         return prim_value;
@@ -280,11 +280,11 @@ __jsstring *__js_ToStringSlow(__jsvalue *v) {
     case JSTYPE_OBJECT: {
       __jsvalue prim_value = __js_ToPrimitive(v, JSTYPE_STRING);
       if (!__is_string(&prim_value)) {
-        GCCheckAndIncRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
+        GCCheckAndIncRf(prim_value.x.asbits, IsNeedRc(prim_value.ptyp));
       }
       __jsstring *str = __js_ToString(&prim_value);
       if (!__is_string(&prim_value)) {
-        GCCheckAndDecRf(prim_value.s.asbits, IsNeedRc((prim_value.tag)));
+        GCCheckAndDecRf(prim_value.x.asbits, IsNeedRc((prim_value.ptyp)));
       }
       return str;
     }
@@ -295,8 +295,6 @@ __jsstring *__js_ToStringSlow(__jsvalue *v) {
       return __jsstr_get_builtin(JSBUILTIN_STRING_NAN);
     case JSTYPE_INFINITY:{
       return __jsstr_get_builtin(__is_neg_infinity(v) ? JSBUILTIN_STRING_NEG_INFINITY_UL: JSBUILTIN_STRING_INFINITY_UL);
-    case JSTYPE_NONE_:
-      return __jsstr_get_builtin(JSBUILTIN_STRING_EMPTY);
     }
     default:
       MAPLE_JS_ASSERT(false && "unreachable.");
@@ -349,20 +347,20 @@ bool __js_IsCallable(__jsvalue *v) {
 // ecma 9.12
 bool __js_SameValue(__jsvalue *x, __jsvalue *y) {
   if ((__is_number(x) || __is_boolean(x)) && (__is_number(y) || __is_boolean(y))) {
-    return x->s.i32 == y->s.i32;
+    return x->x.i32 == y->x.i32;
   }
-  if (x->s.asbits == y->s.asbits && x->tag == y->tag)
+  if (x->x.asbits == y->x.asbits && x->ptyp == y->ptyp)
     return true;
 
-  __jstype jstyx = x->tag;
-  __jstype jstyy = y->tag;
+  uint32_t jstyx = x->ptyp;
+  uint32_t jstyy = y->ptyp;
   if (jstyx == JSTYPE_STRING)
     return jstyy == JSTYPE_STRING && __jsstr_equal(__jsval_to_string(x), __jsval_to_string(y));
   if (jstyx == JSTYPE_OBJECT && jstyy == JSTYPE_OBJECT) {
-    if (x->s.obj == y->s.obj) {
+    if (x->x.obj == y->x.obj) {
         return true;
-    } else if (x->s.obj->object_class == JSFUNCTION && y->s.obj->object_class == JSFUNCTION &&
-        x->s.obj->shared.fun->fp == y->s.obj->shared.fun->fp) {
+    } else if (x->x.obj->object_class == JSFUNCTION && y->x.obj->object_class == JSFUNCTION &&
+        x->x.obj->shared.fun->fp == y->x.obj->shared.fun->fp) {
         return true;
     }
   } else if ((jstyx == JSTYPE_OBJECT && jstyy == JSTYPE_FUNCTION) ||
@@ -372,8 +370,8 @@ bool __js_SameValue(__jsvalue *x, __jsvalue *y) {
       x = y;
       y = t;
     }
-    if (x->s.obj->object_class == JSFUNCTION &&
-      x->s.obj->shared.fun->fp == y->s.ptr) {
+    if (x->x.obj->object_class == JSFUNCTION &&
+      x->x.obj->shared.fun->fp == y->x.ptr) {
       return true;
     }
   }
@@ -410,9 +408,9 @@ uint64_t __js_toLength(__jsvalue *v) {
     return 0;       // 7.1.15 step 4. If len ≤ 0, return +0
   } else if (__is_js_object(v)) {
     __jsvalue prim_value = __js_ToPrimitive(v, JSTYPE_NUMBER);
-    GCCheckAndIncRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
+    GCCheckAndIncRf(prim_value.x.asbits, IsNeedRc(prim_value.ptyp));
     len = __js_toLength(&prim_value);
-    GCCheckAndDecRf(prim_value.s.asbits, IsNeedRc(prim_value.tag));
+    GCCheckAndDecRf(prim_value.x.asbits, IsNeedRc(prim_value.ptyp));
     return len;
   } else if (__is_boolean(v)) {
     return __jsval_to_boolean(v) ? 1 : 0;

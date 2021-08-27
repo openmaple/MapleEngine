@@ -16,6 +16,8 @@
 #ifndef MAPLEBE_INCLUDE_MAPLEVM_VMMEMORY_H_
 #define MAPLEBE_INCLUDE_MAPLEVM_VMMEMORY_H_
 
+//#define MM_DEBUG 1
+
 #include "types_def.h"
 #include "jsobject.h"
 #include "mval.h"
@@ -192,11 +194,9 @@ class MemoryManager {
   std::vector<void *> addrMap;  // map the 32 bits address to 64 bits, for 64-bits machine only
   std::vector<double> f64ToU32Vec;  // index to double value
   // std::map<double, uint32_t> f64ToU32Map; // map the double value to index
-  uint8_t *memoryFlagMap;
-  uint8_t *gpMemoryFlagMap;
-  const uint8_t spBaseFlag = (__jstype)JSTYPE_SPBASE;
-  const uint8_t fpBaseFlag = (__jstype)JSTYPE_FPBASE;
-  const uint8_t gpBaseFlag = (__jstype)JSTYPE_GPBASE;
+  const uint32_t spBaseFlag = (__jstype)JSTYPE_SPBASE;
+  const uint32_t fpBaseFlag = (__jstype)JSTYPE_FPBASE;
+  const uint32_t gpBaseFlag = (__jstype)JSTYPE_GPBASE;
 #endif
 
  public:
@@ -270,11 +270,11 @@ class MemoryManager {
   void GCDecRfJsvalue(__jsvalue jsval) {
     if (TurnoffGC())
       return;
-    __jstype tag = (__jstype)jsval.tag;
-    switch (tag) {
+    __jstype ptyp = (__jstype)jsval.ptyp;
+    switch (ptyp) {
       case JSTYPE_OBJECT:
       case JSTYPE_STRING:
-        GCDecRf((jsval.s.obj));
+        GCDecRf((jsval.x.obj));
       default:
         assert(false && "unexpected");
     }
@@ -291,23 +291,24 @@ class MemoryManager {
   void GCIncRf(void *addr) {
     if (TurnoffGC())
       return;
-    if (IsHeap(addr)) {
-      MemHeader &header = GetMemHeader(addr);
+    void* true_addr = (void*)((uint64_t)addr & PAYLOAD_MASK);
+    if (IsHeap(true_addr)) {
+      MemHeader &header = GetMemHeader(true_addr);
       if(header.refcount < UINT14_MAX)
         header.refcount++;
 #ifdef MM_DEBUG
       num_rcinc++;
-      live_objects[addr]++;
+      live_objects[true_addr]++;
 //printf("addr= %p RC incto= %d\n", addr, live_objects[addr]);
 #endif
     }
   }
   void GCIncRfJsvalue(__jsvalue jsval) {
-    __jstype tag = (__jstype)jsval.tag;
-    switch (tag) {
+    __jstype ptyp = (__jstype)jsval.ptyp;
+    switch (ptyp) {
       case JSTYPE_OBJECT:
       case JSTYPE_STRING:
-        GCIncRf((jsval.s.obj));
+        GCIncRf((jsval.x.obj));
       default:
         assert(false && "unexpected");
     }
@@ -365,37 +366,9 @@ class MemoryManager {
     xx.t = x;
     return xx.t1;
   }
-  uint8_t GetFlagFromMemory(uint8_t *memory, uint8_t addrType) {
-    uint32_t index;
-    if (addrType == spBaseFlag || addrType == fpBaseFlag || addrType == (uint8_t)JSTYPE_ENV) {
-      index = (memory - (uint8_t *)memory_)/sizeof(void *);
-      return *(memoryFlagMap + index);
-    } else {
-      assert(addrType == gpBaseFlag);
-      index = (memory - (uint8_t *)gpMemory)/sizeof(void *);
-      return *(gpMemoryFlagMap + index);
-    }
-  }
-  void SetFlagFromMemory(uint8_t *mem, uint8_t addrType, uint8_t flg) {
-    if (addrType == spBaseFlag || addrType == fpBaseFlag || addrType == (uint8_t)JSTYPE_ENV) {
-      uint32_t index = (mem - (uint8_t *)memory_)/sizeof(void *);
-      *(memoryFlagMap + index) = flg;
-    } else {
-      assert(addrType == gpBaseFlag);
-      uint32_t index = (mem - (uint8_t *)gpMemory)/sizeof(void *);
-      *(gpMemoryFlagMap + index) = flg;
-    }
-  }
   void SetUpGpMemory(void *gpMem, uint8_t *gpFlagMem) {
     gpMemory = gpMem;
-    gpMemoryFlagMap = gpFlagMem;
   }
- __jsvalue EmulateLoad(uint64_t *memory, uint8_t addrTy) {
-   __jsvalue retMv;
-   retMv.s.asbits = *((uint64_t *)memory);
-   retMv.tag = (__jstype)GetFlagFromMemory((uint8_t *)memory, addrTy);
-   return retMv;
- }
 #endif
   bool IsDebugGC() {return false;}
   bool TurnoffGC() {return false;}

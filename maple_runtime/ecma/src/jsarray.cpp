@@ -33,10 +33,15 @@ __jsobject *__js_new_arr_internal(uint32_t length) {
   arr->object_type = JSREGULAR_ARRAY;
   // not allocated huge size here
   __jsvalue *props;
-  if (length > ARRAY_MAXINDEXNUM_INTERNAL)
+  if (length > ARRAY_MAXINDEXNUM_INTERNAL) {
       props = (__jsvalue *)VMMallocGC(sizeof(__jsvalue) * (ARRAY_MAXINDEXNUM_INTERNAL+1));
-  else
+    for (int i = 0; i < ARRAY_MAXINDEXNUM_INTERNAL+1; i++)
+      props[i].ptyp = JSTYPE_NONE;
+  } else {
       props = (__jsvalue *)VMMallocGC(sizeof(__jsvalue) * (length + 1));
+    for (int i = 0; i < length+1; i++)
+      props[i].ptyp = JSTYPE_NONE;
+  }
   arr->shared.array_props = props;
   props[0] = length > INT32_MAX ? __double_value((double)length) : __number_value(length);
   return arr;
@@ -47,11 +52,11 @@ __jsobject *__js_new_arr_elems(__jsvalue *items, uint32_t length) {
   __jsobject *arr = __js_new_arr_internal(length);
   __jsvalue *array_elems = arr->shared.array_props;
   for (uint32_t i = 0; i < length; i++) {
-//    __jsvalue itVt = memory_manager->EmulateLoad(((uint64_t *)items->s.ptr + i), items->tag);
-    __jsvalue  itVt;
-    itVt.s.asbits =  *((uint64_t *)items->s.ptr + i);
+//    __jsvalue itVt = memory_manager->EmulateLoad(((uint64_t *)items->x.ptr + i), items->ptyp);
+    MValue  itVt;
+    itVt.x.u64 =  *((uint64_t *)items->x.ptr + i);
     mDecode(itVt);
-    __set_regular_elem(array_elems, i, &itVt);
+    __set_regular_elem(array_elems, i, (__jsvalue *)&itVt);
   }
   return arr;
 }
@@ -62,7 +67,7 @@ __jsobject *__js_new_arr_elems_direct(__jsvalue *items, uint32_t length) {
   __jsobject *arr = __js_new_arr_internal(length);
   __jsvalue *array_elems = arr->shared.array_props;
   for (uint32_t i = 0; i < length; i++) {
-    GCCheckAndIncRf(items[i].s.asbits, IsNeedRc(items[i].tag));
+    GCCheckAndIncRf(items[i].x.asbits, IsNeedRc(items[i].ptyp));
     array_elems[i + 1] = items[i];
   }
   return arr;
@@ -198,7 +203,7 @@ __jsvalue __jsarr_pt_toLocaleString(__jsvalue *this_array) {
 // return the length property of src.
 uint32_t __jsarr_helper_copy_values(__jsvalue *dest, __jsvalue *src) {
   if (!__is_js_array(src)) {
-    GCCheckAndIncRf(src->s.asbits, IsNeedRc(src->tag));
+    GCCheckAndIncRf(src->x.asbits, IsNeedRc(src->ptyp));
     *dest = *src;
     return 1;
   } else {
@@ -206,7 +211,7 @@ uint32_t __jsarr_helper_copy_values(__jsvalue *dest, __jsvalue *src) {
     uint32_t len = __jsobj_helper_get_length(o);
     for (uint32_t i = 0; i < len; i++) {
       dest[i] = __jsarr_GetElem(o, i);
-      GCCheckAndIncRf(dest[i].s.asbits, IsNeedRc(dest[i].tag));
+      GCCheckAndIncRf(dest[i].x.asbits, IsNeedRc(dest[i].ptyp));
     }
     return len;
   }
@@ -400,7 +405,7 @@ void __jsarr_helper_ExchangeElem(__jsobject *arr, uint32_t idx1, uint32_t idx2) 
   if (exist2) {
     if (exist1) {
       // Inc RF for elem1 otherwise it will goes down to 0 and get released
-      GCCheckAndIncRf(elem1.s.asbits, IsNeedRc(elem1.tag));
+      GCCheckAndIncRf(elem1.x.asbits, IsNeedRc(elem1.ptyp));
     }
     __jsobj_internal_Put(arr, idx1, &elem2, true);
   } else {
@@ -409,7 +414,7 @@ void __jsarr_helper_ExchangeElem(__jsobject *arr, uint32_t idx1, uint32_t idx2) 
   if (exist1) {
     if (exist2) {
       // Inc RF for elem1 otherwise it will goes down to 0 and get released
-      GCCheckAndIncRf(elem2.s.asbits, IsNeedRc((elem2.tag)));
+      GCCheckAndIncRf(elem2.x.asbits, IsNeedRc((elem2.ptyp)));
     }
     __jsobj_internal_Put(arr, idx2, &elem1, true);
   } else {
@@ -992,6 +997,9 @@ __jsvalue __jsarr_helper_iter_method(__jsvalue *this_array, __jsvalue *callbackf
     a = __js_new_arr_internal(0);
   }
 
+  // At this point RC(o)=0, which must be rectified as o is live until after the while loop.
+  // Otherwise, jsfun_internal_call() will cause o to be prematurely released.
+  GCIncRf(o);
   while (k < len) {
     __jsvalue k_value;
     if (__jsobj_helper_HasPropertyAndGet(o, k, &k_value)) {
@@ -999,10 +1007,12 @@ __jsvalue __jsarr_helper_iter_method(__jsvalue *this_array, __jsvalue *callbackf
       __jsvalue result_val = __jsfun_internal_call(func, this_arg, arg_list, 3);
       if (iter_type == JSARR_EVERY || iter_type == JSARR_SOME) {
         if (__js_ToBoolean(&result_val) == res) {
+          GCDecRf(o); // undo the RC++ right before the while loop.
           return __boolean_value(res);
         }
       } else if (iter_type == JSARR_FIND) {
         if (__js_ToBoolean(&result_val) == true) {
+          GCDecRf(o); // undo the RC++ right before the while loop.
           return k_value;
         }
       } else if (iter_type == JSARR_MAP) {
@@ -1013,11 +1023,13 @@ __jsvalue __jsarr_helper_iter_method(__jsvalue *this_array, __jsvalue *callbackf
         }
       }
     } else if (iter_type == JSARR_FIND) {
+      GCDecRf(o); // undo the RC++ right before the while loop.
       // array doesn't have k property
       return __object_value(a);
     }
     k++;
   }
+  GCDecRf(o); // undo the RC++ right before the while loop.
   return ((a == nullptr) && (iter_type != JSARR_FIND)) ? __boolean_value(!res) :  __object_value(a);
 }
 
@@ -1217,6 +1229,9 @@ __jsvalue __jsarr_internal_reduce(__jsvalue *this_array, __jsvalue *arg_list, ui
   }
   // ecma 15.4.4.21 step 9.
   __jsobject *func = __jsval_to_object(callbackfn);
+  // At this point RC(o)=0, which must be rectified as o is live until after the while loop.
+  // Otherwise, jsfun_internal_call() will cause o to be prematurely released.
+  GCIncRf(o);
   while (right_flag ? (k >= 0) : (k < len)) {
     __jsvalue k_value;
     if (k <= UINT32_MAX) {
@@ -1235,6 +1250,7 @@ __jsvalue __jsarr_internal_reduce(__jsvalue *this_array, __jsvalue *arg_list, ui
     }
     k = right_flag ? (k - 1) : (k + 1);
   }
+  GCDecRf(o); // undo the RC++ right before the while loop.
   // ecma 15.4.4.21 step 10.
   return accumulator;
 }
@@ -1427,9 +1443,9 @@ void __set_generic_elem(__jsobject *arr, uint32_t index, __jsvalue *v) {
 
 void __set_regular_elem(__jsvalue *arr, uint32_t index, __jsvalue *v) {
 #ifndef RC_NO_MMAP
-  memory_manager->UpdateGCReference(&arr[index + 1].s.payload.ptr, JsvalToMval(*v));
+  memory_manager->UpdateGCReference(&arr[index + 1].x.payload.ptr, JsvalToMval(*v));
 #else
-  GCCheckAndUpdateRf(arr[index + 1].s.asbits, IsNeedRc(arr[index +1].tag), v->s.asbits, IsNeedRc(v->tag));
+  GCCheckAndUpdateRf(arr[index + 1].x.asbits, IsNeedRc(arr[index +1].ptyp), v->x.asbits, IsNeedRc(v->ptyp));
 #endif
   arr[index + 1] = *v;
 }
@@ -1509,15 +1525,15 @@ __jsvalue *__jsarr_RegularRealloc(__jsvalue *arr, uint32_t old_len, uint32_t new
   if (new_len < old_len) {
     for (uint32_t i = new_size; i < old_size; i++) {
 #ifdef MACHINE64
-      GCCheckAndDecRf(arr[i].s.asbits, IsNeedRc(arr[i].tag));
+      GCCheckAndDecRf(arr[i].x.asbits, IsNeedRc(arr[i].ptyp));
 #else
-      GCDecRf(arr[i].s.payload.ptr);
+      GCDecRf(arr[i].x.payload.ptr);
 #endif
     }
   }
 #ifndef RC_NO_MMAP
   for (uint32_t i = 0; i < old_size; i++) {
-    old_addr[i] = (uint32_t)(&arr[i].s.payload.ptr);
+    old_addr[i] = (uint32_t)(&arr[i].x.payload.ptr);
   }
 #endif
   __jsvalue *new_arr = (__jsvalue *)VMReallocGC(arr, (old_size) * sizeof(__jsvalue), (new_size) * sizeof(__jsvalue));
@@ -1530,7 +1546,7 @@ __jsvalue *__jsarr_RegularRealloc(__jsvalue *arr, uint32_t old_len, uint32_t new
   new_arr[0] = __number_value(new_len);
 #ifndef RC_NO_MMAP
   for (uint32_t i = 0; i < new_size; i++) {
-    new_addr[i] = (uint32_t)(&new_arr[i].s.payload.ptr);
+    new_addr[i] = (uint32_t)(&new_arr[i].x.payload.ptr);
   }
   memory_manager->UpdateAddrMap(old_addr, new_addr, old_size, new_size);
 #endif

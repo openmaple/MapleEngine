@@ -88,10 +88,10 @@ __jsvalue __js_entry_function(__jsvalue *this_arg, bool strict_p) {
   } else if (!__is_js_object(this_arg)) {
     __js_ThisBinding = __object_value(__js_ToObject(this_arg));
 #ifdef MACHINE64
-    // __jsobject *obj = (__jsobject *)memory_manager->GetRealAddr(__js_ThisBinding.s.payload.obj);
-    __jsobject *obj = __js_ThisBinding.s.obj;
+    // __jsobject *obj = (__jsobject *)memory_manager->GetRealAddr(__js_ThisBinding.x.payload.obj);
+    __jsobject *obj = __js_ThisBinding.x.obj;
 #else
-    __jsobject *obj = __js_ThisBinding.s.payload.obj;
+    __jsobject *obj = __js_ThisBinding.x.payload.obj;
 #endif
     GCIncRf(obj);
   } else {
@@ -104,10 +104,10 @@ __jsvalue __js_entry_function(__jsvalue *this_arg, bool strict_p) {
 void __js_exit_function(__jsvalue *this_arg, __jsvalue old_this, bool strict_p) {
   if (!__is_js_object(this_arg) && !__is_null_or_undefined(this_arg) && !strict_p) {
 #ifdef MACHINE64
-    // __jsobject *obj = (__jsobject *)memory_manager->GetRealAddr(__js_ThisBinding.s.payload.obj);
-    __jsobject *obj = (__js_ThisBinding.s.obj);
+    // __jsobject *obj = (__jsobject *)memory_manager->GetRealAddr(__js_ThisBinding.x.payload.obj);
+    __jsobject *obj = (__js_ThisBinding.x.obj);
 #else
-    __jsobject *obj = __js_ThisBinding.s.payload.obj;
+    __jsobject *obj = __js_ThisBinding.x.payload.obj;
 #endif
     GCDecRf(obj);
   }
@@ -136,7 +136,9 @@ __jsvalue __jsfun_internal_call(__jsobject *f, __jsvalue *this_arg, __jsvalue *a
      if (ret.x.u64 == (uint64_t)Exec_handle_exc) {
        throw "callee exception";
      }
-     return MValueToJsval(gInterSource->retVal0);
+     ret = gInterSource->retVal0;
+     mDecode(ret);
+     return ret;
   }
 
   // varg_p
@@ -351,7 +353,7 @@ __jsvalue __jsfun_pt_bind(__jsvalue *function, __jsvalue *args, uint32_t arg_cou
   }
   for (uint32_t i = 0; i < arg_count; i++) {
 #ifdef RC_NO_MMAP
-    GCCheckAndUpdateRf(bound_args[i].s.asbits, IsNeedRc(bound_args[i].tag), args[i].s.asbits, IsNeedRc(args[i].tag));
+    GCCheckAndUpdateRf(bound_args[i].x.asbits, IsNeedRc(bound_args[i].ptyp), args[i].x.asbits, IsNeedRc(args[i].ptyp));
 #endif
     bound_args[i] = args[i];
   }

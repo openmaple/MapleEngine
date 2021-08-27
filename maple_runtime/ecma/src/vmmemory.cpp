@@ -138,6 +138,13 @@ void MemoryHash::PutFreeChunk(MemoryChunk *mchunk) {
   uint32 x = issmall ? (--index) : (MEMHASHTABLESIZE - 1);
   // link the mchunk to the table
   if (issmall) {
+#ifdef MM_DEBUG
+    MemoryChunk* c = table_[x];
+    while(c) {
+      assert(c->offset_ != mchunk->offset_ && "double free");
+      c = c->next;
+    }
+#endif
     mchunk->next = table_[x];
     table_[x] = mchunk;
   } else {  // find the poisition and put free chunk to it
@@ -247,8 +254,8 @@ __jsvalue MemoryManager::GetF64Builtin(uint32_t index) {
     SetF64Builtin();
   }
   __jsvalue jsval;
-  jsval.tag = JSTYPE_DOUBLE;
-  jsval.s.u32 = index;
+  jsval.ptyp = JSTYPE_DOUBLE;
+  jsval.x.u32 = index;
   return jsval;
 }
 
@@ -436,7 +443,7 @@ void MemoryManager::AppMemLeakCheck() {
   //live objects
   //------------------------------------------------
   printf("\nLive objects: %lu\n", live_objects.size());
-#if 1
+#if 0
   for(auto iter : live_objects) {
     printf("%p: maxRC= %u tag= %d rc= %d\n", iter.first, iter.second, GetMemHeader(iter.first).memheadtag, GCGetRf(iter.first));
   }
@@ -582,7 +589,6 @@ MemoryChunk *MemoryManager::NewMemoryChunk(uint32 offset, uint32 size, MemoryChu
 
 void MemoryManager::Init(void *app_memory, uint32 app_memory_size, void *vm_memory, uint32 vm_memory_size) {
   memory_ = app_memory;
-  memoryFlagMap = (uint8_t *)calloc((app_memory_size + vm_memory_size) / sizeof(void *), sizeof(uint8_t));
   total_small_size_ = app_memory_size / 2;
 #if DEBUGGC
   assert((total_small_size_ % 4) == 0 && (VM_MEMORY_SIZE % 4) == 0 && "make sure HEAP SIZE is aligned to 4B");
@@ -787,7 +793,7 @@ void MemoryManager::RecallMem(void *mem, uint32 size) {
     mem_release_bytes_by_type[tag] += alignedsize + head_size;
     mem_release_count_by_type[tag]++;
   }
-printf("RecallMem mem= %p tag= %d\n", mem, tag);
+  // printf("RecallMem mem= %p tag= %d\n", mem, tag);
   max_rc_histogram[live_objects[mem]]++;
   if(live_objects[mem] == 0)
     max_rc0_by_type[tag]++;
@@ -835,14 +841,14 @@ void MemoryManager::RecallArray_props(__jsvalue *array_props) {
 // #ifndef RC_NO_MMAP
 #if  0
       AddrMap *mmap = ginterpreter->GetHeapRefList();
-      AddrMapNode *mmap_node = mmap->FindInAddrMap(&array_props[i].s.payload.ptr);
+      AddrMapNode *mmap_node = mmap->FindInAddrMap(&array_props[i].x.payload.ptr);
       MIR_ASSERT(mmap_node);
       mmap->RemoveAddrMapNode(mmap_node);
 #endif
 #if MACHINE64
-      GCDecRf((array_props[i].s.ptr));
+      GCDecRf((array_props[i].x.ptr));
 #else
-      GCDecRf(array_props[i].s.payload.ptr);
+      GCDecRf(array_props[i].x.payload.ptr);
 #endif
     }
   }
@@ -855,7 +861,7 @@ void MemoryManager::RecallList(__json_list *list) {
   uint32_t count = list->count;
   __json_node *node = list->first;
   for (uint32_t i = 0; i < count; i++) {
-    GCCheckAndDecRf(node->value.s.asbits, IsNeedRc((node->value.tag)));
+    GCCheckAndDecRf(node->value.x.asbits, IsNeedRc((node->value.ptyp)));
     VMFreeNOGC(node, sizeof(__json_node));
     node = node->next;
   }
@@ -1116,19 +1122,19 @@ void MemoryManager::ManageJsvalue(__jsvalue *val, ManageType flag) {
     // if the val is an object, then do nothing
     if (__is_string(val)) {
 #ifdef MACHINE64
-      GCDecRf((val->s.ptr));
+      GCDecRf((val->x.ptr));
 #else
-      GCDecRf(val->s.ptr);
+      GCDecRf(val->x.ptr);
 #endif
     }
   } else if (flag == RECALL) {
-    GCCheckAndDecRf(val->s.asbits, IsNeedRc(val->tag));
+    GCCheckAndDecRf(val->x.asbits, IsNeedRc(val->ptyp));
   } else {
     if (__is_js_object(val)) {
 #ifdef MACHINE64
-      ManageChildObj((val->s.obj), flag);
+      ManageChildObj((val->x.obj), flag);
 #else
-      ManageChildObj(val->s.obj, flag);
+      ManageChildObj(val->x.obj, flag);
 #endif
     }
   }
@@ -1139,7 +1145,8 @@ void MemoryManager::ManageEnvironment(void *envptr, ManageType flag) {
     return;
   }
 #ifdef MACHINE64
-  assert(false && "NYI");
+  //assert(false && "NYI");
+  return;
 #else
   uint32 *u32envptr = (uint32 *)envptr;
   Mval *mvalptr = (Mval *)envptr;
@@ -1230,7 +1237,8 @@ void MemoryManager::ManageObject(__jsobject *obj, ManageType flag) {
             ManageJsvalue(&val, flag);
           }
           if (flag == SWEEP || flag == RECALL) {
-            RecallMem(fun->env, bound_argc * sizeof(__jsvalue));
+            if (fun->env != nullptr)
+              RecallMem(fun->env, bound_argc * sizeof(__jsvalue));
           }
         } else {
           if ((flag != SWEEP) && (flag != RECALL)) {
@@ -1385,9 +1393,9 @@ void MemoryManager::ManageJsvalue(__jsvalue *val, ManageType flag) {
   if (flag == MARK || flag == DECRF) {
     if (__is_js_object(val)) {
 #ifdef MACHINE64
-      ManageChildObj((val->s.obj), flag);
+      ManageChildObj((val->x.obj), flag);
 #else
-      ManageChildObj(val->s.obj, flag);
+      ManageChildObj(val->x.obj, flag);
 #endif
     }
   } else if (is_sweep && NotMarkedObject(val)) {
@@ -1398,7 +1406,7 @@ void MemoryManager::ManageJsvalue(__jsvalue *val, ManageType flag) {
     GCCheckAndDecRf(val->asbits);
 #else
     AddrMap *mmap = ginterpreter->GetHeapRefList();
-    AddrMapNode *mmap_node = mmap->FindInAddrMap(&val->s.payload.ptr);
+    AddrMapNode *mmap_node = mmap->FindInAddrMap(&val->x.payload.ptr);
     MIR_ASSERT(mmap_node);
     mmap->RemoveAddrMapNode(mmap_node);
     // remove_mmap_node(mmap, mmap_node);

@@ -492,7 +492,7 @@ __jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x_val) {
       n = __string_value(n_jsstr);
     } else {
       // Step 3f-3h.
-      // TODO: not implemented yet.
+      MAPLE_JS_ASSERT(false && "NIY: FormatNumber()");
     }
   }
   // Step 4.
@@ -515,9 +515,50 @@ __jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x_val) {
   } else {
     result = n;
   }
-  // TODO: not implemented yet.
-  // Step 5-6.
+  // Step 5.
+  // Replace the substring "{number}" within 'result' with 'n'.
+  __jsvalue search = StrToVal("{number}");
+  __jsstr_replace(&result, &search, &n);
+  // Step 6.
+  // If the value of the [[style]] internal property of 'numberFormat' is "currency", then:
+  __jsvalue p = StrToVal("style");
+  __jsvalue v = __jsop_getprop(number_format, &p);
+  if (ValToStr(&v) == "currency") {
+    // Step 6a.
+    // Let 'currency' be the value of the [[currency]] internal property of 'numberFormat'.
+    p = StrToVal("currency");
+    __jsvalue currency = __jsop_getprop(number_format, &p);
+    // Step 6b.
+    // If the value of the [[currencyDisplay]] internal property of 'numberFormat' is "code",
+    // then let 'cd' be 'currency'.
+    p = StrToVal("currencyDisplay");
+    v = __jsop_getprop(number_format, &p);
+    __jsvalue cd;
+    if (ValToStr(&v) == "code") {
+      p = StrToVal("cd");
+      cd = currency;
+    } else if (ValToStr(&v) == "symbol") {
+      // Step 6c.
+      // Else if the value of the [[currencyDisplay]] internal property of 'numberFormat' is
+      // "symbol", then let 'cd' be an ILD string representing 'currency' in short form.
+      // If the implementation does not have such a representation of 'currency', then use
+      // 'currency' itself.
+      cd = StrToVal("currency");
 
+    } else if (ValToStr(&v) == "name") {
+      // Step 6d.
+      // Else if the value of the [[currencyDisplay]] internal property of 'numberFormat' is
+      // "name", then let 'cd' be an ILD string representing 'currency' in long form.
+      // If the implementation does not have such a representation of 'currency', then use
+      // 'currency' itself.
+      cd = StrToVal("currency");
+    }
+    // Step 6e.
+    // Replace the substring "{currency}" within 'result' with 'cd'.
+    search = StrToVal("{currency}");
+    __jsstr_replace(&result, &search, &cd);
+
+  }
   // Step 7.
   return result;
 }
@@ -625,8 +666,8 @@ __jsvalue __jsintl_NumberFormatFormat(__jsvalue *number_format, __jsvalue *value
     // Step 1b- 1c.
     // Let bf b the result of calling the [[Call]] internal method of 'bind' with F
     // as 'this' value and an argument list containing the single item 'this'.
-    int len = 1;
     __jsvalue args[] = {*number_format, *value};
+    int len = sizeof(args)/sizeof(__jsvalue);
 
     // Temporary workaround to avoid 'strict' constraint inside __jsfun_pt_bind() function.
     // Save old value of __js_ThisBinding.

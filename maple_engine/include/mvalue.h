@@ -19,7 +19,14 @@
 #include <cstdint>
 #include "prim_types.h"
 
+struct __jsobject;
+
 namespace maple {
+    struct nan_encode {
+        uint64_t payload:48;
+        uint16_t type:15;
+        uint8_t  sign:1;
+    };
 
     struct MValue {
         union {
@@ -36,9 +43,15 @@ namespace maple {
             uint8_t    u8;      // For operand type in OP_lshr
             uint32_t   u32;     // For operand type in OP_ge, OP_eq...
             uint64_t   u64;     // For zero-extension
+            struct nan_encode c;
+            uint32_t boo;
+            void *ptr;
+            void *str;
+            __jsobject *obj;
+            uint64_t asbits;
         } x;
 #ifdef MACHINE64
-        uint8_t ptyp:8;
+        uint32_t ptyp;
 #else
         PrimType ptyp:8;
 #endif

@@ -34,8 +34,8 @@ __jsvalue  __js_ToDate(__jsvalue *this_object, __jsvalue *arg_list, uint32_t nar
 static bool __js_argsZero(__jsvalue *arg_list, uint32_t nargs) {
   for (uint32_t i = 0; i < nargs; i++) {
     __jsvalue *arg = &arg_list[i];
-    if ((arg->tag != JSTYPE_NUMBER) ||
-        (arg->s.i32 != 0)) {
+    if ((arg->ptyp != JSTYPE_NUMBER) ||
+        (arg->x.i32 != 0)) {
       return false;
     }
   }
@@ -546,11 +546,11 @@ __jsvalue __jsdate_ToLocaleString(__jsvalue *this_date, __jsvalue *arg_list, uin
     return StrToVal("Invalid Date");
   }
   // Step 3.
-  if (nargs < 2) {
+  if (nargs < 1) {
     locales = __undefined_value();
   }
   // Step 4.
-  if (nargs < 3) {
+  if (nargs < 2) {
     options = __undefined_value();
   }
   // Step 5.

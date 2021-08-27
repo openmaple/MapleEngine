@@ -474,7 +474,7 @@ __jsvalue __jsintl_DateTimeFormatSupportedLocalesOf(__jsvalue *date_time_format,
 
 // ECMA-402 1.0 12.3.2
 __jsvalue ToLocalTime(__jsvalue *x, __jsvalue *calendar, __jsvalue *time_zone) {
-  // TODO: not implemented yet.
+  MAPLE_JS_ASSERT(false && "NIY: ToLocalTime()");
   return __null_value();
 }
 
@@ -483,15 +483,14 @@ __jsvalue ToLocalTime(__jsvalue *x, __jsvalue *calendar, __jsvalue *time_zone) {
 // value) according to the effective locale and the formatting options of
 // 'dateTimeFormat'.
 __jsvalue FormatDateTime(__jsvalue *date_time_format, __jsvalue *x) {
-  // TODO: not implemented yet.
-  __jsvalue p, v;
+  __jsvalue prop, value;
   // Step 1.
   if (__is_infinity(x) || __is_neg_infinity(x)) {
     MAPLE_JS_RANGEERROR_EXCEPTION();
   }
   // Step 2.
-  p = StrToVal("locale");
-  __jsvalue locale = __jsop_getprop(date_time_format, &p);
+  prop = StrToVal("locale");
+  __jsvalue locale = __jsop_getprop(date_time_format, &prop);
   // Step 3.
   // Let 'nf' be the result of creating a new NumberFormat object
   // as if by the expression new Intl.NumberFormat([locale], {useGrouping: false}).
@@ -499,9 +498,9 @@ __jsvalue FormatDateTime(__jsvalue *date_time_format, __jsvalue *x) {
   __jsvalue locales = __object_value(locales_obj);
   __jsobject *options_obj = __js_new_obj_obj_0();
   __jsvalue options = __object_value(options_obj);
-  p = StrToVal("useGrouping");
-  v = __boolean_value(false);
-  __jsop_setprop(&options, &p, &v);
+  prop = StrToVal("useGrouping");
+  value = __boolean_value(false);
+  __jsop_setprop(&options, &prop, &value);
   __jsvalue args[] = {locales, options};
 
   __jsvalue undefined = __undefined_value();
@@ -513,42 +512,103 @@ __jsvalue FormatDateTime(__jsvalue *date_time_format, __jsvalue *x) {
   // {minimumIntegerDigits: 2, useGrouping: false}).
   options_obj = __js_new_obj_obj_0();
   options = __object_value(options_obj);
-  p = StrToVal("minimumIntegerDidigts");
-  v = __number_value(2);
-  __jsop_setprop(&options, &p, &v);
-  p = StrToVal("useGrouping");
-  v = __boolean_value(false);
-  __jsop_setprop(&options, &p, &v);
+  prop = StrToVal("minimumIntegerDidigts");
+  value = __number_value(2);
+  __jsop_setprop(&options, &prop, &value);
+  prop = StrToVal("useGrouping");
+  value = __boolean_value(false);
+  __jsop_setprop(&options, &prop, &value);
 
   __jsvalue nf2 = __js_NumberFormatConstructor(&undefined, args, 2);
 
   // Step 5.
-  p = StrToVal("calendar");
-  __jsvalue calendar = __jsop_getprop(date_time_format, &p);
-  p = StrToVal("timeZone");
-  __jsvalue time_zone = __jsop_getprop(date_time_format, &p);
+  prop = StrToVal("calendar");
+  __jsvalue calendar = __jsop_getprop(date_time_format, &prop);
+  prop = StrToVal("timeZone");
+  __jsvalue time_zone = __jsop_getprop(date_time_format, &prop);
   __jsvalue tm = ToLocalTime(x, &calendar, &time_zone);
 
   // Step 6.
-  p = StrToVal("pattern");
-  __jsvalue result = __jsop_getprop(date_time_format, &p);
+  prop = StrToVal("pattern");
+  __jsvalue result = __jsop_getprop(date_time_format, &prop);
 
   // Step 7.
   __jsvalue pm;
   for (auto it = kDateTimeFormatComponents.begin(); it != kDateTimeFormatComponents.end(); it++) {
-
+    std::string property = it->first;
+    std::vector<std::string> values = it->second;
+    // Step 7a i.
+    // Let 'p' b the name given in the Property column of the row.
+    __jsvalue p = StrToVal(it->first);
+    // Step 7a ii.
+    // Let 'f' be the value of the [[<p>]] internal property of 'dateTimeFormat'.
+    __jsvalue f = __jsop_getprop(date_time_format, &p);
+    // Step 7a iii.
+    // Let 'v' be the value of tm.[[<p>]].
+    __jsvalue v = __jsop_getprop(&tm, &p);
+    // Step 7a iv.
+    if (ValToStr(&p) == "hour" && __jsval_to_number(&v) <= 0) {
+      v = __number_value(1 - __jsval_to_number(&v));
+    }
+    // Step 7a v.
+    if (ValToStr(&p) == "month") {
+      v = __number_value(__jsval_to_number(&v)+1);
+    }
+    // Step 7a vi.
+    __jsvalue p2 = StrToVal("hour12");
+    __jsvalue v2 = __jsop_getprop(date_time_format, &p2);
+    if (ValToStr(&p) == "hour" && __jsval_to_boolean(&v2) == true) {
+      // Step 7a vi 1.
+      v = __number_value(__jsval_to_number(&v) % 12);
+      // Step 7a vi 2.
+      v2 = __jsop_getprop(&tm, &p);
+      if (__jsval_to_number(&v) == __jsval_to_number(&v2)) {
+        pm = __boolean_value(false);
+      } else {
+        pm = __boolean_value(true);
+      }
+      // Step 7a vi 3.
+      p2 = StrToVal("hourNo0");
+      v2 = __jsop_getprop(date_time_format, &p2);
+      if (__jsval_to_number(&v) == 0 && __jsval_to_boolean(&v2) == true) {
+        v = __number_value(12);
+      }
+    }
+    // Step 7a vii.
+    __jsvalue fv;
+    std::string f_str = ValToStr(&f);
+    if (f_str == "numeric") {
+      // Step 7a vii 1.
+      fv = FormatNumber(&nf, &v);
+    } else if (f_str == "2-digit") { // Step 7a viii.
+      // Step 7a viii 1.
+      fv = FormatNumber(&nf2, &v);
+      __jsstring *fv_str = __jsval_to_string(&fv);
+      // step 7a viii 2.
+      int len = __jsstr_get_length(fv_str);
+      if (len < 2) {
+        __jsvalue start = __number_value(len-2), end = __undefined_value();
+        fv = __jsstr_substring(&fv, &start, &end);
+      }
+    } else if (f_str == "narrow" || f_str == "short" || f_str == "long") { // Step 7a ix
+      MAPLE_JS_ASSERT(false && "FIY: FormatDateTime()");
+    }
+    __jsvalue search = StrToVal("{" + ValToStr(&p) + "}");
+    __jsstr_replace(&result, &search, &fv);
   }
   // Step 8.
-  p = StrToVal("hour12");
-  v = __jsop_getprop(date_time_format, &p);
+  prop = StrToVal("hour12");
+  value = __jsop_getprop(date_time_format, &prop);
   __jsvalue fv;
-  if (__jsval_to_boolean(&v)) {
+  if (__jsval_to_boolean(&value)) {
     // Step 8a.
     if (__jsval_to_boolean(&pm)) {
-
+      MAPLE_JS_ASSERT(false && "FIY: FormatDateTime()");
     }
+    // Step 8b.
+    __jsvalue search = StrToVal("{ampm}");
+    __jsstr_replace(&result, &search, &fv);
   }
-
   // Step 9.
   return result;
 }
@@ -606,7 +666,8 @@ __jsvalue __jsintl_DateTimeFormatFormat(__jsvalue *date_time_format, __jsvalue *
   // Step 2.
   // Return the value of the [[boundFormat]] internal property of this DateTimeFormat
   // object.
-  return __jsop_getprop(date_time_format, &p);
+  __jsvalue res = __jsop_getprop(date_time_format, &p);
+  return res;
 }
 
 // ECMA-402 1.0 12.3.3

@@ -22,7 +22,8 @@ namespace maple {
         kEngineDebugNone = 0,
         kEngineDebugInstruction = 1,
         kEngineDebugMethod = 2,
-        kEngineDebugAll = kEngineDebugInstruction | kEngineDebugMethod
+        kEngineDebugAll = kEngineDebugInstruction | kEngineDebugMethod,
+        kEngineDebuggerOn = 4,
     };
 
     extern int debug_engine;

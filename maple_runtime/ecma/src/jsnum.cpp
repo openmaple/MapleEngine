@@ -559,9 +559,9 @@ __jsvalue __jsnum_pt_toString(__jsvalue *this_number, __jsvalue *radix) {
   signstr = istr = ret = NULL;
   int64_t val;
 #ifdef MACHINE64
-  if (this_number->tag == JSTYPE_OBJECT) {
-    // __jsobject *obj = (__jsobject *)memory_manager->GetRealAddr(this_number->s.payload.obj);
-    __jsobject *obj = this_number->s.obj;
+  if (this_number->ptyp == JSTYPE_OBJECT) {
+    // __jsobject *obj = (__jsobject *)memory_manager->GetRealAddr(this_number->x.payload.obj);
+    __jsobject *obj = this_number->x.obj;
     if(obj->object_class == JSNUMBER) {
       if (obj->object_type == JSSPECIAL_NUMBER_OBJECT) {
         // NaN or Infinity
@@ -574,8 +574,8 @@ __jsvalue __jsnum_pt_toString(__jsvalue *this_number, __jsvalue *radix) {
       val = __js_ToNumber64(this_number);
     }
 #else
-  if (this_number->s.tag == JSTYPE_OBJECT && this_number->s.payload.obj->object_class == JSNUMBER) {
-    val = this_number->s.payload.obj->shared.prim_number;
+  if (this_number->x.ptyp == JSTYPE_OBJECT && this_number->x.payload.obj->object_class == JSNUMBER) {
+    val = this_number->x.payload.obj->shared.prim_number;
 #endif
   } else {
     val = (int64_t)__js_ToNumber(this_number);
@@ -681,7 +681,7 @@ __jsvalue __jsnum_pt_toFixed(__jsvalue *this_number, __jsvalue *fracdigit) {
 
   // get double value from this_number
   if (__is_double(this_number)) {
-    dval = (this_number->s.f64);
+    dval = (this_number->x.f64);
   } else if (__is_number(this_number)) {
     dval = (double)__js_ToNumber(this_number);
   } else {

@@ -35,7 +35,7 @@ bool __json_char_is_decimal_digit(__jschar c) {
 static void __js_list_append(__json_list *list, __jsvalue elem) {
   __json_node *node = (__json_node *)VMMallocNOGC(sizeof(__json_node));
   node->value = elem;
-  GCCheckAndIncRf(elem.s.asbits, IsNeedRc(elem.tag));
+  GCCheckAndIncRf(elem.x.asbits, IsNeedRc(elem.ptyp));
   node->next = NULL;
   node->prev = list->last;
   if (list->count == 0) {
@@ -50,7 +50,7 @@ static void __js_list_append(__json_list *list, __jsvalue elem) {
 static void __js_list_pop(__json_list *list) {
   MAPLE_JS_ASSERT(list->count > 0);
   __json_node *prev_node = list->last->prev;
-  GCCheckAndDecRf(list->last->value.s.asbits, IsNeedRc((list->last->value.tag)));
+  GCCheckAndDecRf(list->last->value.x.asbits, IsNeedRc((list->last->value.ptyp)));
   VMFreeNOGC(list->last, sizeof(__json_node));
   if (prev_node) {
     prev_node->next = NULL;
@@ -629,7 +629,7 @@ __jsvalue __json_stringify(__jsvalue *this_json, __jsvalue *value, __jsvalue *re
 __jsvalue __json_str(__jsvalue *key, __jsobject *holder, __json_stringify_context *context) {
   // 1.
   __jsvalue value = __jsobj_internal_Get(holder, key);
-  GCCheckAndIncRf(value.s.asbits, IsNeedRc((value.tag)));
+  GCCheckAndIncRf(value.x.asbits, IsNeedRc((value.ptyp)));
   __jsstring *str;
   // 2.
   if (__is_js_object(&value)) {
@@ -639,7 +639,7 @@ __jsvalue __json_str(__jsvalue *key, __jsobject *holder, __json_stringify_contex
     // 2.b
     if (__js_IsCallable(&to_json)) {
       __jsvalue temp = __jsfun_internal_call(__jsval_to_object(&to_json), &value, key, 1);
-      GCCheckAndUpdateRf(value.s.asbits, IsNeedRc(value.tag), temp.s.asbits, IsNeedRc((temp.tag)));
+      GCCheckAndUpdateRf(value.x.asbits, IsNeedRc(value.ptyp), temp.x.asbits, IsNeedRc((temp.ptyp)));
       value = temp;
     }
   }
@@ -650,7 +650,7 @@ __jsvalue __json_str(__jsvalue *key, __jsobject *holder, __json_stringify_contex
     args[1] = value;
     __jsvalue hold = __object_value(holder);
     __jsvalue temp = __jsfun_internal_call(context->replacer_function, &hold, args, 2);
-    GCCheckAndUpdateRf(value.s.asbits, IsNeedRc(value.tag), temp.s.asbits, IsNeedRc((temp.tag)));
+    GCCheckAndUpdateRf(value.x.asbits, IsNeedRc(value.ptyp), temp.x.asbits, IsNeedRc((temp.ptyp)));
     value = temp;
   }
   // 4
@@ -665,7 +665,7 @@ __jsvalue __json_str(__jsvalue *key, __jsobject *holder, __json_stringify_contex
       temp = __boolean_value(obj->shared.prim_bool);
     }
 
-    GCCheckAndUpdateRf(value.s.asbits, IsNeedRc(value.tag), temp.s.asbits, IsNeedRc((temp.tag)));
+    GCCheckAndUpdateRf(value.x.asbits, IsNeedRc(value.ptyp), temp.x.asbits, IsNeedRc((temp.ptyp)));
     value = temp;
   }
 
@@ -676,7 +676,7 @@ __jsvalue __json_str(__jsvalue *key, __jsobject *holder, __json_stringify_contex
       res = __string_value(str);
       break;
     case JSTYPE_BOOLEAN:
-      if (value.s.boo == true) {
+      if (value.x.boo == true) {
         str = __jsstr_new_from_char("true");
       } else {
         str = __jsstr_new_from_char("false");
@@ -705,7 +705,7 @@ __jsvalue __json_str(__jsvalue *key, __jsobject *holder, __json_stringify_contex
     default:
       break;
   }
-  GCCheckAndDecRf(value.s.asbits, IsNeedRc((value.tag)));
+  GCCheckAndDecRf(value.x.asbits, IsNeedRc((value.ptyp)));
   return res;
 }
 
