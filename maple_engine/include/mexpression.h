@@ -216,7 +216,7 @@
     do { \
         MValue &op1 = func.operand_stack[func.sp--]; \
         MValue &op0 = func.operand_stack[func.sp]; \
-        MASSERT(op0.ptyp == op1.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, op1.ptyp); \
+        /*MASSERT(op0.ptyp == op1.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, op1.ptyp);*/\
         switch(optype) { \
             case PTY_i8:  op0.x.i64 = op0.x.i8  == op1.x.i8 ? 0 : (op0.x.i8  < op1.x.i8 ? -1 : 1);  break; \
             case PTY_i16: op0.x.i64 = op0.x.i16 == op1.x.i16? 0 : (op0.x.i16 < op1.x.i16? -1 : 1);  break; \
@@ -233,7 +233,31 @@
                           nanres : (op0.x.f64 == op1.x.f64? 0 : (op0.x.f64 < op1.x.f64? -1 : 1));  break; \
             default: MIR_FATAL("Unsupported PrimType %d for comparison cmp/cmpl/cmpg oprator %s", op0.ptyp, #exprop); \
         } \
-        op0.ptyp = resptyp; \
+        op0.x.c.type = resptyp;\
+    } while(0)
+
+#define EXPRCMPLGOP_T(exprop, nanres, resptyp, optype) \
+    do { \
+        TValue &op1 = func.operand_stack[func.sp--]; \
+        TValue &op0 = func.operand_stack[func.sp]; \
+        /*MASSERT(op0.ptyp == op1.ptyp, "Type mismatch: 0x%02x and 0x%02x", op0.ptyp, op1.ptyp);*/\
+        switch(optype) { \
+            case PTY_i8:  op0.x.i64 = op0.x.i8  == op1.x.i8 ? 0 : (op0.x.i8  < op1.x.i8 ? -1 : 1);  break; \
+            case PTY_i16: op0.x.i64 = op0.x.i16 == op1.x.i16? 0 : (op0.x.i16 < op1.x.i16? -1 : 1);  break; \
+            case PTY_i32: op0.x.i64 = op0.x.i32 == op1.x.i32? 0 : (op0.x.i32 < op1.x.i32? -1 : 1);  break; \
+            case PTY_i64: op0.x.i64 = op0.x.i64 == op1.x.i64? 0 : (op0.x.i64 < op1.x.i64? -1 : 1);  break; \
+            case PTY_u64: op0.x.i64 = op0.x.u64 == op1.x.u64? 0 : (op0.x.u64 < op1.x.u64? -1 : 1);  break; \
+            case PTY_u32: op0.x.i64 = op0.x.u32 == op1.x.u32? 0 : (op0.x.u32 < op1.x.u32? -1 : 1);  break; \
+            case PTY_u16: op0.x.i64 = op0.x.u64 == op1.x.u16? 0 : (op0.x.u16 < op1.x.u16? -1 : 1);  break; \
+            case PTY_u1 : op0.x.i64 = op0.x.u1  == op1.x.u1 ? 0 : (op0.x.u1  < op1.x.u1 ? -1 : 1);  break; \
+            case PTY_a64: op0.x.i64 = op0.x.a64 == op1.x.a64? 0 : (op0.x.a64 < op1.x.a64? -1 : 1);  break; \
+            case PTY_f32: op0.x.i64 = isnan(op0.x.f32) || isnan(op1.x.f32)? \
+                          nanres : (op0.x.f32 == op1.x.f32? 0 : (op0.x.f32 < op1.x.f32? -1 : 1));  break; \
+            case PTY_f64: op0.x.i64 = isnan(op0.x.f64) || isnan(op1.x.f64)? \
+                          nanres : (op0.x.f64 == op1.x.f64? 0 : (op0.x.f64 < op1.x.f64? -1 : 1));  break; \
+            default: MIR_FATAL("Unsupported PrimType %d for comparison cmp/cmpl/cmpg oprator %s", op0.x.c.type, #exprop); \
+        } \
+        op0.x.c.type = resptyp | NAN_BASE;\
     } while(0)
 
 #define EXPRSELECTOP() \
@@ -241,9 +265,32 @@
         MValue &op2 = func.operand_stack[func.sp--]; \
         MValue &op1 = func.operand_stack[func.sp--]; \
         MValue &op0 = func.operand_stack[func.sp]; \
-        MASSERT(op1.ptyp == op2.ptyp, "Type mismatch: 0x%02x and 0x%02x", op1.ptyp, op2.ptyp); \
-        MASSERT(op2.ptyp == expr.primType, "Type mismatch: 0x%02x and result type 0x%02x", op2.ptyp, expr.primType); \
-        op0.ptyp = expr.primType; \
+        MASSERT(op1.ptyp == op2.ptyp, "Type mismatch: 0x%02x and 0x%02x", op1.ptyp, op2.ptyp);\
+        MASSERT(op2.ptyp == expr.primType, "Type mismatch: 0x%02x and result type 0x%02x", op2.ptyp, expr.primType);\
+        op0.ptyp = expr.primType;\
+        switch(expr.primType) { \
+            case PTY_i8:  op0.x.i8  = op0.x.i64? op1.x.i8  : op2.x.i8;  break; \
+            case PTY_i16: op0.x.i16 = op0.x.i64? op1.x.i16 : op2.x.i16; break; \
+            case PTY_i32: op0.x.i32 = op0.x.i64? op1.x.i32 : op2.x.i32; break; \
+            case PTY_i64: op0.x.i64 = op0.x.i64? op1.x.i64 : op2.x.i64; break; \
+            case PTY_u16: op0.x.u16 = op0.x.i64? op1.x.u16 : op2.x.u16; break; \
+            case PTY_u1:  op0.x.u1  = op0.x.i64? op1.x.u1  : op2.x.u1;  break; \
+            case PTY_a64: op0.x.a64 = op0.x.i64? op1.x.a64 : op2.x.a64; break; \
+            case PTY_f32: op0.x.f32 = op0.x.i64? op1.x.f32 : op2.x.f32; break; \
+            case PTY_f64: op0.x.f64 = op0.x.i64? op1.x.f64 : op2.x.f64; break; \
+            default: MIR_FATAL("Unsupported PrimType %d for select oprator", expr.primType); \
+        } \
+    } while(0)
+
+
+#define EXPRSELECTOP_T() \
+    do { \
+        TValue &op2 = func.operand_stack[func.sp--]; \
+        TValue &op1 = func.operand_stack[func.sp--]; \
+        TValue &op0 = func.operand_stack[func.sp]; \
+        /*MASSERT(op1.ptyp == op2.ptyp, "Type mismatch: 0x%02x and 0x%02x", op1.ptyp, op2.ptyp);*/\
+        /*MASSERT(op2.ptyp == expr.primType, "Type mismatch: 0x%02x and result type 0x%02x", op2.ptyp, expr.primType);*/\
+        /*op0.ptyp = expr.primType;*/\
         switch(expr.primType) { \
             case PTY_i8:  op0.x.i8  = op0.x.i64? op1.x.i8  : op2.x.i8;  break; \
             case PTY_i16: op0.x.i16 = op0.x.i64? op1.x.i16 : op2.x.i16; break; \

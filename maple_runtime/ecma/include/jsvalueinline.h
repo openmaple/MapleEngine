@@ -287,14 +287,14 @@ static inline __jsvalue __nan_value() {
 
 static inline __jsvalue __positive_zero_value() {
   __jsvalue data;
-  data.x.asbits = 0;
+  data.x.asbits = POS_ZERO;
   data.ptyp = JSTYPE_NUMBER;
   return data;
 }
 
 static inline __jsvalue __negative_zero_value() {
   __jsvalue data;
-  data.x.f64 = 0;
+  data.x.asbits = NEG_ZERO;
   data.ptyp = JSTYPE_DOUBLE;
   return data;
 }

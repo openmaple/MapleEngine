@@ -66,9 +66,9 @@ __jsvalue __jsdate_SetUTCMinutes(__jsvalue *this_date, __jsvalue *args, uint32_t
 __jsvalue __jsdate_SetUTCMonth(__jsvalue *this_date, __jsvalue *args, uint32_t nargs);
 __jsvalue __jsdate_SetUTCSeconds(__jsvalue *this_date, __jsvalue *args, uint32_t nargs);
 __jsvalue __jsdate_ToDateString(__jsvalue *this_date);
-__jsvalue __jsdate_ToLocaleDateString(__jsvalue *this_date);
+__jsvalue __jsdate_ToLocaleDateString(__jsvalue *this_date, __jsvalue *arg_list, uint32_t nargs);
 __jsvalue __jsdate_ToLocaleString(__jsvalue *this_date, __jsvalue *arg_list, uint32_t nargs);
-__jsvalue __jsdate_ToLocaleTimeString(__jsvalue *this_date);
+__jsvalue __jsdate_ToLocaleTimeString(__jsvalue *this_date, __jsvalue *arg_list, uint32_t nargs);
 __jsvalue __jsdate_ToString(__jsvalue *this_date);
 __jsvalue __jsdate_ToString_Obj(__jsobject *obj);
 __jsvalue __jsdate_ToTimeString(__jsvalue *this_date);

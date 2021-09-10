@@ -156,9 +156,9 @@ static inline void __set_set_gc(__jsprop_desc *desc, __jsobject *o) {
 
 static inline void __set_value_gc(__jsprop_desc *desc, __jsvalue *v) {
 #ifndef RC_NO_MMAP
-  UpdateGCReference(&desc->named_data_property.value.x.payload.ptr, JsvalToMval(*v));
+  UpdateGCReference(&desc->named_data_property.value.x.payload.ptr, *v);
 #else
-  GCCheckAndUpdateRf(desc->named_data_property.value.x.asbits, desc->named_data_property.value.ptyp,  v->x.asbits, v->ptyp);
+  GCCheckAndUpdateRf(desc->named_data_property.value.x.asbits, IsNeedRc(desc->named_data_property.value.ptyp),  v->x.asbits, IsNeedRc(v->ptyp));
 #endif
   __set_value(desc, v);
 }

@@ -275,8 +275,13 @@ __jsstring *__js_ToStringSlow(__jsvalue *v) {
                                    : __jsstr_get_builtin(JSBUILTIN_STRING_FALSE);
     case JSTYPE_NUMBER:
       return __js_NumberToString(__jsval_to_int32(v));
-    case JSTYPE_DOUBLE:
-      return __js_DoubleToString(__jsval_to_double(v));
+    case JSTYPE_DOUBLE: {
+      if (v->x.u64 == NEG_ZERO) {
+        return  __jsstr_get_builtin(JSBUILTIN_STRING_ZERO_CHAR);
+      } else {
+        return __js_DoubleToString(__jsval_to_double(v));
+      }
+    }
     case JSTYPE_OBJECT: {
       __jsvalue prim_value = __js_ToPrimitive(v, JSTYPE_STRING);
       if (!__is_string(&prim_value)) {

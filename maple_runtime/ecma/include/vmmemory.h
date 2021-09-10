@@ -160,6 +160,8 @@ class MemoryManager {
 
   void* mainSP;
   void* mainFP;
+  void* mainGP;
+  void* mainTopGP;
 
   uint32 max_rc0_by_type[MemHeadLast];
   void AppMemLeakCheck();
@@ -298,8 +300,11 @@ class MemoryManager {
         header.refcount++;
 #ifdef MM_DEBUG
       num_rcinc++;
-      live_objects[true_addr]++;
-//printf("addr= %p RC incto= %d\n", addr, live_objects[addr]);
+#ifdef MEMORY_LEAK_CHECK
+      if (header.refcount > live_objects[true_addr])
+        live_objects[true_addr] = header.refcount;
+//printf("addr= %p RC incto= %d  max= %d\n", true_addr, header.refcount, live_objects[true_addr]);
+#endif
 #endif
     }
   }

@@ -25,7 +25,7 @@ __jsvalue __js_CollatorConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
                                    uint32_t nargs) {
   __jsobject *obj = __create_object();
   __jsobj_set_prototype(obj, JSBUILTIN_INTL_COLLATOR_PROTOTYPE);
-  obj->object_class = JSINTL;
+  obj->object_class = JSINTL_COLLATOR;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
   __jsvalue obj_val = __object_value(obj);
@@ -84,7 +84,7 @@ void InitializeCollator(__jsvalue *this_collator, __jsvalue *locales,
   __jsop_setprop(this_collator, &p, &u);
   // Step 8.
   __jsobject *collator_obj = __create_object();
-  collator_obj->object_class = JSINTL;
+  collator_obj->object_class = JSINTL_COLLATOR;
   collator_obj->extensible = true;
   collator_obj->object_type = JSREGULAR_OBJECT;
   __jsvalue collator = __object_value(collator_obj);
@@ -192,8 +192,7 @@ void InitializeCollator(__jsvalue *this_collator, __jsvalue *locales,
       }
     }
     // Step 19d.
-    p = StrToVal("property");
-    __jsop_setprop(this_collator, &p, &value);
+    __jsop_setprop(this_collator, &property, &value);
     // Step 19e.
     i++;
   }
@@ -213,8 +212,7 @@ void InitializeCollator(__jsvalue *this_collator, __jsvalue *locales,
       p = StrToVal("dataLocale");
       __jsvalue data_locale = __jsop_getprop(&r, &p);
       // Step 21b ii.
-      p = StrToVal("dataLocale");
-      __jsvalue data_locale_data = __jsop_getprop(&locale_data, &p);
+      __jsvalue data_locale_data = __jsop_getprop(&locale_data, &data_locale);
       // Step 21b iii.
       p = StrToVal("sensitivity");
       s = __jsop_getprop(&data_locale_data, &p);
@@ -269,26 +267,158 @@ __jsvalue __jsintl_CollatorSupportedLocalesOf(__jsvalue *collator,
   return SupportedLocales(&available_locales, &requested_locales, &options);
 }
 
+__jsvalue CompareStrings(__jsvalue *collator, __jsvalue *x, __jsvalue *y) {
+  __jsvalue p = StrToVal("sensitivity");
+  __jsvalue v = __jsop_getprop(collator, &p);
+  std::string sensitivity = ValToStr(&v);
+
+  UColAttributeValue strength = UCOL_DEFAULT;
+  UColAttributeValue case_level = UCOL_OFF;
+  UColAttributeValue alternate = UCOL_DEFAULT;
+  UColAttributeValue numeric = UCOL_OFF;
+  UColAttributeValue normalization = UCOL_ON;
+  UColAttributeValue case_first = UCOL_DEFAULT;
+
+  if (sensitivity == "base") {
+    strength = UCOL_PRIMARY;
+  } else if (sensitivity == "accent") {
+    strength = UCOL_SECONDARY;
+  } else if (sensitivity == "case") {
+    strength = UCOL_PRIMARY;
+    case_level = UCOL_ON;
+  } else if (sensitivity == "variant") {
+    strength = UCOL_TERTIARY;
+  } else {
+    MAPLE_JS_ASSERT(false && "wrong sensitivity");
+  }
+
+  p = StrToVal("locale");
+  v = __jsop_getprop(collator, &p);
+  std::string locale_str = ValToStr(&v);
+
+  UErrorCode status = U_ZERO_ERROR;
+  UCollator *col = ucol_open(locale_str.c_str(), &status);
+  if (U_FAILURE(status)) {
+    MAPLE_JS_ASSERT(false && "Error in ucol_open()");
+  }
+  ucol_setAttribute(col, UCOL_STRENGTH, strength, &status);
+  ucol_setAttribute(col, UCOL_CASE_LEVEL, case_level, &status);
+  ucol_setAttribute(col, UCOL_ALTERNATE_HANDLING, alternate, &status);
+  ucol_setAttribute(col, UCOL_NUMERIC_COLLATION, numeric, &status);
+  ucol_setAttribute(col, UCOL_NORMALIZATION_MODE, normalization, &status);
+  ucol_setAttribute(col, UCOL_CASE_FIRST, case_first, &status);
+
+  if (U_FAILURE(status)) {
+    ucol_close(col);
+  }
+
+  __jsstring *x_str = __jsval_to_string(x);
+  __jsstring *y_str = __jsval_to_string(y);
+  uint32_t x_len = __jsstr_get_length(x_str);
+  uint32_t y_len = __jsstr_get_length(y_str);
+
+  UChar *x_uchar = (UChar*)VMMallocGC(sizeof(UChar)*(x_len+1));
+  UChar *y_uchar = (UChar*)VMMallocGC(sizeof(UChar)*(y_len+1));
+  x_uchar[x_len] = '\0';
+  y_uchar[y_len] = '\0';
+  if (__jsstr_is_ascii(x_str)) {
+    for (int i = 0; i < x_len; i++) {
+      x_uchar[i] = x_str->x.ascii[i];
+    }
+  } else {
+    for (int i = 0; i < x_len; i++) {
+      x_uchar[i] = x_str->x.utf16[i];
+    }
+  }
+  if (__jsstr_is_ascii(y_str)) {
+    for (int i = 0; i < y_len; i++) {
+      y_uchar[i] = y_str->x.ascii[i];
+    }
+  } else {
+    for (int i = 0; i < y_len; i++) {
+      y_uchar[i] = y_str->x.utf16[i];
+    }
+  }
+  UCollationResult col_res = ucol_strcoll(col, x_uchar, x_len, y_uchar, y_len);
+  int32_t res;
+  switch (col_res) {
+    case UCOL_LESS:
+      res = -1;
+      break;
+    case UCOL_EQUAL:
+      res = 0;
+      break;
+    case UCOL_GREATER:
+      res = 1;
+      break;
+    default:
+      MAPLE_JS_ASSERT(false && "Error in ucol_strcoll()");
+  }
+  return __number_value(res);
+}
+
 // ECMA-402 1.0 10.3.2
 // Intl.Collator.prototype.compare
-__jsvalue __jsintl_CollatorCompare(__jsvalue *this_arg, __jsvalue *arg_list,
-                                   uint32_t nargs) {
-  MAPLE_JS_ASSERT(false && "NIY: __jsintl_CollatorCompare");
-  return __null_value();
+__jsvalue __jsintl_CollatorCompare(__jsvalue *collator, __jsvalue *x, __jsvalue *y) {
+  // Check if 'collator' is a non-object value or is not initlized as a Collator.
+  if (!__is_js_object(collator)) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
+  __jsobject *collator_obj = __jsval_to_object(collator);
+  if (collator_obj->object_class != JSINTL_COLLATOR) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
+
+  // Step 1.
+  __jsvalue p = StrToVal("boundCompare");
+  __jsvalue bound_compare = __jsop_getprop(collator, &p);
+
+  if (__is_undefined(&bound_compare)) {
+#define ATTRS(nargs, length) \
+  ((uint32_t)(uint8_t)(nargs == UNCERTAIN_NARGS ? 1: 0) << 24 | (uint32_t)(uint8_t)nargs << 16 | \
+       (uint32_t)(uint8_t)length << 8 | JSFUNCPROP_NATIVE)
+    __jsvalue f = __js_new_function((void*)CompareStrings, NULL, ATTRS(3, 2));
+
+    *x = __string_value(__jsval_to_string(x));
+    *y = __string_value(__jsval_to_string(y));
+
+    __jsvalue args[] = { *collator, *x, *y };
+    int arg_count = 1;
+
+    __jsvalue this_binding_old = __js_ThisBinding;
+    __js_ThisBinding = f;
+    __jsvalue bc = __jsfun_pt_bind(&f, args, arg_count);
+    __js_ThisBinding = this_binding_old;
+
+    __jsop_setprop(collator, &p, &bc);
+  }
+  // Step 2.
+  __jsvalue res = __jsop_getprop(collator, &p);
+  return res;
 }
 
 // ECMA-402 1.0 10.3.3
 // Intl.Collator.prototype.resolvedOptions()
 __jsvalue __jsintl_CollatorResolvedOptions(__jsvalue *collator) {
+  // Check if 'collator' is object.
+  if (!__is_js_object(collator)) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
+  // Check if 'collator' is an Intl.Collator object.
+  __jsobject *collator_obj = __jsval_to_object(collator);
+  if (collator_obj->object_class != JSINTL_COLLATOR) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
+
   __jsobject *col_obj = __create_object();
   __jsobj_set_prototype(col_obj, JSBUILTIN_INTL_COLLATOR_PROTOTYPE);
-  col_obj->object_class = JSINTL;
+  col_obj->object_class = JSINTL_COLLATOR;
   col_obj->extensible = true;
   col_obj->object_type = JSREGULAR_OBJECT;
   __jsvalue col = __object_value(col_obj);
 
   std::vector<std::string> props = {"locale", "usage", "sensitivity",
-                                    "ignorePunctuation", "collation", "kn"};
+                                    "ignorePunctuation", "collation"};
   __jsvalue p, v;
   for (int i = 0; i < props.size(); i++) {
     p = StrToVal(props[i]);
@@ -326,12 +456,11 @@ void InitializeCollatorProperties(__jsvalue *collator, __jsvalue *locales, std::
       locale_object->object_type = JSREGULAR_OBJECT;
 
       p = StrToVal("co");
-      std::vector<std::string> vec = GetCollations();
-      v = StrVecToVal(vec);
+      v = __null_value();
       __jsop_setprop(&locale, &p, &v); // Set 'co' to locale.
 
       p = StrToVal("kn");
-      vec = {"true", "false"};
+      std::vector<std::string> vec = {"true", "false"};
       v = StrVecToVal(vec);
       __jsop_setprop(&locale, &p, &v); // Set 'kn' to locale.
 
@@ -409,6 +538,8 @@ std::vector<std::string> GetCollations() {
   for (int i = 0; i < count; i++) {
     const char *col_value = uenum_next(values, nullptr, &status);
     assert(U_FAILURE(status) == false);
+
+    if (strcmp(col_value, "standard") == 0 || strcmp(col_value, "search") == 0) continue;
     std::string s(col_value);
     vec.push_back(s);
   }

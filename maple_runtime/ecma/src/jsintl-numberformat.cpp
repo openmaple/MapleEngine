@@ -59,7 +59,7 @@ __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
                                        uint32_t nargs) {
   __jsobject *obj = __create_object();
   __jsobj_set_prototype(obj, JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE);
-  obj->object_class = JSINTL;
+  obj->object_class = JSINTL_NUMBERFORMAT;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
   __jsvalue obj_val = __object_value(obj);
@@ -125,7 +125,7 @@ void InitializeNumberFormat(__jsvalue *this_number_format, __jsvalue *locales,
   // Let 'NumberFormat' be the standard built-in object that is the initial value
   // of Intl.NumberFormat.
   __jsobject *number_format_obj = __create_object();
-  number_format_obj->object_class = JSINTL;
+  number_format_obj->object_class = JSINTL_NUMBERFORMAT;
   number_format_obj->extensible = true;
   number_format_obj->object_type = JSREGULAR_OBJECT;
   __jsvalue number_format = __object_value(number_format_obj);
@@ -390,6 +390,9 @@ __jsvalue __jsintl_NumberFormatSupportedLocalesOf(__jsvalue *number_format,
 // returns a String value representing x according to the effective locale and the formatting options
 // of numberFormat.
 __jsvalue FormatNumber(__jsvalue *number_format, __jsvalue *x_val) {
+  if (__is_boolean(x_val)) {
+    *x_val = __number_value(__jsval_to_number(x_val));
+  }
   // Step 1.
   __jsvalue negative = __boolean_value(false);
   __jsvalue n = __undefined_value();
@@ -667,7 +670,7 @@ __jsvalue __jsintl_NumberFormatFormat(__jsvalue *number_format, __jsvalue *value
     // Let bf b the result of calling the [[Call]] internal method of 'bind' with F
     // as 'this' value and an argument list containing the single item 'this'.
     __jsvalue args[] = {*number_format, *value};
-    int len = sizeof(args)/sizeof(__jsvalue);
+    int len = 1;
 
     // Temporary workaround to avoid 'strict' constraint inside __jsfun_pt_bind() function.
     // Save old value of __js_ThisBinding.
@@ -698,7 +701,7 @@ __jsvalue __jsintl_NumberFormatFormat(__jsvalue *number_format, __jsvalue *value
 __jsvalue __jsintl_NumberFormatResolvedOptions(__jsvalue *number_format) {
   __jsobject *nf_obj = __create_object();
   __jsobj_set_prototype(nf_obj, JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE);
-  nf_obj->object_class = JSINTL;
+  nf_obj->object_class = JSINTL_NUMBERFORMAT;
   nf_obj->extensible = true;
   nf_obj->object_type = JSREGULAR_OBJECT;
   __jsvalue nf = __object_value(nf_obj);

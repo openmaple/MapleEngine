@@ -57,6 +57,24 @@ namespace maple {
 #endif
     };
 
+    struct TValue {
+        union {
+            // All integer primitive types are signed in Java
+            uint8_t    u1;      // Java boolean
+            int8_t     i8;      // Java byte
+            int16_t    i16;     // Java short
+            uint16_t   u16;     // Java char, defined as Unicode character
+            int32_t    i32;     // Java int
+            int64_t    i64;     // Java long
+            float      f32;     // Java float
+            double     f64;     // Java double
+            uint8_t*   a64;     // Java object ref (use uint8_t* instead of void* for reference)
+            uint8_t    u8;      // For operand type in OP_lshr
+            uint32_t   u32;     // For operand type in OP_ge, OP_eq...
+            uint64_t   u64;     // For zero-extension
+            struct nan_encode c;
+        } x;
+    };
 }
 
 #endif // MAPLERE_MVALUE_H_

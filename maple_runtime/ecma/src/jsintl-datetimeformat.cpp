@@ -15,12 +15,19 @@
 
 #include <algorithm>
 #include <unicode/ucal.h>
+#include <unicode/calendar.h>
+#include <unicode/timezone.h>
+#include <unicode/udat.h>
+#include <unicode/udatpg.h>
+#include <unicode/ustring.h>
 #include "jsobject.h"
 #include "jsobjectinline.h"
 #include "jsarray.h"
 #include "jsmath.h"
 #include "jsdate.h"
 #include "jsintl.h"
+
+static const size_t INITIAL_STRING_BUFFER_SIZE = 32;
 
 extern std::unordered_map<std::string,std::vector<std::string>> kDateTimeFormatComponents;
 
@@ -29,7 +36,7 @@ __jsvalue __js_DateTimeFormatConstructor(__jsvalue *this_arg,
                                         __jsvalue *arg_list, uint32_t nargs) {
   __jsobject *obj = __create_object();
   __jsobj_set_prototype(obj, JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE);
-  obj->object_class = JSINTL;
+  obj->object_class = JSINTL_DATETIMEFORMAT;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
   __jsvalue obj_val = __object_value(obj);
@@ -74,10 +81,18 @@ void InitializeDateTimeFormat(__jsvalue *this_date_time_format, __jsvalue *local
   __jsvalue required = StrToVal("any");
   __jsvalue default_val = StrToVal("date");
   *options = ToDateTimeOptions(options, &required, &default_val);
+
   // Step 5.
   // Let 'opt' be a new Record.
   __jsobject *opt_obj = __js_new_obj_obj_0();
   __jsvalue opt = __object_value(opt_obj);
+
+  // Additional check if 'localeMatcher' is null (JSI9502).
+  __jsvalue p = StrToVal("localeMatcher");
+  __jsvalue v = __jsop_getprop(options, &p);
+  if (__is_null(&v)) {
+    MAPLE_JS_RANGEERROR_EXCEPTION();
+  }
   // Step 6.
   __jsvalue property = StrToVal("localMatcher");
   __jsvalue type = StrToVal("string");
@@ -90,13 +105,12 @@ void InitializeDateTimeFormat(__jsvalue *this_date_time_format, __jsvalue *local
   __jsop_setprop(&opt, &prop, &matcher);
   // Step 8.
   __jsobject *data_time_format_obj = __create_object();
-  data_time_format_obj->object_class = JSINTL;
+  data_time_format_obj->object_class = JSINTL_DATETIMEFORMAT;
   data_time_format_obj->extensible = true;
   data_time_format_obj->object_type = JSREGULAR_OBJECT;
   __jsvalue date_time_format = __object_value(data_time_format_obj);
 
-  InitializeDateTimeFormatProperties(&date_time_format, &requested_locales,
-      {"availableLocales", "relevantExtensionKeys", "localeData", "formats"});
+  InitializeDateTimeFormatProperties(&date_time_format, &requested_locales, options);
 
   // Step 9.
   // Let 'localeData' be the value of the [[localeData]] internal property of
@@ -177,6 +191,7 @@ void InitializeDateTimeFormat(__jsvalue *this_date_time_format, __jsvalue *local
   // method of 'localeData' with argument 'dataLocale'.
   // Note: 'dataLocale' from Step 14.
   __jsvalue data_locale_data = __jsop_getprop(&locale_data, &data_locale);
+
   // Step 21.
   // Let 'formats' be the result of calling the [[Get]] internal method of
   // 'dataLocaleData' with argument "formats".
@@ -205,12 +220,19 @@ void InitializeDateTimeFormat(__jsvalue *this_date_time_format, __jsvalue *local
     std::string p = it->first;
     prop = StrToVal(p);
     // Step 25b.
-    __jsvalue p_desc = __jsobj_getOwnPropertyNames(&best_format, &prop);
+    // Let 'pDesc' be  the result of calling the [[GetOwnProperty]] internal method of
+    // 'bestFormat' with argument 'prop'.
+    __jsobject *best_format_obj = __jsval_to_object(&best_format);
+    __jsprop_desc p_desc = __jsobj_internal_GetOwnProperty(best_format_obj, &prop);
     // Step 25c.
-    if (!__is_undefined(&p_desc)) {
+    // If 'pDesc' is not undefined, then
+    if (!__is_undefined_desc(p_desc)) {
       // Step 25c i.
+      // Let 'p' be the rersult of calling the [[Get]] internal method of 'bestFormat'
+      // with argument 'prop'.
       __jsvalue p = __jsop_getprop(&best_format, &prop);
       // Step 25c ii.
+      // Set the [[<prop>]] internal property of 'dateTimeFormat' to 'p'.
       __jsop_setprop(this_date_time_format, &prop, &p);
     }
   }
@@ -231,6 +253,7 @@ void InitializeDateTimeFormat(__jsvalue *this_date_time_format, __jsvalue *local
       hr12 = __jsop_getprop(&data_locale_data, &prop);
     }
     // Step 27b.
+    prop = StrToVal("hour");
     __jsop_setprop(this_date_time_format, &prop, &hr12);
     // Step 27c.
     if (__jsval_to_boolean(&hr12) == true) {
@@ -280,6 +303,7 @@ __jsvalue ToDateTimeOptions(__jsvalue *options, __jsvalue *required, __jsvalue *
   __jsvalue this_object = __undefined_value();
   __jsvalue properties = __undefined_value();
   *options = __jsobj_create(&this_object, options, &properties);
+
   // Step 4.
   __jsvalue need_defaults = __boolean_value(true);
   // Step 5.
@@ -288,7 +312,7 @@ __jsvalue ToDateTimeOptions(__jsvalue *options, __jsvalue *required, __jsvalue *
   __jsvalue prop, value;
   if (required_str == "date" || required_str == "any") {
     // Step 5a.
-    vprops = {"weekday", "year", "day"};
+    vprops = {"weekday", "year", "month", "day"};
     for (int i = 0; i < vprops.size(); i++) {
       // Step 5a i.
       prop = StrToVal(vprops[i]);
@@ -473,9 +497,79 @@ __jsvalue __jsintl_DateTimeFormatSupportedLocalesOf(__jsvalue *date_time_format,
 }
 
 // ECMA-402 1.0 12.3.2
-__jsvalue ToLocalTime(__jsvalue *x, __jsvalue *calendar, __jsvalue *time_zone) {
-  MAPLE_JS_ASSERT(false && "NIY: ToLocalTime()");
-  return __null_value();
+__jsvalue ToLocalTime(__jsvalue *date, __jsvalue *calendar, __jsvalue *time_zone) {
+  // Step 1. Apply calendrical calculations on date for the given calendar and time zone
+  // to produce weekday, era, year, month, day, hour, minute, second, and inDST values.
+  int64_t t = (int64_t)__jsval_to_double(date);
+  std::string cal = ValToStr(calendar);
+  int64_t tz;
+  if (cal == "gregory") {
+    UErrorCode status = U_ZERO_ERROR;
+    UnicodeString tz_str;
+    // check if 'time_zone' is not defined.
+    if (!__is_undefined(time_zone)) {
+      tz_str = UnicodeString::fromUTF8(ValToStr(time_zone));
+    } else {
+      tz_str = UnicodeString::fromUTF8("UTC");
+    }
+    TimeZone *timezone = TimeZone::createTimeZone(tz_str);
+    Calendar *cal = Calendar::createInstance(status);
+    UDate cur_date = cal->getNow();
+    int32_t std_offset, dst_offset;
+    timezone->getOffset(cur_date, true, std_offset, dst_offset, status);
+    int64_t time_zone_offset = (int64_t) dst_offset/(1000*60*60);
+    tz = t + time_zone_offset;
+  } else {
+    MAPLE_JS_ASSERT(false && "NIY: ToLocalTime");
+  }
+  // Step 2. Return a Record with fields [[weekday]], [[era]], [[year]], [[month]], [[day]],
+  // [[hour]], [[minute]], [[second]], and [[inDST]], each with the corresponding calculated
+  // value.
+  __jsvalue p, v;
+
+  __jsobject *time_object = __create_object();
+  __jsvalue time_val = __object_value(time_object);
+  time_object->object_class = JSOBJECT;
+  time_object->extensible = true;
+  time_object->object_type = JSREGULAR_OBJECT;
+
+  p = StrToVal("weekday");
+  v = __double_value(WeekDay(tz));
+  __jsop_setprop(&time_val, &p, &v);
+
+  p = StrToVal("era");
+  int64_t year = YearFromTime(tz);
+  v = (year < 0) ? StrToVal("BC") : StrToVal("AD");
+  __jsop_setprop(&time_val, &p, &v);
+
+  p = StrToVal("year");
+  v = __double_value(YearFromTime(tz));
+  __jsop_setprop(&time_val, &p, &v);
+
+  p = StrToVal("month");
+  v = __double_value(MonthFromTime(tz));
+  __jsop_setprop(&time_val, &p, &v);
+
+  p = StrToVal("day");
+  v = __double_value(DateFromTime(tz));
+  __jsop_setprop(&time_val, &p ,&v);
+
+  p = StrToVal("hour");
+  v = __double_value(HourFromTime(tz));
+  __jsop_setprop(&time_val, &p, &v);
+
+  p = StrToVal("minute");
+  v = __double_value(MinFromTime(tz));
+  __jsop_setprop(&time_val, &p, &v);
+
+  p = StrToVal("second");
+  v = __double_value(SecFromTime(tz));
+  __jsop_setprop(&time_val, &p, &v);
+
+  p = StrToVal("inDST");
+  // TODO: inDST handling
+
+  return time_val;
 }
 
 // ECMA-402 1.0 12.3.2
@@ -489,6 +583,7 @@ __jsvalue FormatDateTime(__jsvalue *date_time_format, __jsvalue *x) {
     MAPLE_JS_RANGEERROR_EXCEPTION();
   }
   // Step 2.
+  // Let 'locale' be the value of the [[locale]] internal property of 'dateTimeFormat'.
   prop = StrToVal("locale");
   __jsvalue locale = __jsop_getprop(date_time_format, &prop);
   // Step 3.
@@ -532,6 +627,8 @@ __jsvalue FormatDateTime(__jsvalue *date_time_format, __jsvalue *x) {
   prop = StrToVal("pattern");
   __jsvalue result = __jsop_getprop(date_time_format, &prop);
 
+  // Replace operation step 7 to 8 (described in the specification) with ICU.
+#if 0
   // Step 7.
   __jsvalue pm;
   for (auto it = kDateTimeFormatComponents.begin(); it != kDateTimeFormatComponents.end(); it++) {
@@ -539,15 +636,17 @@ __jsvalue FormatDateTime(__jsvalue *date_time_format, __jsvalue *x) {
     std::vector<std::string> values = it->second;
     // Step 7a i.
     // Let 'p' b the name given in the Property column of the row.
-    __jsvalue p = StrToVal(it->first);
+    __jsvalue p = StrToVal(property);
     // Step 7a ii.
     // Let 'f' be the value of the [[<p>]] internal property of 'dateTimeFormat'.
     __jsvalue f = __jsop_getprop(date_time_format, &p);
+    if (__is_undefined(&f)) continue; // Skip undefined value for a given property.
+
     // Step 7a iii.
     // Let 'v' be the value of tm.[[<p>]].
     __jsvalue v = __jsop_getprop(&tm, &p);
     // Step 7a iv.
-    if (ValToStr(&p) == "hour" && __jsval_to_number(&v) <= 0) {
+    if (ValToStr(&p) == "year" && __jsval_to_number(&v) <= 0) {
       v = __number_value(1 - __jsval_to_number(&v));
     }
     // Step 7a v.
@@ -609,6 +708,53 @@ __jsvalue FormatDateTime(__jsvalue *date_time_format, __jsvalue *x) {
     __jsvalue search = StrToVal("{ampm}");
     __jsstr_replace(&result, &search, &fv);
   }
+#endif
+
+  // 'result' contains pattern.
+  std::string pat = ValToStr(&result);
+  UChar *pattern = (UChar*)VMMallocGC(sizeof(UChar)*(pat.length()+1));
+  for (int i = 0; i < pat.length(); i++) {
+    pattern[i] = pat[i];
+  }
+  std::string tz;
+  if (!__is_undefined(&time_zone)) {
+    tz = ValToStr(&time_zone);
+  } else {
+    tz = "UTC"; // TODO: check
+  }
+  const UChar *timezone = (UChar *)tz.c_str();
+  uint32_t timezone_len = tz.length();
+  uint32_t pattern_len = u_strlen(pattern);
+  UErrorCode status = U_ZERO_ERROR;
+  std::string locale_name = ValToStr(&locale);
+
+  UDateFormat *df = udat_open(UDAT_PATTERN, UDAT_PATTERN, locale_name.c_str(), timezone, timezone_len, pattern, pattern_len, &status);
+  if (U_FAILURE(status)) {
+    MAPLE_JS_ASSERT(false && "Error in udat_open()");
+  }
+  // Convert to Gregorian calendar.
+  UCalendar *cal = const_cast<UCalendar*>(udat_getCalendar(df));
+  const double start_of_time = -8.64e15;
+  ucal_setGregorianChange(cal, start_of_time, &status);
+
+  double time = __jsval_to_double(x);
+  UChar *chars = (UChar*)VMMallocGC(sizeof(UChar)*(INITIAL_STRING_BUFFER_SIZE+1));
+  int32_t size = udat_format(df, time, chars, INITIAL_STRING_BUFFER_SIZE, nullptr, &status);
+  if (status == U_BUFFER_OVERFLOW_ERROR) {
+    status = U_ZERO_ERROR;
+    VMReallocGC(chars, sizeof(UChar)*(INITIAL_STRING_BUFFER_SIZE+1), sizeof(UChar)*(size+1));
+    udat_format(df, time, chars, size, nullptr, &status);
+  }
+  if (U_FAILURE(status)) {
+    MAPLE_JS_ASSERT(false && "Error in udat_format()");
+  }
+  char *res = (char*)VMMallocGC(sizeof(char)*64);
+  u_austrcpy(res, chars);
+  std::string res_str(res);
+  result = StrToVal(res_str);
+
+  udat_close(df);
+
   // Step 9.
   return result;
 }
@@ -675,21 +821,25 @@ __jsvalue __jsintl_DateTimeFormatFormat(__jsvalue *date_time_format, __jsvalue *
 __jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *date_time_format) {
   __jsobject *dtf_obj = __create_object();
   __jsobj_set_prototype(dtf_obj, JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE);
-  dtf_obj->object_class = JSINTL;
+  dtf_obj->object_class = JSINTL_DATETIMEFORMAT;
   dtf_obj->extensible = true;
   dtf_obj->object_type = JSREGULAR_OBJECT;
   __jsvalue dtf = __object_value(dtf_obj);
 
   std::vector<std::string> props = {"locale", "calendar", "numberingSystem",
-                                    "timeZone", "hour12", "weekday", "era",
-                                    "year", "month", "day", "hour", "minute",
-                                    "second", "timezoneName"};
+                                    "timeZone", "weekday", "era", "year",
+                                    "month", "day", "hour", "minute",
+                                    "second", "timezoneName",
+                                    "hour12", "hourNo0"};
   __jsvalue p, v;
   for (int i = 0; i < props.size(); i++) {
     p = StrToVal(props[i]);
     v = __jsop_getprop(date_time_format, &p);
     __jsop_setprop(&dtf, &p, &v);
   }
+  // TODO: Handle "pattern".
+  p = StrToVal("pattern");
+
   // NOTE: is this really needed?
   p = StrToVal("initializedNumberFormat");
   v = __boolean_value(true);
@@ -698,97 +848,115 @@ __jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *date_time_format) {
   return dtf;
 }
 
-void InitializeDateTimeFormatProperties(__jsvalue *date_time_format, __jsvalue *locales,
-                                        std::vector<std::string> properties) {
+//void InitializeDateTimeFormatProperties(__jsvalue *date_time_format, __jsvalue *locales, __jsvalue *options, std::vector<std::string> properties) {
+void InitializeDateTimeFormatProperties(__jsvalue *date_time_format, __jsvalue *locales, __jsvalue *options) {
   __jsvalue p, v;
   __jsvalue locale, locale_data;
-  for (int i = 0; i < properties.size(); i++) {
-    if (properties[i] == "availableLocales") {
-      p = StrToVal(properties[i]);
-      v = GetAvailableLocales();
-      __jsop_setprop(date_time_format, &p, &v);
-    } else if (properties[i] == "relevantExtensionKeys") {
-      p = StrToVal(properties[i]);
-      std::vector<std::string> values = {"ca", "nu"};
-      v = StrVecToVal(values);
-      __jsop_setprop(date_time_format, &p, &v);
-    } else if (properties[i] == "localeData") {
-      __jsobject *locale_object = __create_object();
-      locale = __object_value(locale_object);
-      locale_object->object_class = JSOBJECT;
-      locale_object->extensible = true;
-      locale_object->object_type = JSREGULAR_OBJECT;
+  std::string locale_name;
 
-      // [[localeData]][locale]['nu']
-      std::vector<std::string> vec = GetNumberingSystems();
-      v = StrVecToVal(vec);
-      p = StrToVal("nu");
-      __jsop_setprop(&locale, &p, &v);  // Set "nu" to locale.
+  p = StrToVal("availableLocales");
+  v = GetAvailableLocales();
+  __jsop_setprop(date_time_format, &p, &v);
 
-      // [[localeData]][locale]['ca']
-      vec = GetAvailableCalendars();
-      v = StrVecToVal(vec);
-      p = StrToVal("ca");
-      __jsop_setprop(&locale, &p, &v);  // Set "ca" to locale.
+  p = StrToVal("relevantExtensionKeys");
+  std::vector<std::string> values = {"ca", "nu"};
+  v = StrVecToVal(values);
+  __jsop_setprop(date_time_format, &p, &v);
 
-      __jsobject *locale_data_object = __create_object();
-      locale_data = __object_value(locale_data_object);
-      locale_data_object->object_class = JSOBJECT;
-      locale_data_object->extensible = true;
-      locale_data_object->object_type = JSREGULAR_OBJECT;
+  // Set 'localeData'.
+  __jsobject *locale_object = __create_object();
+  locale = __object_value(locale_object);
+  locale_object->object_class = JSOBJECT;
+  locale_object->extensible = true;
+  locale_object->object_type = JSREGULAR_OBJECT;
 
-      __jsobject *locales_object = __jsval_to_object(locales); // locales from function arguments.
-      uint32_t size = __jsobj_helper_get_length(locales_object);
-      for (int j = 0; j < size; j++) {
-        p = __jsarr_GetElem(locales_object, j);
-        // locale should be included in available_locales.
-        __jsvalue available_locales = GetAvailableLocales();
-        p = BestAvailableLocale(&available_locales, &p);
-        __jsop_setprop(&locale_data, &p, &locale);
-      }
-      if (size == 0) {
-        // When locale is not specified, use default one.
-        p = DefaultLocale();
-        __jsop_setprop(&locale_data, &p, &locale);
-      }
+  // [[localeData]][locale]['nu']
+  std::vector<std::string> vec = GetNumberingSystems();
+  v = StrVecToVal(vec);
+  p = StrToVal("nu");
+  __jsop_setprop(&locale, &p, &v);  // Set "nu" to locale.
 
-      p = StrToVal(properties[i]);
-      // Set localeData to date_time_format object.
-      __jsop_setprop(date_time_format, &p, &locale_data);
-    } else if (properties[i] == "formats") {
-      // Create a single format for en-US by default,
-      // and make it as a single entry of "formats" array.
-      __jsobject *format_object = __create_object();
-      __jsvalue format = __object_value(format_object);
-      format_object->object_class = JSOBJECT;
-      format_object->extensible = true;
-      format_object->object_type = JSREGULAR_OBJECT;
+  // [[localeData]][locale]['ca']
+  vec = GetAvailableCalendars();
+  v = StrVecToVal(vec);
+  p = StrToVal("ca");
+  __jsop_setprop(&locale, &p, &v);  // Set "ca" to locale.
 
-      p = StrToVal("hour");
-      v = StrToVal("numeric");
-      __jsop_setprop(&format, &p, &v);
-      p = StrToVal("minute");
-      v = StrToVal("2-digit");
-      __jsop_setprop(&format, &p, &v);
-      p = StrToVal("second");
-      v = StrToVal("2-digit");
-      __jsop_setprop(&format, &p, &v);
-      p = StrToVal("pattern");
-      v = StrToVal("{hour}:{minute}:{second}");
-      __jsop_setprop(&format, &p, &v);
-      p = StrToVal("pattern12");
-      v = StrToVal("{hour}:{minute}:{second}:{ampm}");
-      __jsop_setprop(&format, &p, &v);
+  __jsobject *locale_data_object = __create_object();
+  locale_data = __object_value(locale_data_object);
+  locale_data_object->object_class = JSOBJECT;
+  locale_data_object->extensible = true;
+  locale_data_object->object_type = JSREGULAR_OBJECT;
 
-      __jsobject *formats_array = __js_new_arr_elems_direct(&format, 1);
-      __jsvalue formats = __object_value(formats_array);
+  __jsobject *locales_object = __jsval_to_object(locales); // locales from function arguments.
+  uint32_t size = __jsobj_helper_get_length(locales_object);
+  for (int j = 0; j < size; j++) {
+    p = __jsarr_GetElem(locales_object, j);
+    // locale should be included in available_locales.
+    __jsvalue available_locales = GetAvailableLocales();
+    p = BestAvailableLocale(&available_locales, &p);
 
-      // Set 'formats" to localeData.
-      assert(__is_null(&locale) == false);
-      p = StrToVal("formats");
-      __jsop_setprop(&locale, &p, &formats);
+    // Check if 'p' is undefined (JSI9460).
+    if (__is_undefined(&p)) {
+      continue;
     }
+    __jsop_setprop(&locale_data, &p, &locale);
+
+    locale_name = ValToStr(&p);
   }
+  if (size == 0) {
+    // When locale is not specified, use default one.
+    p = DefaultLocale();
+    __jsop_setprop(&locale_data, &p, &locale);
+  }
+
+  p = StrToVal("localeData");
+  // Set localeData to date_time_format object.
+  __jsop_setprop(date_time_format, &p, &locale_data);
+
+  // Set 'format'.
+  // Create a single format for en-US by default,
+  // and make it as a single entry of "formats" array.
+  __jsobject *format_object = __create_object();
+  __jsvalue format = __object_value(format_object);
+  format_object->object_class = JSOBJECT;
+  format_object->extensible = true;
+  format_object->object_type = JSREGULAR_OBJECT;
+
+  p = StrToVal("hour");
+  v = StrToVal("numeric");
+  __jsop_setprop(&format, &p, &v);
+
+  p = StrToVal("minute");
+  v = StrToVal("2-digit");
+  __jsop_setprop(&format, &p, &v);
+
+  p = StrToVal("second");
+  v = StrToVal("2-digit");
+  __jsop_setprop(&format, &p, &v);
+
+  p = StrToVal("pattern");
+  MAPLE_JS_ASSERT(__is_null(&locale) == false);
+  std::string pat = GetDateTimeStringSkeleton(&locale, options);
+  v = GetICUPattern(locale_name, pat);
+  __jsop_setprop(&format, &p, &v);
+
+  p = StrToVal("pattern12");
+  v = StrToVal("{hour}:{minute}:{second}:{ampm}");
+  __jsop_setprop(&format, &p, &v);
+
+  __jsobject *formats_array = __js_new_arr_elems_direct(&format, 1);
+  __jsvalue formats = __object_value(formats_array);
+
+  // Set 'formats" to localeData.
+  assert(__is_null(&locale) == false);
+  p = StrToVal("formats");
+  __jsop_setprop(&locale, &p, &formats);
+
+  // Set 'timeZone' to date_time_format.
+  p = StrToVal("timeZone");
+  v = __undefined_value();
+  __jsop_setprop(date_time_format, &p, &v);
 }
 
 std::vector<std::string> GetAvailableCalendars() {
@@ -828,4 +996,158 @@ std::string ToBCP47CalendarName(const char* name) {
     res = std::string(name);
   }
   return res;
+}
+
+std::string GetDateTimeStringSkeleton(__jsvalue *locale, __jsvalue *options) {
+  std::string pattern = "";
+  __jsvalue p, v;
+  p = StrToVal("weekday");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string weekday = ValToStr(&v);
+    if (weekday == "narrow") {
+      pattern += "EEEEE";
+    } else if (weekday == "short") {
+      pattern += "E";
+    } else if (weekday == "long") {
+      pattern += "EEEE";
+    }
+  }
+  p = StrToVal("era");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string era = ValToStr(&v);
+    if (era == "narrow") {
+      pattern += "GGGGG";
+    } else if (era == "short") {
+      pattern += "G";
+    } else if (era == "long") {
+      pattern += "GGGG";
+    }
+  }
+  p = StrToVal("year");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string year = ValToStr(&v);
+    if (year == "2-digit") {
+      pattern += "yy";
+    } else if (year == "numeric") {
+      pattern += "y";
+    }
+  }
+  p = StrToVal("month");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string month = ValToStr(&v);
+    if (month == "2-digit") {
+      pattern += "MM";
+    } else if (month == "numeric") {
+      pattern += "M";
+    } else if (month == "narrow") {
+      pattern += "MMMMM";
+    } else if (month == "short") {
+      pattern += "MMM";
+    } else if (month == "long") {
+      pattern += "MMMM";
+    }
+  }
+  p = StrToVal("day");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string day = ValToStr(&v);
+    if (day == "2-digit") {
+      pattern += "dd";
+    } else if (day == "numeric") {
+      pattern += "d";
+    }
+  }
+  std::string hour_pattern_char = "j";
+  p = StrToVal("hour12");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    hour_pattern_char = "h";
+  } else {
+    hour_pattern_char = "H";
+  }
+  p = StrToVal("hour");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string hour = ValToStr(&v);
+    if (hour == "2-digit") {
+      pattern += hour_pattern_char + hour_pattern_char;
+    } else if (hour == "numeric") {
+      pattern += hour_pattern_char;
+    }
+  }
+  p = StrToVal("minute");
+  v=  __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string minute = ValToStr(&v);
+    if (minute == "2-digit") {
+      pattern += "mm";
+    } else if (minute == "numeric") {
+      pattern += "m";
+    }
+  }
+  p = StrToVal("second");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string second = ValToStr(&v);
+    if (second == "2-digit") {
+      pattern += "ss";
+    } else if (second == "numeric") {
+      pattern += "s";
+    }
+  }
+  p = StrToVal("timeZoneName");
+  v = __jsop_getprop(options, &p);
+  if (!__is_undefined(&v)) {
+    std::string timezone_name = ValToStr(&v);
+    if (timezone_name == "short") {
+      pattern += "z";
+    } else if (timezone_name == "long") {
+      pattern += "zzzz";
+    }
+  }
+  return pattern;
+}
+
+const char* ToICULocale(std::string& locale) {
+  replace(locale.begin(), locale.end(), '-', '_');
+  return locale.c_str();
+}
+
+__jsvalue GetICUPattern(std::string& locale, std::string& skeleton) {
+  UErrorCode status = U_ZERO_ERROR;
+  UDateTimePatternGenerator *gen = udatpg_open(ToICULocale(locale), &status);
+  if (U_FAILURE(status)) {
+    MAPLE_JS_ASSERT(false && "Error in udatpg_open()");
+  }
+
+  uint32_t skeleton_len = skeleton.length();
+  UChar skel[skeleton_len];
+  for (int i = 0; i < skeleton_len; i++) {
+    skel[i] = skeleton[i];
+  }
+  int32_t size = udatpg_getBestPattern(gen, skel, skeleton_len, nullptr, 0, &status);
+  if (U_FAILURE(status) && status != U_BUFFER_OVERFLOW_ERROR) {
+    MAPLE_JS_ASSERT(false && "Error in udatpg_getBestPattern()");
+  }
+  UChar *pattern = (UChar*) VMMallocGC(sizeof(UChar)*(size+1));
+  pattern[size] = '\0';
+  if (!pattern)
+    MAPLE_JS_ASSERT(false && "Error in VMMAllocGC()");
+
+  status = U_ZERO_ERROR;
+  udatpg_getBestPattern(gen, skel, skeleton_len, pattern, size, &status);
+  if (U_FAILURE(status)) {
+    MAPLE_JS_ASSERT(false && "Error in udatpg_getBestPattern()");
+  }
+  char dst[64];
+  u_austrcpy(dst, pattern);
+  std::string res(dst);
+
+  udatpg_close(gen);
+
+  return StrToVal(dst);
 }

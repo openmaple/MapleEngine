@@ -121,6 +121,11 @@ __jsvalue __jsop_add(__jsvalue *x, __jsvalue *y) {
       memory_manager->RecallString(lstr);
     if (!isRstr)
       memory_manager->RecallString(rstr);
+    else {
+      if (!__is_string(y)) { // if rstr is created from a non-string value y, it must be released.
+        memory_manager->RecallString(rstr);
+      }
+    }
     return ret;
   } else {
     if (__is_undefined(x) || __is_undefined(y)) {

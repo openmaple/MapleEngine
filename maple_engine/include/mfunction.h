@@ -133,12 +133,12 @@ namespace maple {
           uint32_t argumentsDeleted;
           void *argumentsObj;
           DynamicMethodHeaderT * header;
-          explicit DynMFunction(DynamicMethodHeaderT *, void *, MValue *stack);
-          explicit DynMFunction(uint8_t *argPC, DynamicMethodHeaderT *cheader, MValue *stack);
+          explicit DynMFunction(DynamicMethodHeaderT *, void *, TValue *stack);
+          explicit DynMFunction(uint8_t *argPC, DynamicMethodHeaderT *cheader, TValue *stack);
 
       public:
           uint64_t                      sp;            // evaluation stack pointer
-          MValue                       *operand_stack; // for locals, return value, throw value and evaluation stack
+          TValue                       *operand_stack; // for locals, return value, throw value and evaluation stack
           uint8_t                      *lib_addr;
 
      public:

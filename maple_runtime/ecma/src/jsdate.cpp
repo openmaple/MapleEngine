@@ -522,10 +522,59 @@ __jsvalue __jsdate_ToDateString(__jsvalue *this_date) {
 }
 
 // ES5 15.9.5.6 Date.prototype.toLocaleDateString()
-__jsvalue __jsdate_ToLocaleDateString(__jsvalue *this_date) {
-  // TODO: not implemented yet
-  __jsobject *obj = __jsdata_value_to_obj(this_date);
-  return __object_value(obj);
+__jsvalue __jsdate_ToLocaleDateString(__jsvalue *this_date, __jsvalue *arg_list, uint32_t nargs) {
+  __jsvalue locales, options;
+
+  if (nargs == 1) {
+    locales = arg_list[0];
+  } else if (nargs == 2) {
+    locales = arg_list[0];
+    options = arg_list[1];
+  }
+  // Step 1.
+  __jsvalue x = *this_date;
+  // Step 2.
+  if (__is_nan(&x)) {
+    return StrToVal("Invalid Date");
+  }
+  // Step 3.
+  if (nargs < 1) {
+    locales = __undefined_value();
+  }
+  // Step 4.
+  if (nargs < 2) {
+    options = __undefined_value();
+  }
+
+  // Check if 'locales' is undefined.
+  if (__is_undefined(&locales)) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
+  // Check if 'locales' is valid (JSI9502).
+  locales = CanonicalizeLocaleList(&locales);
+
+  // Check if 'options' are undefined.
+  if (!__is_undefined(&options)) {
+    __jsvalue p = StrToVal("localeMatcher");
+    __jsvalue v = __jsop_getprop(&options, &p);
+    // Check if 'localeMatcher' in 'options' is null (JSI9502).
+    if (__is_null(&v)) {
+      MAPLE_JS_RANGEERROR_EXCEPTION();
+    }
+  }
+
+  // Step 5.
+  __jsvalue required = StrToVal("date");
+  __jsvalue defaults = StrToVal("date");
+  options = ToDateTimeOptions(&options, &required, &defaults);
+
+  // Step 6.
+  __jsvalue undefined_val = __undefined_value();
+  __jsvalue args[] = {locales, options};
+  __jsvalue date_time_format = __js_DateTimeFormatConstructor(&undefined_val, args, 2);
+
+  // Step 7.
+  return FormatDateTime(&date_time_format, &x);
 }
 
 // ES5 15.9.5.5 Date.prototype.toLocaleString()
@@ -553,6 +602,24 @@ __jsvalue __jsdate_ToLocaleString(__jsvalue *this_date, __jsvalue *arg_list, uin
   if (nargs < 2) {
     options = __undefined_value();
   }
+
+  // Check if 'locales' is undefined.
+  if (__is_undefined(&locales)) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
+  // Check if 'locales' is valid (JSI9502).
+  locales = CanonicalizeLocaleList(&locales);
+
+  // Check if 'options' is undefined (JSI9416).
+  if (!__is_undefined(&options)) {
+    __jsvalue p = StrToVal("localeMatcher");
+    __jsvalue v = __jsop_getprop(&options, &p);
+    // Check if 'localeMatcher' in 'options' is null (JSI9502).
+    if (__is_null(&v)) {
+      MAPLE_JS_RANGEERROR_EXCEPTION();
+    }
+  }
+
   // Step 5.
   __jsvalue required = StrToVal("any");
   __jsvalue defaults = StrToVal("all");
@@ -566,10 +633,59 @@ __jsvalue __jsdate_ToLocaleString(__jsvalue *this_date, __jsvalue *arg_list, uin
 }
 
 // ES5 15.9.5.7 Date.prototype.toLocaleTimeString()
-__jsvalue __jsdate_ToLocaleTimeString(__jsvalue *this_date) {
-  // TODO: not implemented yet
-  __jsobject *obj = __jsdata_value_to_obj(this_date);
-  return __object_value(obj);
+__jsvalue __jsdate_ToLocaleTimeString(__jsvalue *this_date, __jsvalue *arg_list, uint32_t nargs) {
+  __jsvalue locales, options;
+
+  if (nargs == 1) {
+    locales = arg_list[0];
+  } else if (nargs == 2) {
+    locales = arg_list[0];
+    options = arg_list[1];
+  }
+  // Step 1.
+  __jsvalue x = *this_date;
+  // Step 2.
+  if (__is_nan(&x)) {
+    return StrToVal("Invalid Date");
+  }
+  // Step 3.
+  if (nargs < 1) {
+    locales = __undefined_value();
+  }
+  // Step 4.
+  if (nargs < 2) {
+    options = __undefined_value();
+  }
+ 
+  // Check if 'locales' is undefined.
+  if (__is_undefined(&locales)) {
+    MAPLE_JS_TYPEERROR_EXCEPTION();
+  }
+  // Check if 'locales' is valid (JSI9502).
+  locales = CanonicalizeLocaleList(&locales);
+
+  // Check if 'options' is undefined (JSI9416).
+  if (!__is_undefined(&options)) {
+    __jsvalue p = StrToVal("localeMatcher");
+    __jsvalue v = __jsop_getprop(&options, &p);
+    // Check if 'localeMatcher' in 'options' is null (JSI9502).
+    if (__is_null(&v)) {
+      MAPLE_JS_RANGEERROR_EXCEPTION();
+    }
+  }
+
+  // Step 5.
+  __jsvalue required = StrToVal("time");
+  __jsvalue defaults = StrToVal("time");
+  options = ToDateTimeOptions(&options, &required, &defaults);
+
+  // Step 6.
+  __jsvalue undefined_val = __undefined_value();
+  __jsvalue args[] = {locales, options};
+  __jsvalue date_time_format = __js_DateTimeFormatConstructor(&undefined_val, args, 2);
+
+  // Step 7.
+  return FormatDateTime(&date_time_format, &x);
 }
 
 // ES5 B.2.4 Date.prototype.getYea()

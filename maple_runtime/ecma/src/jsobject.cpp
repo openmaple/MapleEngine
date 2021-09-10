@@ -51,11 +51,20 @@ static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, 
     if (it != obj->prop_string_map->end()) {
       p = it->second;
     } else { // name could be copied to a new string, find by name
-      std::wstring w_name = __jsstr_to_wstring(name);
-      for (it = obj->prop_string_map->begin(); it != obj->prop_string_map->end(); ++it) {
-	if (__jsstr_to_wstring(it->first) == w_name) {
-          p = it->second; // found by name
-          break;
+      if (__jsstr_is_ascii(name)) {
+        for (it = obj->prop_string_map->begin(); it != obj->prop_string_map->end(); ++it) {
+          if (__jsstr_equal(it->first, name)) {
+            p = it->second; // found by name
+            break;
+          }
+        }
+      } else {
+        std::wstring w_name = __jsstr_to_wstring(name);
+        for (it = obj->prop_string_map->begin(); it != obj->prop_string_map->end(); ++it) {
+          if (__jsstr_to_wstring(it->first) == w_name) {
+            p = it->second; // found by name
+            break;
+          }
         }
       }
     }
@@ -348,20 +357,20 @@ void __jsobj_helper_DefineOwnPropertyByValue(__jsobject *obj, uint32_t index, __
     __jsobj_internal_DefineOwnPropertyByValue(obj, index, d, throw_p);
   }
 }
-void __jsobj_helper_DefineOwnProperty(__jsobject *obj, __jsstring *p, __jsprop_desc d, bool throw_p) {
+void __jsobj_helper_DefineOwnProperty(__jsobject *obj, __jsstring *p, __jsprop_desc d, bool throw_p, __jsprop *prop = NULL) {
   if (obj->object_class == JSARRAY) {
     __jsvalue p_v = __string_value(p);
     __jsarr_internal_DefineOwnProperty(obj, &p_v, d, throw_p);
   } else {
-    __jsobj_internal_DefineOwnProperty(obj, p, d, throw_p);
+    __jsobj_internal_DefineOwnProperty(obj, p, d, throw_p, prop);
   }
 }
 
-void __jsobj_helper_DefineOwnProperty(__jsobject *obj, __jsvalue *p, __jsprop_desc d, bool throw_p) {
+void __jsobj_helper_DefineOwnProperty(__jsobject *obj, __jsvalue *p, __jsprop_desc d, bool throw_p, __jsprop *prop = NULL) {
   if (obj->object_class == JSARRAY) {
     __jsarr_internal_DefineOwnProperty(obj, p, d, throw_p);
   } else {
-    __jsobj_internal_DefineOwnProperty(obj, p, d, throw_p);
+    __jsobj_internal_DefineOwnProperty(obj, p, d, throw_p, prop);
   }
 }
 
@@ -371,18 +380,18 @@ void __jsobj_helper_add_value_propertyByValue(__jsobject *obj, uint32_t index, _
 }
 
 // Helper function for add a value property.
-void __jsobj_helper_add_value_property(__jsobject *obj, __jsvalue *name, __jsvalue *v, uint32_t attrs) {
+void __jsobj_helper_add_value_property(__jsobject *obj, __jsvalue *name, __jsvalue *v, uint32_t attrs, __jsprop *prop) {
   __jsprop_desc d = __new_value_desc(v, attrs);
-  __jsobj_helper_DefineOwnProperty(obj, name, d, false);
+  __jsobj_helper_DefineOwnProperty(obj, name, d, false, prop);
 }
 
-void __jsobj_helper_add_value_property(__jsobject *obj, __jsstring *p, __jsvalue *v, uint32_t attrs) {
+void __jsobj_helper_add_value_property(__jsobject *obj, __jsstring *p, __jsvalue *v, uint32_t attrs, __jsprop *prop) {
   __jsprop_desc desc = __new_value_desc(v, attrs);
-  __jsobj_helper_DefineOwnProperty(obj, p, desc, false);
+  __jsobj_helper_DefineOwnProperty(obj, p, desc, false, prop);
 }
 
-void __jsobj_helper_add_value_property(__jsobject *obj, __jsbuiltin_string_id id, __jsvalue *v, uint32_t attrs) {
-  __jsobj_helper_add_value_property(obj, __jsstr_get_builtin(id), v, attrs);
+void __jsobj_helper_add_value_property(__jsobject *obj, __jsbuiltin_string_id id, __jsvalue *v, uint32_t attrs, __jsprop *prop) {
+  __jsobj_helper_add_value_property(obj, __jsstr_get_builtin(id), v, attrs, prop);
 }
 
 __jsprop *__jsobj_helper_init_value_propertyByValue(__jsobject *obj, uint32_t index, __jsvalue *v, uint32_t attrs) {
@@ -419,6 +428,11 @@ __jsprop *__add_builtin_function_property(__jsbuiltin_string_id id, void *method
                                               obj->builtin_id == JSBUILTIN_ARRAYPROTOTYPE ||
                                               obj->builtin_id == JSBUILTIN_DATEPROTOTYPE ||
                                               obj->builtin_id == JSBUILTIN_REGEXPPROTOTYPE ||
+                                              obj->builtin_id == JSBUILTIN_NUMBERPROTOTYPE ||
+                                              obj->builtin_id == JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE ||
+                                              obj->builtin_id == JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE ||
+                                              obj->builtin_id == JSBUILTIN_INTL_COLLATOR_PROTOTYPE ||
+                                              __jsstr_equal_to_builtin(name, JSBUILTIN_STRING_SUPPORTED_LOCALES_OF) ||
                                               obj->builtin_id == JSBUILTIN_JSON ||
                                               obj->builtin_id == JSBUILTIN_OBJECTPROTOTYPE));
     __jsvalue v = __js_new_function((void *)method, NULL, attrs, -1, (!skipprototype));
@@ -444,7 +458,10 @@ __jsprop *__add_builtin_value_property(__jsbuiltin_string_id id, __jsbuiltin_obj
       case JSBUILTIN_REGEXPPROTOTYPE:
           attrs = id != JSBUILTIN_STRING_PROTOTYPE ? JSPROP_DESC_HAS_VUWUEC : JSPROP_DESC_HAS_VUWUEUC;
           break;
+      case JSBUILTIN_INTL_COLLATOR_CONSTRUCTOR:
       case JSBUILTIN_INTL_NUMBERFORMAT_CONSTRUCTOR:
+      case JSBUILTIN_INTL_DATETIMEFORMAT_CONSTRUCTOR:
+          // must be writable.
           attrs = JSPROP_DESC_HAS_VWUEC;
           break;
       default:
@@ -495,11 +512,13 @@ __jsprop *add_builtin_accessor_property(__jsbuiltin_string_id id, __jsbuiltin_ob
       f = __js_new_function((void *)getter, NULL, get_attr);
       __jsobject *fobj = __jsval_to_object(&f);
       __set_get(&(prop->desc), fobj);
+      GCIncRf(fobj);
     }
     if (setter) {
       f = __js_new_function((void *)setter, NULL, set_attr);
       __jsobject *fobj = __jsval_to_object(&f);
       __set_set(&(prop->desc), fobj);
+      GCIncRf(fobj);
     }
     return prop;
   }
@@ -715,6 +734,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       break;
     case JSBUILTIN_REFERENCEERRORPROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_REFERENCEERRORCONSTRUCTOR));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NAME, (JSBUILTIN_REFERENCEERRORCONSTRUCTOR), __string_value(__jsstr_get_builtin(JSBUILTIN_STRING_REFERENCE_ERROR_UL)));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_referenceerror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_ERROR_CONSTRUCTOR:
@@ -731,6 +751,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       break;
     case JSBUILTIN_EVALERROR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_EVALERROR_CONSTRUCTOR));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NAME, (JSBUILTIN_EVALERROR_CONSTRUCTOR), __string_value(__jsstr_get_builtin(JSBUILTIN_STRING_EVAL_ERROR_UL)));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_evalerror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_RANGEERROR_CONSTRUCTOR:
@@ -738,6 +759,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       break;
     case JSBUILTIN_RANGEERROR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_RANGEERROR_CONSTRUCTOR));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NAME, (JSBUILTIN_RANGEERROR_CONSTRUCTOR), __string_value(__jsstr_get_builtin(JSBUILTIN_STRING_RANGE_ERROR_UL)));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_rangeerror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_SYNTAXERROR_CONSTRUCTOR:
@@ -753,6 +775,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       break;
     case JSBUILTIN_URIERROR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_URIERROR_CONSTRUCTOR));
+      ADD_VALUE2_PROPERTY(JSBUILTIN_STRING_NAME, (JSBUILTIN_URIERROR_CONSTRUCTOR), __string_value(__jsstr_get_builtin(JSBUILTIN_STRING_URI_ERROR_UL)));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __js_urierror_pt_toString, ATTRS(0, 0));
       break;
     case JSBUILTIN_TYPEERROR_CONSTRUCTOR:
@@ -819,9 +842,9 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SET_UTC_MONTH_UL, __jsdate_SetUTCMonth, ATTRS(UNCERTAIN_NARGS, 2));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_SET_UTC_SECONDS_UL, __jsdate_SetUTCSeconds, ATTRS(UNCERTAIN_NARGS, 2));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_DATE_STRING_UL, __jsdate_ToDateString, ATTRS(0, 0));
-      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_LOCALE_DATE_STRING_UL, __jsdate_ToLocaleDateString, ATTRS(0, 0));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_LOCALE_DATE_STRING_UL, __jsdate_ToLocaleDateString, ATTRS(UNCERTAIN_NARGS, 0));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_LOCALE_STRING_UL, __jsdate_ToLocaleString, ATTRS(UNCERTAIN_NARGS, 0));
-      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_LOCALE_TIME_STRING_UL, __jsdate_ToLocaleTimeString, ATTRS(0, 0));
+      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_LOCALE_TIME_STRING_UL, __jsdate_ToLocaleTimeString, ATTRS(UNCERTAIN_NARGS, 0));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_STRING_UL, __jsdate_ToString, ATTRS(0, 0));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_TIME_STRING_UL, __jsdate_ToTimeString, ATTRS(0, 0));
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_TO_UTC_STRING_UL, __jsdate_ToUTCString, ATTRS(0, 0));
@@ -879,7 +902,7 @@ __jsprop *__create_builtin_property(__jsobject *obj, __jsstring *name) {
       break;
     case JSBUILTIN_INTL_COLLATOR_PROTOTYPE:
       ADD_VALUE_PROPERTY(JSBUILTIN_STRING_CONSTRUCTOR, (JSBUILTIN_INTL_COLLATOR_CONSTRUCTOR));
-      ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_COMPARE, __jsintl_CollatorCompare, ATTRS(2, 2));
+      ADD_ACCESSOR_PROPERTY(JSBUILTIN_STRING_COMPARE, JSBUILTIN_INTL_COLLATOR_PROTOTYPE, __jsintl_CollatorCompare, ATTRS(2, 0), NULL, ATTRS(0, 0), JSPROP_DESC_HAS_UVUWUEC);
       ADD_FUNCTION_PROPERTY(JSBUILTIN_STRING_RESOLVED_OPTIONS, __jsintl_CollatorResolvedOptions, ATTRS(0, 0));
       break;
     case JSBUILTIN_INTL_NUMBERFORMAT_CONSTRUCTOR:
@@ -1139,7 +1162,7 @@ __jsprop_desc __jsobj_internal_GetOwnPropertyByValue(__jsobject *o, uint32_t ind
   return prop->desc;
 }
 // ecma 8.12.1
-__jsprop_desc __jsobj_internal_GetOwnProperty(__jsobject *o, __jsstring *p) {
+__jsprop_desc __jsobj_internal_GetOwnProperty(__jsobject *o, __jsstring *p, __jsprop **prop_cache = NULL) {
   bool isNum;
   uint32 idxNum = __jsstr_is_numidx(p, isNum);
   if (isNum) {
@@ -1155,6 +1178,8 @@ __jsprop_desc __jsobj_internal_GetOwnProperty(__jsobject *o, __jsstring *p) {
   // ecma 8.12.1 step 2~8
   // ??? Can we return the prop-desc directly.
   // It seems there's no difference from ecma 8.12.1 step 2~8.
+  if (prop_cache)
+    *prop_cache = prop;
   return prop->desc;
 }
 
@@ -1415,10 +1440,12 @@ bool __jsobj_internal_CanPutByValue(__jsobject *o, uint32_t index) {
   __jsprop_desc inherited = __jsobj_internal_GetPropertyByValue(proto, index);
   return InheritedDescCanbePut(inherited, o);
 }
+
 // ecma 8.12.4
-bool __jsobj_internal_CanPut(__jsobject *o, __jsstring *p, bool isStrict) {
+bool __jsobj_internal_CanPut(__jsobject *o, __jsstring *p, bool isStrict, __jsprop **prop_cache) {
+  __jsprop *prop = NULL;
   // ecma 8.12.4 step 1.
-  __jsprop_desc desc = __jsobj_internal_GetOwnProperty(o, p);
+  __jsprop_desc desc = __jsobj_internal_GetOwnProperty(o, p, &prop);
   // ecma 8.12.4 step 2.
   if (!__is_undefined_desc(desc)) {
     // ecma 8.12.4 step 2.a.
@@ -1431,16 +1458,25 @@ bool __jsobj_internal_CanPut(__jsobject *o, __jsstring *p, bool isStrict) {
         return false;
       }
       // ecma 8.12.4 step 2.a.ii.
+      if (prop_cache)
+        *prop_cache = prop;
       return true;
     }
     // ecma 8.12.4 step 2.b.
+    if (prop_cache)
+      *prop_cache = prop;
     return __writable(desc);
   }
   // ecma 8.12.4 step 3.
   __jsobject *proto = __jsobj_get_prototype(o);
   // ecma 8.12.4 step 4.
   if (!proto) {
-    return o->extensible;
+    if (o->extensible) {
+      if (prop_cache)
+        *prop_cache = prop;
+      return true;
+    }
+    return false;
   }
   // ecma 8.12.3 step 5.
   __jsprop_desc inherited = __jsobj_internal_GetProperty(proto, p);
@@ -1538,9 +1574,10 @@ void __jsobj_internal_Put(__jsobject *o, __jsstring *p, __jsvalue *v, bool throw
       return;
     }
   }
+  __jsprop *prop_cache = NULL;
   // Slow path.
   // ecma 8.12.5 step 1.
-  if (!__jsobj_internal_CanPut(o, p, isStrict)) {
+  if (!__jsobj_internal_CanPut(o, p, isStrict, &prop_cache)) {
     // ecma 8.12.5 step 1.a.
     if (throw_p) {
       MAPLE_JS_TYPEERROR_EXCEPTION();
@@ -1551,10 +1588,15 @@ void __jsobj_internal_Put(__jsobject *o, __jsstring *p, __jsvalue *v, bool throw
     }
   }
   // ecma 8.12.5 step 2.
-  __jsprop_desc own_desc = __jsobj_internal_GetOwnProperty(o, p);
+  //__jsprop_desc own_desc = __jsobj_internal_GetOwnProperty(o, p);
+  __jsprop_desc own_desc;
+  if (prop_cache)
+    own_desc = prop_cache->desc;
+  else
+    own_desc = __jsobj_internal_GetOwnProperty(o, p);
   // ecma 8.12.5 step 3.
   if (__jsprop_desc_IsDataDescriptor(own_desc)) {
-    __jsobj_helper_add_value_property(o, p, v, JSPROP_DESC_HAS_V);
+    __jsobj_helper_add_value_property(o, p, v, JSPROP_DESC_HAS_V, prop_cache);
     return;
   }
   // ecma 8.12.5 step 4.
@@ -1571,7 +1613,7 @@ void __jsobj_internal_Put(__jsobject *o, __jsstring *p, __jsvalue *v, bool throw
   }
   // ecma 8.12.5 step 6.
   else {
-    __jsobj_helper_add_value_property(o, p, v, JSPROP_DESC_HAS_VWEC);
+    __jsobj_helper_add_value_property(o, p, v, JSPROP_DESC_HAS_VWEC, prop_cache);
   }
   // ecma 8.12.5 step 7.
   return;
@@ -1683,11 +1725,20 @@ bool __jsobj_internal_Delete(__jsobject *o, __jsstring *p, bool mark_as_deleted,
       if (it != o->prop_string_map->end()) {
         prop = it->second;
       } else {
-        std::wstring w_name = __jsstr_to_wstring(p);
-        for (it = o->prop_string_map->begin(); it != o->prop_string_map->end(); ++it) {
-          if (__jsstr_to_wstring(it->first) == w_name) {
-            prop = it->second;
-            break;
+        if (__jsstr_is_ascii(p)) {
+          for (it = o->prop_string_map->begin(); it != o->prop_string_map->end(); ++it) {
+            if (__jsstr_equal(it->first, p)) {
+              prop = it->second; // found by name
+              break;
+            }
+          }
+        } else {
+          std::wstring w_name = __jsstr_to_wstring(p);
+          for (it = o->prop_string_map->begin(); it != o->prop_string_map->end(); ++it) {
+            if (__jsstr_to_wstring(it->first) == w_name) {
+              prop = it->second; // found by name
+              break;
+            }
           }
         }
       }
@@ -2069,10 +2120,18 @@ void __jsobj_internal_DefineOwnPropertyByValue(__jsobject *o, uint32_t index, __
   prop->desc = current;
 }
 // ecma 8.12.9
-void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsstring *p, __jsprop_desc desc, bool throw_p) {
+void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsstring *p, __jsprop_desc desc, bool throw_p, __jsprop *prop_cache) {
   __jsobj_helper_convert_to_generic(o);
   // ecma 8.12.9 step 1
-  __jsprop_desc current = __jsobj_internal_GetOwnProperty(o, p);
+  __jsprop_desc current;
+  __jsprop *prop = NULL;
+  if (prop_cache) {
+    prop = prop_cache;
+    current = prop_cache->desc;
+  }
+  else {
+    current = __jsobj_internal_GetOwnProperty(o, p, &prop);
+  }
   // ecma 8.12.9 step 2
   bool extensible = o->extensible;
   bool isNum;
@@ -2193,7 +2252,9 @@ void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsstring *p, __jsprop_d
   /* ecma 8.12.9 step 12 */
   __jsobj_helper_set_data_desc_gc(&current, desc, false);
   __jsobj_helper_set_access_desc_gc(&current, desc, false);
-  __jsprop *prop = isNum ? __jsobj_helper_get_propertyByValue(o, idxNum) :
+
+  if (prop == NULL)
+    prop = isNum ? __jsobj_helper_get_propertyByValue(o, idxNum) :
                            __jsobj_helper_get_property(o, p);
   MIR_ASSERT(prop);
   prop->desc = current;
@@ -2201,17 +2262,17 @@ void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsstring *p, __jsprop_d
 }
 
 // ecma 8.12.9
-void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsbuiltin_string_id id, __jsprop_desc desc, bool throw_p) {
-  __jsobj_internal_DefineOwnProperty(o, __jsstr_get_builtin(id), desc, throw_p);
+void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsbuiltin_string_id id, __jsprop_desc desc, bool throw_p, __jsprop *prop_cache) {
+  __jsobj_internal_DefineOwnProperty(o, __jsstr_get_builtin(id), desc, throw_p, prop_cache);
 }
 
 // ecma 8.12.9
-void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsvalue *p, __jsprop_desc desc, bool throw_p) {
+void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsvalue *p, __jsprop_desc desc, bool throw_p, __jsprop *prop_cache) {
   __jsstring *name = __js_ToString(p);
   if (!__is_string(p)) {
     GCIncRf(name);
   }
-  __jsobj_internal_DefineOwnProperty(o, name, desc, throw_p);
+  __jsobj_internal_DefineOwnProperty(o, name, desc, throw_p, prop_cache);
   if (!__is_string(p)) {
     GCDecRf(name);
   }

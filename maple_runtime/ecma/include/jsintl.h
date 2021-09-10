@@ -90,16 +90,15 @@ void InitializeCollatorProperties(__jsvalue *collator, __jsvalue *locales, std::
 __jsvalue __jsintl_CollatorSupportedLocalesOf(__jsvalue *this_arg,
                                               __jsvalue *arg_list,
                                               uint32_t nargs);
-__jsvalue __jsintl_CollatorCompare(__jsvalue *this_arg, __jsvalue *arg_list,
-                                   uint32_t nargs);
+__jsvalue __jsintl_CollatorCompare(__jsvalue *this_collator, __jsvalue *x, __jsvalue *y);
+__jsvalue CompareStrings(__jsvalue *collator, __jsvalue *x, __jsvalue *y);
 __jsvalue __jsintl_CollatorResolvedOptions(__jsvalue *collator);
 std::vector<std::string> GetCollations();
 
 // DateTimeFormat
 void InitializeDateTimeFormat(__jsvalue *date_time_format, __jsvalue *locales,
                               __jsvalue *options);
-void InitializeDateTimeFormatProperties(__jsvalue *date_time_format, __jsvalue *locales,
-                                     std::vector<std::string> properties);
+void InitializeDateTimeFormatProperties(__jsvalue *date_time_format, __jsvalue *locales, __jsvalue *options);
 __jsvalue __jsintl_DateTimeFormatSupportedLocalesOf(__jsvalue *date_time_format,
                                                     __jsvalue *arg_list,
                                                     uint32_t nargs);
@@ -109,5 +108,8 @@ __jsvalue ToLocalTime(__jsvalue *x, __jsvalue *calendar, __jsvalue *time_zone);
 __jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *date_time_format);
 std::vector<std::string> GetAvailableCalendars();
 std::string ToBCP47CalendarName(const char* name);
+std::string GetDateTimeStringSkeleton(__jsvalue *locale, __jsvalue *options);
+__jsvalue GetICUPattern(std::string&, std::string& pattern);
+const char* ToICULocale(std::string& locale);
 
 #endif // JSINTL_H

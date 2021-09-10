@@ -126,7 +126,9 @@ enum __jsobj_class : uint8_t {
   JSON,
   JSERROR,
   JSARGUMENTS,
-  JSINTL,
+  JSINTL_COLLATOR,
+  JSINTL_NUMBERFORMAT,
+  JSINTL_DATETIMEFORMAT,
   JSOBJ_CLASS_LAST,
   JSDOUBLE,
   JSARRAYBUFFER,
@@ -246,9 +248,9 @@ static inline __jsobject *__jsobj_get_prototype(__jsobject *obj) {
 
 void __jsobj_helper_reject(bool throw_p);
 void __jsobj_helper_convert_to_generic(__jsobject *obj);
-void __jsobj_helper_add_value_property(__jsobject *obj, __jsvalue *name, __jsvalue *v, uint32_t attrs);
-void __jsobj_helper_add_value_property(__jsobject *obj, __jsstring *name, __jsvalue *v, uint32_t attrs);
-void __jsobj_helper_add_value_property(__jsobject *obj, __jsbuiltin_string_id id, __jsvalue *v, uint32_t attrs);
+void __jsobj_helper_add_value_property(__jsobject *obj, __jsvalue *name, __jsvalue *v, uint32_t attrs, __jsprop *prop_cache = NULL);
+void __jsobj_helper_add_value_property(__jsobject *obj, __jsstring *name, __jsvalue *v, uint32_t attrs, __jsprop *prop_cache = NULL);
+void __jsobj_helper_add_value_property(__jsobject *obj, __jsbuiltin_string_id id, __jsvalue *v, uint32_t attrs, __jsprop *prop_cache = NULL);
 __jsprop *__jsobj_helper_init_value_property(__jsobject *obj, __jsbuiltin_string_id id, __jsvalue *v, uint32_t attrs);
 
 uint32_t __jsobj_helper_get_length(__jsobject *obj);
@@ -284,7 +286,7 @@ __jsvalue __jsobj_internal_Get(__jsobject *o, __jsstring *p);
 __jsvalue __jsobj_internal_Get(__jsobject *o, __jsbuiltin_string_id id);
 __jsvalue __jsobj_internal_Get(__jsobject *o, uint32_t index);
 // ecma 8.12.4
-bool __jsobj_internal_CanPut(__jsobject *o, __jsvalue *p, bool isStrict = false);
+bool __jsobj_internal_CanPut(__jsobject *o, __jsvalue *p, bool isStrict = false, __jsprop **prop_cache = NULL);
 // ecma 8.12.5
 void __jsobj_internal_Put(__jsobject *o, __jsstring *p, __jsvalue *v, bool throw_p, bool isStrict = false);
 void __jsobj_internal_Put(__jsobject *o, uint32_t index, __jsvalue *v, bool throw_p);
@@ -299,9 +301,9 @@ bool __jsobj_internal_Delete(__jsobject *o, uint32_t index, bool mark_as_deleted
 __jsvalue __object_internal_DefaultValue(__jsobject *o, __jstype hint);
 void __jsobj_internal_DefineOwnPropertyByValue(__jsobject *o, uint32_t index, __jsprop_desc desc, bool throw_p);
 // ecma 8.12.9
-void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsstring *p, __jsprop_desc desc, bool throw_p);
-void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsbuiltin_string_id id, __jsprop_desc desc, bool throw_p);
-void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsvalue *p, __jsprop_desc desc, bool throw_p);
+void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsstring *p, __jsprop_desc desc, bool throw_p, __jsprop *prop_cache = NULL);
+void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsbuiltin_string_id id, __jsprop_desc desc, bool throw_p, __jsprop *prop_cache = NULL);
+void __jsobj_internal_DefineOwnProperty(__jsobject *o, __jsvalue *p, __jsprop_desc desc, bool throw_p, __jsprop *prop_cache = NULL);
 // ecma 15.2.3.2
 __jsvalue __jsobj_getPrototypeOf(__jsvalue *this_object, __jsvalue *o);
 // ecma 15.2.3.3

@@ -370,6 +370,19 @@ void MemoryManager::ReleaseVariables(uint8_t *base, uint8_t *typetagged, uint8_t
 // and builtin-variables may refer to a heap-object or a heap-string.
 // If we release global-variables and builtin-variables here, there must be no heap
 // memory used.
+#ifdef MEMORY_LEAK_CHECK
+static void BatchRCDec(void* lowAddr, void* hiAddr) {
+  uint8 *addr = (uint8*)lowAddr;
+  while(addr < hiAddr) {
+    void **local = (void**)addr;
+    if (IS_NEEDRC((long)(*local))) {
+      GCDecRf(*local);
+    }
+    addr += sizeof(void*);
+  }
+}
+#endif
+
 void MemoryManager::AppMemLeakCheck() {
 #ifdef MEMORY_LEAK_CHECK
 
@@ -390,21 +403,14 @@ void MemoryManager::AppMemLeakCheck() {
   printf("Releasing local variables in main()\n");
   released_b4 = mem_released;
   size_t live_objs_b4 =  live_objects.size();
-  uint8 *addr = (uint8*)mainSP;
-  while(addr < mainFP) {
-    void **local = (void**)addr;
-#ifdef COULD_BE_ADDRESS
-    if (COULD_BE_ADDRESS((void*)((long)*local & PAYLOAD_MASK)))
-#endif
-      if (IS_NEEDRC((long)(*local))) {
-        GCDecRf(*local);
-      }
-    addr += sizeof(void*);
-  }
+
+  BatchRCDec(mainSP, mainFP);
 
   printf("After releasing main(), app_mem_usage= %u alloc= %u release= %u max= %u\n", app_mem_usage, mem_allocated, mem_released, max_app_mem_usage);
   printf("  Released main() variables: %u B released objects= %lu\n", mem_released - released_b4, live_objs_b4 - live_objects.size());
 
+  printf("Releasing global variables\n");
+  BatchRCDec(mainGP, mainTopGP);
 
   printf("Num Malloc calls= %u including Realloc calls= %u\n", num_Malloc_calls, num_Realloc_calls);
   printf("Mem allocation by type:\n");
@@ -575,11 +581,11 @@ MemoryChunk *MemoryManager::NewMemoryChunk(uint32 offset, uint32 size, MemoryChu
     free_memory_chunk_ = new_chunk->next;
   } else {
     // new_chunk = (MemoryChunk *) MallocInternal(sizeof(MemoryChunk));
-    if (size + vm_free_small_offset_ > vm_memory_small_size_) {
-      MIR_FATAL("TODO run out of VM internal memory.\n");
-    }
     new_chunk = (MemoryChunk *)((uint8 *)vm_memory_ + vm_free_small_offset_);
     vm_free_small_offset_ += Bytes4Align(sizeof(MemoryChunk));
+    if (vm_free_small_offset_ > vm_memory_small_size_) {
+      MIR_FATAL("TODO run out of VM internal memory.\n");
+    }
   }
   new_chunk->offset_ = offset;
   new_chunk->size_ = size;
@@ -1267,8 +1273,11 @@ void MemoryManager::ManageObject(__jsobject *obj, ManageType flag) {
     case JSDOUBLE:
     case JSREGEXP:
     case JSDATE:
-    case JSINTL:
+    case JSINTL_COLLATOR:
+    case JSINTL_NUMBERFORMAT:
+    case JSINTL_DATETIMEFORMAT:
     case JSARGUMENTS:
+    case JSERROR:
       break;
     default:
       MIR_FATAL("manage unknown js object class");
@@ -1529,7 +1538,7 @@ void MemoryManager::ManageObject(__jsobject *obj, ManageType flag) {
             __jsvalue val = bound_args[i];
             ManageJsvalue(&val, flag);
           }
-          if (flag == RECALL || flag == SWEEP) {
+          if ((flag == RECALL || flag == SWEEP) && bound_argc > 0) {
             RecallMem(fun->env, bound_argc * sizeof(__jsvalue));
           }
         } else {

@@ -400,7 +400,6 @@ std::vector<std::string> VecValToVecStr(__jsvalue *value) {
 __jsvalue __js_IntlConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
                             uint32_t nargs) {
   __jsobject *obj = __create_object();
-  obj->object_class = JSINTL;
   obj->extensible = true;
   obj->object_type = JSREGULAR_OBJECT;
 
@@ -624,12 +623,13 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
   }
   // Step 4.
   // Let 'O' be ToObject(locales).
-  __jsobject *o = __jsval_to_object(locales);
+  __jsobject *o_obj = __jsval_to_object(locales);
+  __jsvalue o = __object_value(o_obj);
 
   // Step 5.
   // Let 'lenValue' be the result of calling the [[Get]] internal method of 'O'
   // with the argument "length".
-  __jsvalue len_value = __jsobj_helper_get_length_value(o);
+  __jsvalue len_value = __jsobj_helper_get_length_value(o_obj);
 
   // Step 6.
   // Let 'len' be ToUint32(lenValue).
@@ -643,10 +643,12 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
     // Step 8a.
     __jsstring *p_k = __js_NumberToString(k);
     // Step 8b.
-    __jsvalue k_value;
-    bool k_present = __jsobj_helper_HasPropertyAndGet(o, p_k, &k_value);
+    bool k_present = __jsobj_internal_HasProperty(o_obj, p_k);
     // Step 8c.
     if (k_present) {
+      // Step 8c i.
+      __jsvalue prop = __string_value(p_k);
+      __jsvalue k_value = __jsop_getprop(&o, &prop);
       // Step 8c ii.
       if (!(__is_string(&k_value) || __is_js_object(&k_value))) {
         MAPLE_JS_TYPEERROR_EXCEPTION();
@@ -660,7 +662,7 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
       // Step 8c v.
       __jsvalue tag = CanonicalizeLanguageTag(tag_str);
       // step 8c vi.
-      __jsvalue idx = __jsarr_pt_indexOf(&seen, &tag, 0);
+      __jsvalue idx = __jsarr_pt_indexOf(&seen, &tag, 1);
       if (__js_ToNumber(&idx) == -1) {
         seen = __jsarr_pt_concat(&seen, &tag, 1);
       }
@@ -895,19 +897,36 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
   }
   // Step 11.
   while (i < len) {
+    // default for each entry.
+    __jsvalue value = __null_value();
+
     // Step 11a.
     __jsvalue key = __jsarr_GetElem(__jsval_to_object(relevant_extension_keys), i);
     // Step 11b.
     __jsvalue found_locale_data = __jsop_getprop(locale_data, &found_locale);
+
+    // Check if 'found_locale_data' is undefined (JSI9398).
+    if (__is_undefined(&found_locale_data)) {
+      break;
+    }
+
     // Step 11c.
     // Let 'keyLocaleData' be the result of calling the [[Get]] internal method
     // of 'foundLocaleData' with the argument 'key'.
     __jsvalue key_locale_data = __jsop_getprop(&found_locale_data, &key);
+
+    // Error handling for null or undefined key_locale_data.
+    if (__is_null_or_undefined(&key_locale_data)) {
+      __jsop_setprop(&result, &key, &value);
+      i++;
+      continue;
+    }
     // Step 11d.
     // Let 'value' be the result of calling the [[Get]] internal method of 'keyLocaleData'
     // with argument "0".
     __jsobject *o = __jsval_to_object(&key_locale_data);
-    __jsvalue value = __jsarr_GetElem(o, 0);
+
+    value = __jsarr_GetElem(o, 0);
     // Step 11e.
     __jsvalue supported_extension_addition = StrToVal("");
     // Step 11g.
@@ -962,7 +981,8 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
     }
     if (!__is_undefined(&options_value)) {
       // Step 11h ii.
-      __jsvalue idx = __jsstr_indexOf(&key_locale_data, &options_value, 0);
+      __jsvalue zero_idx = __number_value(0);
+      __jsvalue idx = __jsstr_indexOf(&key_locale_data, &options_value, &zero_idx);
       if (__jsval_to_number(&idx) != -1) {
         // Step 11h ii 1.
         __jsstring *options_value_str = __jsval_to_string(&options_value);
@@ -981,7 +1001,7 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
     __jsstr_concat(&supported_extension_addition, &supported_extension, 1);
     // Step 11h k.
     i++;
-  }
+  } // end of while
   // Step 12.
   if (__jsstr_get_length(__jsval_to_string(&supported_extension)) > 2) {
     // Step 12a.
@@ -1108,15 +1128,20 @@ __jsvalue GetOption(__jsvalue *options, __jsvalue *property, __jsvalue *type,
                     __jsvalue *values, __jsvalue *fallback) {
   // Step 1.
   __jsvalue value = __jsop_getprop(options, property);
+
+  // Additional null check for 'value'.
+  if (__is_null(&value)) {
+    MAPLE_JS_REFERENCEERROR_EXCEPTION();
+  }
+
   // Step 2.
-  if (!__is_undefined(&value)) {
+  // Additional check if 'value' is none (JSI9479).
+  if (!__is_undefined(&value) && !__is_none(&value)) {
     // Step 2a.
     // Assert: 'type' is "boolean" or "string".
     __jsstring *jsstr_type = __jsval_to_string(type);
-    std::string string_type_str = "string";
-    __jsstring *string_type = __jsstr_new_from_char(string_type_str.c_str());
-    std::string boolean_type_str = "boolean";
-    __jsstring *boolean_type = __jsstr_new_from_char(boolean_type_str.c_str());
+    __jsstring *string_type = __jsstr_new_from_char("string");
+    __jsstring *boolean_type = __jsstr_new_from_char("boolean");
     MAPLE_JS_ASSERT(__jsstr_equal(jsstr_type, string_type) || __jsstr_equal(jsstr_type, boolean_type));
     // Step 2b.
     // If 'type' is "boolean", then let 'value' to be ToBoolean(value).
@@ -1153,6 +1178,10 @@ __jsvalue GetNumberOption(__jsvalue *options, __jsvalue *property,
                           __jsvalue *fallback) {
   // Step 1.
   __jsvalue value = __jsop_getprop(options, property);
+  // Additional check for 'value' (JSI9465).
+  if (__is_infinity(&value) || __is_neg_infinity(&value)) {
+    MAPLE_JS_REFERENCEERROR_EXCEPTION();
+  }
   // Step 2.
   if (!__is_undefined(&value)) {
     // Step 2a.
