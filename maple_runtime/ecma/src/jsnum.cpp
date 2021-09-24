@@ -231,7 +231,7 @@ __jsvalue __js_str2double(__jsstring *str, bool &isNum) {
             chars[2] == '0')) {
     return __number_value(0);
   } else if (len == 2 && chars[0] == '-' && chars[1] == '0')
-    return __double_value(0); //-0
+    return __negative_zero_value(); //-0
 
   double n;
   /* hex to decimal.*/

@@ -57,6 +57,16 @@ std::map<std::string,int> kCurrencyDigits = {
 // ECMA-402 1.0 11.1.3.1 The Intl.NumberFormat Constructor
 __jsvalue __js_NumberFormatConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
                                        uint32_t nargs) {
+  if (!__is_null(this_arg) && __is_js_object(this_arg)) {
+    __jsvalue p = StrToVal("initializedIntlObject");
+    __jsvalue v = __jsop_getprop(this_arg, &p);
+    if (!__is_undefined(&v)) {
+      if (__is_boolean(&v) && __jsval_to_boolean(&v) == true) {
+        MAPLE_JS_TYPEERROR_EXCEPTION();
+      }
+    }
+  }
+
   __jsobject *obj = __create_object();
   __jsobj_set_prototype(obj, JSBUILTIN_INTL_NUMBERFORMAT_PROTOTYPE);
   obj->object_class = JSINTL_NUMBERFORMAT;
@@ -255,8 +265,8 @@ void InitializeNumberFormat(__jsvalue *this_number_format, __jsvalue *locales,
   }
   // Step 29.
   prop = StrToVal("maximumFractionDigits");
-  maximum = mnfd;
-  minimum = __number_value(20);
+  minimum = mnfd;
+  maximum = __number_value(20);
   fallback = mxfd_default;
   __jsvalue mxfd = GetNumberOption(options, &prop, &minimum, &maximum, &fallback);
   // Step 30.
@@ -718,7 +728,8 @@ __jsvalue __jsintl_NumberFormatResolvedOptions(__jsvalue *number_format) {
   for (int i = 0; i < props.size(); i++) {
     p = StrToVal(props[i]);
     v = __jsop_getprop(number_format, &p);
-    __jsop_setprop(&nf, &p, &v);
+    if (!__is_undefined(&v))
+      __jsop_setprop(&nf, &p, &v);
   }
   // NOTE: is this really needed?
   p = StrToVal("initializedNumberFormat");

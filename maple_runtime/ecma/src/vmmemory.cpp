@@ -84,8 +84,8 @@ void *VMMallocGC(uint32 size, MemHeadTag tag, bool init_p) {
     printf("memory %p was allocated with header %d size %d\n", ((void *)((uint8 *)memory + head_size)), tag, alignedsize);
   }
 #ifdef MM_DEBUG
-  memory_manager->mem_alloc_bytes_by_type[(int)tag] += alignedsize + head_size;
-  memory_manager->mem_alloc_count_by_type[(int)tag]++;
+  memory_manager->mem_alloc_bytes_by_tag[(int)tag] += alignedsize + head_size;
+  memory_manager->mem_alloc_count_by_tag[(int)tag]++;
   memory_manager->live_objects[(void*)((uint8_t*)memory + head_size)] = 0;
   // printf("in VMMallocGC, addr= %p size= %u tag= %d\n", (void*)((uint8_t*)memory + head_size), alignedsize + head_size, tag);
 #endif
@@ -98,8 +98,8 @@ void *VMReallocGC(void *origptr, uint32 origsize, uint32 newsize) {
   void *memory = memory_manager->Realloc(origptr, alignedorigsize, alignednewsize);
 #ifdef MM_DEBUG
   int tag = memory_manager->GetMemHeader((uint8*)memory+MALLOCHEADSIZE).memheadtag;
-  memory_manager->mem_alloc_bytes_by_type[(int)tag] += alignednewsize + MALLOCHEADSIZE;
-  memory_manager->mem_alloc_count_by_type[tag]++;
+  memory_manager->mem_alloc_bytes_by_tag[(int)tag] += alignednewsize + MALLOCHEADSIZE;
+  memory_manager->mem_alloc_count_by_tag[tag]++;
   memory_manager->live_objects[(void*)((uint8_t*)memory + MALLOCHEADSIZE)] = 0;
   //printf("in VMReallocGC, addr= %p size= %u tag= %d\n", (void*)((uint8_t*)memory + MALLOCHEADSIZE), (uint32)(alignednewsize + MALLOCHEADSIZE), tag);
 #endif
@@ -365,6 +365,15 @@ void MemoryManager::ReleaseVariables(uint8_t *base, uint8_t *typetagged, uint8_t
 }
 
 #ifdef MM_DEBUG
+void MemoryManager::DumpMMStats() {
+#ifdef MEMORY_LEAK_CHECK
+  AppMemLeakCheck();
+#endif
+#ifdef MM_RC_STATS
+  DumpRCStats();
+#endif
+}
+
 // A VM self-check for memory-leak.
 // When exit the app, stack-variables have been released. Only global-variables
 // and builtin-variables may refer to a heap-object or a heap-string.
@@ -382,6 +391,29 @@ static void BatchRCDec(void* lowAddr, void* hiAddr) {
   }
 }
 #endif
+
+void MemoryManager::DumpAllocReleaseStats() {
+  printf("[MM] Num_alloc= %u num_release= %u\n", mem_alloc_count, mem_release_count);
+  printf("[MM] Num Malloc calls= %u including Realloc calls= %u\n", num_Malloc_calls, num_Realloc_calls);
+  printf("[MM] Mem allocation by tag:\n");
+  uint32 ta_size = 0;
+  uint32 ta_count = 0;
+  for(int i=0; i<MemHeadLast; i++) {
+    printf("[MM] tag= %d alloc_size= %10u alloc_count= %u\n", i, mem_alloc_bytes_by_tag[i], mem_alloc_count_by_tag[i]);
+    ta_size += mem_alloc_bytes_by_tag[i];
+    ta_count += mem_alloc_count_by_tag[i];
+  }
+  printf("[MM] total: alloc_size= %10u alloc_count= %u\n", ta_size, ta_count);
+
+  uint32 tr_size = 0;
+  uint32 tr_count = 0;
+  for(int i=0; i<MemHeadLast; i++) {
+    printf("[MM] tag= %d release_size= %10u release_count= %u\n", i, mem_release_bytes_by_tag[i], mem_release_count_by_tag[i]);
+    tr_size += mem_release_bytes_by_tag[i];
+    tr_count += mem_release_count_by_tag[i];
+  }
+  printf("[MM} total: release_size= %10u release_count= %u\n", tr_size, tr_count);
+}
 
 void MemoryManager::AppMemLeakCheck() {
 #ifdef MEMORY_LEAK_CHECK
@@ -412,38 +444,7 @@ void MemoryManager::AppMemLeakCheck() {
   printf("Releasing global variables\n");
   BatchRCDec(mainGP, mainTopGP);
 
-  printf("Num Malloc calls= %u including Realloc calls= %u\n", num_Malloc_calls, num_Realloc_calls);
-  printf("Mem allocation by type:\n");
-  uint32 ta_size = 0;
-  uint32 ta_count = 0;
-  for(int i=0; i<MemHeadLast; i++) {
-    printf("tag= %d alloc_size= %10u alloc_count= %u\n", i, mem_alloc_bytes_by_type[i], mem_alloc_count_by_type[i]);
-    ta_size += mem_alloc_bytes_by_type[i];
-    ta_count += mem_alloc_count_by_type[i];
-  }
-  printf("total: alloc_size= %10u alloc_count= %u\n", ta_size, ta_count);
-
-  uint32 tr_size = 0;
-  uint32 tr_count = 0;
-  for(int i=0; i<MemHeadLast; i++) {
-    printf("tag= %d release_size= %10u release_count= %u\n", i, mem_release_bytes_by_type[i], mem_release_count_by_type[i]);
-    tr_size += mem_release_bytes_by_type[i];
-    tr_count += mem_release_count_by_type[i];
-  }
-  printf("total: release_size= %10u release_count= %u\n", tr_size, tr_count);
-
-  // dump RC histogram
-  printf("Max RC histogram for released objects:\n");
-  for(auto m : max_rc_histogram) {
-    printf("%5d: %6u\n", m.first, m.second);
-  }
-
-  uint32_t t_max_rc0_released = 0;
-  printf("Num of objects with max RC=0 by type:\n");
-  for(int i=0; i<MemHeadLast; i++) {
-    printf("tag= %d count= %d\n", i, max_rc0_by_type[i]);
-    t_max_rc0_released += max_rc0_by_type[i];
-  }
+  DumpAllocReleaseStats();
 
   //------------------------------------------------
   //live objects
@@ -454,14 +455,14 @@ void MemoryManager::AppMemLeakCheck() {
     printf("%p: maxRC= %u tag= %d rc= %d\n", iter.first, iter.second, GetMemHeader(iter.first).memheadtag, GCGetRf(iter.first));
   }
 #endif
-  int live_by_type[MemHeadLast];
+  int live_by_tag[MemHeadLast];
   for(int i=0; i<MemHeadLast; i++)
-    live_by_type[i] = 0;
+    live_by_tag[i] = 0;
 
   uint32_t t_max_rc0_live = 0;
   std::map<int, uint32_t> max_rc_histogram_live;
   for(auto iter : live_objects) {
-    live_by_type[GetMemHeader(iter.first).memheadtag]++;
+    live_by_tag[GetMemHeader(iter.first).memheadtag]++;
     if(iter.second == 0)
       t_max_rc0_live++;
     max_rc_histogram_live[iter.second]++;
@@ -469,16 +470,16 @@ void MemoryManager::AppMemLeakCheck() {
 
   printf("Live object count by type:\n");
   for(int i=0; i<MemHeadLast; i++)
-    printf("tag= %d count= %d\n", i, live_by_type[i]);
+    printf("tag= %d count= %d\n", i, live_by_tag[i]);
 
   printf("Max RC histogram for live objects:\n");
   for(auto m : max_rc_histogram_live) {
     printf("%5d %6u\n", m.first, m.second);
   }
 
-  printf("Num of objects with MaxRC=0: released= %u live= %u total= %u\n", t_max_rc0_released, t_max_rc0_live, t_max_rc0_released + t_max_rc0_live);
-  printf("Num of alloc count excluding those with MaxRC=0: %u\n", ta_count - t_max_rc0_released - t_max_rc0_live);
-  printf("RCInc= %lu RCDec= %lu total= %lu\n", num_rcinc, num_rcdec, num_rcinc + num_rcdec);
+  //printf("Num of objects with MaxRC=0: released= %u live= %u total= %u\n", t_max_rc0_released, t_max_rc0_live, t_max_rc0_released + t_max_rc0_live);
+  //printf("Num of alloc count excluding those with MaxRC=0: %u\n", ta_count - t_max_rc0_released - t_max_rc0_live);
+
 #ifdef MARK_CYCLE_ROOTS
   RecallCycle();
   RecallRoots(cycle_roots);
@@ -489,7 +490,7 @@ void MemoryManager::AppMemLeakCheck() {
 
   if (app_mem_usage != 0) {
     printf("[Memory Manager] %d Bytes heap memory leaked!\n", app_mem_usage);
-    MIR_FATAL("memory leak.\n");
+    // MIR_FATAL("memory leak.\n");
   }
 #endif
 }
@@ -572,7 +573,28 @@ void MemoryManager::AppMemShapeSummary() {
 #endif
 }
 
+void MemoryManager::DumpRCStats() {
+#ifdef MM_RC_STATS
+  // dump MaxRC histogram
+  printf("[RC] Max RC histogram for released objects:\n");
+  for(auto m : max_rc_histogram) {
+    printf("[RC] %5d: %6u\n", m.first, m.second);
+  }
+
+  uint32_t num_max_rc0_released = 0;
+  printf("[RC] Num of released objects with max RC=0 by type:\n");
+  for(int i=0; i<MemHeadLast; i++) {
+    printf("[RC] tag= %d count= %d\n", i, max_rc0_by_tag[i]);
+    num_max_rc0_released += max_rc0_by_tag[i];
+  }
+
+  printf("[RC] Num of released objects with MaxRC=0: %u total_release_count= %u diff= %u\n", num_max_rc0_released, mem_release_count, mem_release_count - num_max_rc0_released);
+  printf("[RC] RCInc= %lu RCDec= %lu total= %lu op/obj= %.2f\n", num_rcinc, num_rcdec, num_rcinc + num_rcdec, (double)(num_rcinc + num_rcdec)/(mem_release_count - num_max_rc0_released));
+#endif
+}
+
 #endif  // MM_DEBUG
+
 
 MemoryChunk *MemoryManager::NewMemoryChunk(uint32 offset, uint32 size, MemoryChunk *next) {
   MemoryChunk *new_chunk;
@@ -634,13 +656,16 @@ void MemoryManager::Init(void *app_memory, uint32 app_memory_size, void *vm_memo
   max_app_mem_usage = 0;
   mem_allocated = 0;
   mem_released = 0;
-  for(int i=0; i<MemHeadLast; i++) {
-    mem_alloc_bytes_by_type[i] = 0;
-    mem_alloc_count_by_type[i] = 0;
-    mem_release_bytes_by_type[i] = 0;
-    mem_release_count_by_type[i] = 0;
+  mem_alloc_count = 0;
+  mem_release_count = 0;
 
-    max_rc0_by_type[i] = 0;
+  for(int i=0; i<MemHeadLast; i++) {
+    mem_alloc_bytes_by_tag[i] = 0;
+    mem_alloc_count_by_tag[i] = 0;
+    mem_release_bytes_by_tag[i] = 0;
+    mem_release_count_by_tag[i] = 0;
+
+    max_rc0_by_tag[i] = 0;
   }
   num_Malloc_calls = 0;
   num_Realloc_calls = 0;
@@ -661,6 +686,7 @@ void *MemoryManager::Malloc(uint32 size, bool init_p) {
   if(app_mem_usage > max_app_mem_usage)
     max_app_mem_usage = app_mem_usage;
   num_Malloc_calls++;
+  mem_alloc_count++;
 #endif  // MM_DEBUG
 #if DEBUGGC
   assert((IsAlignedBy4(size)) && "memory doesn't align by 4 bytes");
@@ -796,13 +822,16 @@ void MemoryManager::RecallMem(void *mem, uint32 size) {
   mem_released += (alignedsize + head_size);
   int tag = GetMemHeader(mem).memheadtag;
   if(tag < (int)MemHeadLast) {
-    mem_release_bytes_by_type[tag] += alignedsize + head_size;
-    mem_release_count_by_type[tag]++;
+    mem_release_bytes_by_tag[tag] += alignedsize + head_size;
+    mem_release_count_by_tag[tag]++;
   }
+  mem_release_count++;
   // printf("RecallMem mem= %p tag= %d\n", mem, tag);
   max_rc_histogram[live_objects[mem]]++;
+#ifdef MM_RC_STATS
   if(live_objects[mem] == 0)
-    max_rc0_by_type[tag]++;
+    max_rc0_by_tag[tag]++;
+#endif
   live_objects.erase(mem);
 #endif  // MM_DEBUG
 
@@ -882,7 +911,7 @@ void MemoryManager::GCDecRf(void *addr) {
   if (!IsHeap(true_addr)) {
     return;
   }
-#ifdef MM_DEBUG
+#ifdef MM_RC_STATS
   num_rcdec++;
 #endif
   MemHeader &header = GetMemHeader(true_addr);

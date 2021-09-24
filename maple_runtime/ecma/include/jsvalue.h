@@ -100,6 +100,7 @@ enum __jstype : uint32_t {
 #define PAYLOAD_MASK 0x0000FFFFFFFFFFFF
 #define POS_ZERO     0x7FF3000000000000
 #define NEG_ZERO     0x8000000000000000
+#define NONE_VALUE   0x7FFA000000000000  // JSTYPE_NONE = 10
 
 #define mEncode(v) {\
   if (v.ptyp < JSTYPE_DOUBLE) {\

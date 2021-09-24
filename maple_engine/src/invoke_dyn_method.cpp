@@ -144,7 +144,7 @@ inline MValue TValue2MValue(TValue t) {
   MValue r;
   if (NOT_DOUBLE(t.x.u64)) {
     r.ptyp = t.x.c.type & ~NAN_BASE;
-    r.x.u64 = t.x.u64 & PAYLOAD_MASK;
+    r.x.u64 = (t.x.u64 == POS_ZERO) ? POS_ZERO : (t.x.u64 & PAYLOAD_MASK);
   } else {
     r.ptyp = JSTYPE_DOUBLE;
     r.x.u64 = t.x.u64;
@@ -319,7 +319,12 @@ inline MValue TValue2MValue(TValue t) {
     } else if (IS_DOUBLE(op0.x.u64)) {\
       double r;\
       r = op0.x.f64 / (double)op1.x.i32;\
-      if (ABS(r) <= NumberMaxValue) {\
+      if (r == 0) { \
+        op0.x.u64 = ((op0.x.f64 > 0 && op1.x.i32 >= 0) || (op0.x.f64 <= 0 && op1.x.i32 < 0)) ?  POS_ZERO : NEG_ZERO;\
+        MPUSH_SELF(op0);\
+        func.pc += sizeof(binary_node_t);\
+        goto *(labels[*func.pc]);\
+      } else if (ABS(r) <= NumberMaxValue) {\
         op0.x.f64 = r;\
         MPUSH_SELF(op0);\
         func.pc += sizeof(binary_node_t);\
@@ -330,7 +335,12 @@ inline MValue TValue2MValue(TValue t) {
     double r;\
     if (IS_DOUBLE(op0.x.u64)) {\
       r = op0.x.f64 / op1.x.f64;\
-      if (ABS(r) <= NumberMaxValue) {\
+      if (r == 0) { \
+        op0.x.u64 = ((op0.x.f64 > 0 && op1.x.f64 > 0) || (op0.x.f64 <= 0 && op1.x.f64 <= 0)) ?  POS_ZERO : NEG_ZERO;\
+        MPUSH_SELF(op0);\
+        func.pc += sizeof(binary_node_t);\
+        goto *(labels[*func.pc]);\
+      } else if (ABS(r) <= NumberMaxValue) {\
         op0.x.f64 = r;\
         MPUSH_SELF(op0);\
         func.pc += sizeof(binary_node_t);\
@@ -338,7 +348,12 @@ inline MValue TValue2MValue(TValue t) {
       }\
     } else if IS_NUMBER(op0.x.u64) {\
       r = (double)op0.x.i32 / op1.x.f64;\
-      if (ABS(r) <= NumberMaxValue) {\
+      if (r == 0) { \
+        op0.x.u64 = ((op0.x.i32 >= 0 && op1.x.f64 > 0) || (op0.x.i32 < 0 && op1.x.f64 < 0)) ?  POS_ZERO : NEG_ZERO;\
+        MPUSH_SELF(op0);\
+        func.pc += sizeof(binary_node_t);\
+        goto *(labels[*func.pc]);\
+      } else if (ABS(r) <= NumberMaxValue) {\
         op0.x.f64 = r;\
         MPUSH_SELF(op0);\
         func.pc += sizeof(binary_node_t);\
@@ -533,6 +548,12 @@ extern "C" uint32_t __inc_opcode_cnt_dyn() {
         __opcode_cnt_dyn); \
     }\
   }
+
+struct prop_cache {
+  void *o;
+  void *p;
+  __jsvalue ret;
+} named_prop_cache[2] = {{.o = 0}};
 
 MValue InvokeInterpretMethod(DynMFunction &func) {
     uint8_t *frame_pointer = (uint8_t *)gInterSource->GetFPAddr();
@@ -759,7 +780,7 @@ label_OP_constval:
         default: MASSERT(false, "Unexpected type for OP_constval: 0x%02x", res.x.c.type);
     }
     //res.ptyp = JSTYPE_NUMBER;
-    res.x.u64 |= NAN_NUMBER;
+    res.x.u64 = (res.x.u64 == 0) ? POS_ZERO : (res.x.u64 | NAN_NUMBER);
     MPUSH(res);
     func.pc += sizeof(mre_instr_t);
     goto *(labels[*func.pc]);
@@ -1898,7 +1919,6 @@ label_OP_intrinsiccall:
       }
       TValue &v0 = MPOP();
       MValue v0_ = TValue2MValue(v0);
-      //v0 = gInterSource->JSopNewObj1(v0);
       v0_.x.a64 = (uint8_t *) __js_new_obj_obj_1(&v0_);
       v0_.ptyp = JSTYPE_OBJECT;
       SetRetval0(v0_);
@@ -1907,7 +1927,6 @@ label_OP_intrinsiccall:
     case INTRN_JSOP_INIT_THIS_PROP_BY_NAME: {
       MIR_ASSERT(argnums == 1);
       TValue &v0 = MPOP();
-      //gInterSource->JSopInitThisPropByName(v0);
       __jsstring *v1 = (__jsstring *)(v0.x.u64 & PAYLOAD_MASK);
       __jsvalue &v = __js_Global_ThisBinding;
       __jsop_init_this_prop_by_name(&v, v1);
@@ -1917,6 +1936,7 @@ label_OP_intrinsiccall:
       MIR_ASSERT(argnums == 2);
       TValue &arg1 = MPOP();
       TValue &arg0 = MPOP();
+      named_prop_cache[1].o = 0; // invalidate cache
       CHECKREFERENCEMVALUE(arg1);
       MValue arg1_ = TValue2MValue(arg1);
       try {
@@ -1928,7 +1948,6 @@ label_OP_intrinsiccall:
           MAPLE_JS_TYPEERROR_EXCEPTION();
         }
         __jsop_set_this_prop_by_name(&v0, v1, &arg1_, true);
-        //gInterSource->JSopSetThisPropByName(arg0_, arg1_);
       }
       CATCHINTRINSICOP();
       break;
@@ -1938,17 +1957,17 @@ label_OP_intrinsiccall:
       TValue &v2 = MPOP();
       TValue &v1 = MPOP();
       TValue &v0 = MPOP();
+      named_prop_cache[0].o = 0; // invalidate cache
       CHECKREFERENCEMVALUE(v0);
       MValue v2_ = TValue2MValue(v2);
       MValue v0_ = TValue2MValue(v0);
       try {
-      // gInterSource->JSopSetPropByName(v0, v1, v2, is_strict);
-       __jsstring *s1 = (__jsstring *)(v1.x.u64 & PAYLOAD_MASK);
-       if (v0_.x.asbits == __js_Global_ThisBinding.x.asbits &&
-         __is_global_strict && __jsstr_throw_typeerror(s1)) {
-         MAPLE_JS_TYPEERROR_EXCEPTION();
-       }
-       __jsop_setprop_by_name(&v0_, s1, &v2_, is_strict);
+        __jsstring *s1 = (__jsstring *)(v1.x.u64 & PAYLOAD_MASK);
+        if (v0_.x.asbits == __js_Global_ThisBinding.x.asbits &&
+          __is_global_strict && __jsstr_throw_typeerror(s1)) {
+          MAPLE_JS_TYPEERROR_EXCEPTION();
+        }
+        __jsop_setprop_by_name(&v0_, s1, &v2_, is_strict);
       }
       CATCHINTRINSICOP();
       break;
@@ -1961,7 +1980,6 @@ label_OP_intrinsiccall:
       MValue v1_ = TValue2MValue(v1);
       MValue v0_ = TValue2MValue(v0);
       try {
-        //MValue retMv = gInterSource->JSopGetProp(v0, v1);
         MValue retMv = __jsop_getprop(&v0_, &v1_);
         SetRetval0(retMv);
       }
@@ -1972,12 +1990,20 @@ label_OP_intrinsiccall:
       MIR_ASSERT(argnums == 2);
       TValue &v1 = MPOP();
       TValue &v0 = MPOP();
+      if (named_prop_cache[0].o == v0.x.a64 && named_prop_cache[0].p == v1.x.a64) {
+        SetRetval0(named_prop_cache[0].ret);;
+        break;
+      }
       CHECKREFERENCEMVALUE(v0);
       MValue v1_ = TValue2MValue(v1);
       MValue v0_ = TValue2MValue(v0);
       try {
         MValue retMv = gInterSource->JSopGetPropByName(v0_, v1_);
         SetRetval0(retMv);
+
+        named_prop_cache[0].o = v0.x.a64;
+        named_prop_cache[0].p = v1.x.a64;
+        named_prop_cache[0].ret = retMv;
       }
       CATCHINTRINSICOP();
       break;
@@ -1992,6 +2018,8 @@ label_OP_intrinsiccall:
       try {
         MValue retMv = gInterSource->JSopDelProp(v0_, v1_, is_strict);
         SetRetval0(retMv);
+        named_prop_cache[0].o = 0; // invalidate cache
+        named_prop_cache[1].o = 0; // invalidate cache
       }
       CATCHINTRINSICOP();
       break;
@@ -2006,6 +2034,8 @@ label_OP_intrinsiccall:
       try {
         MValue retMv = gInterSource->JSopDelProp(v0_, v1_, is_strict);
         SetRetval0(retMv);
+        named_prop_cache[0].o = 0; // invalidate cache
+        named_prop_cache[1].o = 0; // invalidate cache
       }
       CATCHINTRINSICOP();
       break;
@@ -2018,7 +2048,6 @@ label_OP_intrinsiccall:
       MValue v1_ = TValue2MValue(v1);
       MValue v0_ = TValue2MValue(v0);
       __jsop_initprop(&v0_, &v1_, &v2_);
-      //gInterSource->JSopInitProp(v0, v1, v2);
       break;
     }
     case INTRN_JSOP_INITPROP_BY_NAME: {
@@ -2135,6 +2164,11 @@ label_OP_intrinsiccall:
           } else if (IS_DOUBLE(op0.x.u64)) {
             double r;
             r = op0.x.f64 + op1.x.i32;
+            if (r == 0) {
+              op0.x.u64 = POS_ZERO;
+              SetRetval0NoEncode(op0);
+              break;
+            }
             if (ABS(r) <= NumberMaxValue) {
               op0.x.f64 = r;
               SetRetval0NoEncode(op0);
@@ -2145,6 +2179,11 @@ label_OP_intrinsiccall:
           double r;
           if (IS_DOUBLE(op0.x.u64)) {
             r = op1.x.f64 + op0.x.f64;
+            if (r == 0) {
+              op0.x.u64 = POS_ZERO;
+              SetRetval0NoEncode(op0);
+              break;
+            }
             if (ABS(r) <= NumberMaxValue && ABS(r) >= NumberMinValue) {
               op1.x.f64 = r;
               SetRetval0NoEncode(op1);
@@ -2152,6 +2191,11 @@ label_OP_intrinsiccall:
             }
           } else if (IS_NUMBER(op0.x.u64)) {
             r = op1.x.f64 + op0.x.i32;
+            if (r == 0) {
+              op0.x.u64 = POS_ZERO;
+              SetRetval0NoEncode(op0);
+              break;
+            }
             if (ABS(r) <= NumberMaxValue && ABS(r) >= NumberMinValue) {
               op1.x.f64 = r;
               SetRetval0NoEncode(op1);
@@ -2317,7 +2361,7 @@ label_OP_intrinsiccall:
         // no need to do anything
         TValue &mv = MPOP();// TValue2MValue(mv);
         CHECKREFERENCEMVALUE(mv);
-        gInterSource->retVal0.x.u64 = mv.x.u64;
+        // gInterSource->retVal0.x.u64 = mv.x.u64;
         break;
       }
       default:
@@ -2501,7 +2545,7 @@ label_OP_ireadfpoff: // offset from stack frame
     //mv.x.u64 =  *((uint64_t *)addr);
     uint64_t lValue = *((uint64_t *)addr);
     if (lValue == 0) {
-      THROWANDHANDLEREFERENCE();
+      lValue = NONE_VALUE; // NONE value
     }
     MPUSHV(lValue);
 
@@ -2789,8 +2833,19 @@ label_OP_intrinsicop:
          case INTRN_JSOP_GET_THIS_PROP_BY_NAME: {
            MIR_ASSERT(argnums == 1);
            TValue &v0 = MPOP();
+
+           if (named_prop_cache[1].o == __js_Global_ThisBinding.x.a64 && named_prop_cache[1].p == v0.x.a64) {
+             retMv = named_prop_cache[1].ret;
+             break;
+           }
+
            MValue v0_ = TValue2MValue(v0);
            retMv = gInterSource->JSopGetThisPropByName(v0_);
+
+           named_prop_cache[1].o = __js_Global_ThisBinding.x.a64;
+           named_prop_cache[1].p = v0.x.a64;
+           named_prop_cache[1].ret = retMv;
+
            break;
          }
          case INTRN_JSOP_GETPROP: {

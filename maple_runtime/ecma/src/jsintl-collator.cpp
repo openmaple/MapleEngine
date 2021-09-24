@@ -23,6 +23,16 @@
 // ECMA-402 1.0 10.1 The Intl.Collator Constructor
 __jsvalue __js_CollatorConstructor(__jsvalue *this_arg, __jsvalue *arg_list,
                                    uint32_t nargs) {
+  if (!__is_null(this_arg) && __is_js_object(this_arg)) {
+    __jsvalue p = StrToVal("initializedIntlObject");
+    __jsvalue v = __jsop_getprop(this_arg, &p);
+    if (!__is_undefined(&v)) {
+      if (__is_boolean(&v) && __jsval_to_boolean(&v) == true) {
+        MAPLE_JS_TYPEERROR_EXCEPTION();
+      }
+    }
+  }
+
   __jsobject *obj = __create_object();
   __jsobj_set_prototype(obj, JSBUILTIN_INTL_COLLATOR_PROTOTYPE);
   obj->object_class = JSINTL_COLLATOR;
@@ -96,8 +106,7 @@ void InitializeCollator(__jsvalue *this_collator, __jsvalue *locales,
   // internal property of 'Collator'; else let 'localeData' be the value of the
   // [searchLocaleData]] internal property of 'Collator'.
   __jsstring *u_str = __jsval_to_string(&u);
-  std::string sort_str = "sort";
-  __jsstring *sort = __jsstr_new_from_char(sort_str.c_str());
+  __jsstring *sort = __jsstr_new_from_char("sort");
   __jsvalue locale_data = __undefined_value();
   if (__jsstr_equal(u_str, sort)) {
     p = StrToVal("sortLocaleData");
@@ -162,8 +171,7 @@ void InitializeCollator(__jsvalue *this_collator, __jsvalue *locales,
     __jsvalue key = __jsarr_GetElem(__jsval_to_object(&relevant_extension_keys), i);
     // Step 19b.
     __jsstring *key_str = __jsval_to_string(&key);
-    std::string co = "co";
-    __jsstring *co_str = __jsstr_new_from_char(co.c_str());
+    __jsstring *co_str = __jsstr_new_from_char("co");
     if (__jsstr_equal(key_str, co_str)) {
       // Step 19b i.
       property = StrToVal("collation");
@@ -175,20 +183,25 @@ void InitializeCollator(__jsvalue *this_collator, __jsvalue *locales,
         value = StrToVal("default");
       }
     } else {
-      // Step 19c.
-      // Unrolled operations based on Table 1.
-      // Step 19c i.
-      property = StrToVal("numeric");
-      // Step 19c ii.
-      value = __jsop_getprop(&r, &key);
-      __jsstring *value_str = __jsval_to_string(&value);
-      // Step 19c iii.
-      std::string true_str = "true";
-      __jsstring *true_jsstr = __jsstr_new_from_char(true_str.c_str());
-      if (__jsstr_equal(value_str, true_jsstr)) {
-        value = __boolean_value(true);
-      } else {
-        value = __boolean_value(false);
+      __jsstring *kn_str = __jsstr_new_from_char("kn");
+      __jsstring *kf_str = __jsstr_new_from_char("kf");
+      if (__jsstr_equal(key_str, kn_str)) {
+        // Step 19c.
+        // Step 19c i.
+        property = StrToVal("numeric");
+        // Step 19c ii.
+        value = __jsop_getprop(&r, &key);
+        __jsstring *value_str = __jsval_to_string(&value);
+        // Step 19c iii.
+        __jsstring *true_str = __jsstr_new_from_char("true");
+        if (__jsstr_equal(value_str, true_str)) {
+          value = __boolean_value(true);
+        } else {
+          value = __boolean_value(false);
+        }
+      } else if (__jsstr_equal(key_str, kf_str)) {
+        property = StrToVal("caseFirst");
+        value = __jsop_getprop(&r, &key);
       }
     }
     // Step 19d.
@@ -225,7 +238,7 @@ void InitializeCollator(__jsvalue *this_collator, __jsvalue *locales,
   property = StrToVal("ignorePunctuation");
   type = StrToVal("boolean");
   values = __undefined_value();
-  fallback = __undefined_value();
+  fallback = __boolean_value(false);
   __jsvalue ip = GetOption(options, &property, &type, &values, &fallback);
   // Step 24.
   p = StrToVal("ignorePunctuation");
@@ -354,6 +367,9 @@ __jsvalue CompareStrings(__jsvalue *collator, __jsvalue *x, __jsvalue *y) {
     default:
       MAPLE_JS_ASSERT(false && "Error in ucol_strcoll()");
   }
+  // Close ICU UCollator.
+  ucol_close(col);
+
   return __number_value(res);
 }
 

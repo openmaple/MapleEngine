@@ -100,7 +100,7 @@ static __jsprop *__jsobj_helper_get_property(__jsobject *obj, __jsstring *name, 
 
 }
 
-static __jsprop *__jsobj_helper_get_propertyByValue(__jsobject *obj, uint32_t index, bool createBuiltin = true) {
+__jsprop *__jsobj_helper_get_propertyByValue(__jsobject *obj, uint32_t index, bool createBuiltin = true) {
 #ifdef USE_PROP_MAP
   if (obj->prop_index_map == NULL && obj->object_class == JSSTRING && obj->shared.prim_string) {
     // lazy initailize properties for string
@@ -1036,7 +1036,7 @@ static inline __jsvalue __jsprop_desc_FromPropertyDescriptor(__jsprop_desc desc)
   return __object_value(obj);
 }
 
-static __jsvalue __jsobj_internal_get_by_desc(__jsobject *obj, __jsprop_desc desc, __jsvalue *orgVal = NULL) {
+__jsvalue __jsobj_internal_get_by_desc(__jsobject *obj, __jsprop_desc desc, __jsvalue *orgVal) {
   // ecma 8.12.3 step 2.
   if (__is_undefined_desc(desc)) {
     return __undefined_value();
@@ -1064,10 +1064,12 @@ static __jsvalue __jsobj_internal_get_by_desc(__jsobject *obj, __jsprop_desc des
 // Return true if HasProperty return true, else return the false.
 // If HasProperty return true, store the result of GET to *result;
 bool __jsobj_helper_HasPropertyAndGet(__jsobject *obj, __jsstring *p, __jsvalue *result) {
-  if (!__jsobj_internal_HasProperty(obj, p)) {
+  __jsprop_desc desc;
+  if (!__jsobj_internal_HasProperty(obj, p, &desc)) {
     return false;
   }
-  *result = __jsobj_internal_Get(obj, p);
+  //*result = __jsobj_internal_Get(obj, p);
+  *result = __jsobj_internal_get_by_desc(obj, desc);
   return true;
 }
 
@@ -1625,7 +1627,7 @@ void __jsobj_internal_Put(__jsobject *obj, uint32_t index, __jsvalue *v, bool th
 }
 
 // ecma 8.12.6
-bool __jsobj_internal_HasProperty(__jsobject *o, __jsstring *p) {
+bool __jsobj_internal_HasProperty(__jsobject *o, __jsstring *p, __jsprop_desc *descp) {
   // ecma 8.12.6 step 1.
   __jsprop_desc desc = __jsobj_internal_GetProperty(o, p);
   // ecma 8.12.6 step 2.
@@ -1633,6 +1635,8 @@ bool __jsobj_internal_HasProperty(__jsobject *o, __jsstring *p) {
     return false;
   }
   // ecma 8.12.6 step 3.
+  if (descp)
+    *descp = desc;
   return true;
 }
 

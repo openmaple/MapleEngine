@@ -170,8 +170,11 @@ int32_t InterSource::PassArguments(MValue this_arg, void *env, MValue *arg_list,
     offset -= MVALSIZE;
     ALIGNMENTNEGOFFSET(offset, MVALSIZE);
     EmulateStore(spaddr + offset, actual);
-    if (IsNeedRc(actual.ptyp))
-      GCIncRf((void*)(actual.x.u64 & PAYLOAD_MASK));
+#if 0 // RC is increased for args and decreased after the func call, therefore, the pair of RC ops can be eliminated.
+    if (IsNeedRc(actual.ptyp)) {
+       GCIncRf((void*)(actual.x.u64 & PAYLOAD_MASK));
+    }
+#endif
   }
   if (env) {
     offset -= PTRSIZE + MVALSIZE;
@@ -187,13 +190,14 @@ int32_t InterSource::PassArguments(MValue this_arg, void *env, MValue *arg_list,
     // SetMValueValue(envMal, memory_manager->MapRealAddr(env));
     // SetMValueTag(envMal, JSTYPE_ENV);
     EmulateStore(spaddr + offset + MVALSIZE, envMal);
-    // GCCheckAndIncRf(envMal.x.u64);
-    GCCheckAndIncRf(envMal.x.u64, true);
+    // GCCheckAndIncRf(envMal.x.u64, true);
   }
   // Pass the 'this'.
   EmulateStore(spaddr + offset, this_arg);
+#if 0 // RC is increased for args and decreased after the func call, therefore, the pair of RC ops can be eliminated.
   if (IsNeedRc(this_arg.ptyp))
     GCIncRf((void*)this_arg.x.u64);
+#endif
   return offset;
 }
 
@@ -335,7 +339,7 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         case JSTYPE_INFINITY: {
           __jsvalue v1 = (mv1);
           bool isPos = __is_neg_infinity(&v1) ? x0 < 0 : x0 >= 0;
-          return (isPos ? __number_value(0) :  __double_value(0));
+          return (isPos ? __positive_zero_value() :  __negative_zero_value());
         }
         default:
           assert(false && "unexpected div op1");
@@ -369,7 +373,7 @@ MValue InterSource::JSopDiv(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           return (rhs > 0 ? __number_infinity() : __number_neg_infinity());
         }
         case JSTYPE_INFINITY: {
-          return (__number_value(0));
+          return (__positive_zero_value());
         }
         default:
           assert(false && "unexpected div op1");
@@ -517,7 +521,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         case JSTYPE_INFINITY: {
           __jsvalue v1 = (mv1);
           bool isPos = __is_neg_infinity(&mv1) ? x0 < 0 : x0 >= 0;
-          return (isPos ? __number_value(0) :  __double_value(0));
+          return (isPos ? __positive_zero_value() :  __negative_zero_value());
         }
         default:
           assert(false && "unexpected rem op1");
@@ -611,7 +615,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
         case JSTYPE_INFINITY: {
           __jsvalue v1 = (mv1);
           bool isPos = __is_neg_infinity(&mv1) ? x0 < 0 : x0 >= 0;
-          return (isPos ? __number_value(0) :  __double_value(0));
+          return (isPos ? __positive_zero_value() :  __negative_zero_value());
         }
         default:
           assert(false && "unexpected rem op1");
@@ -646,7 +650,7 @@ MValue InterSource::JSopRem(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           return (rhs > 0 ? __number_infinity() : __number_neg_infinity());
         }
         case JSTYPE_INFINITY: {
-          return (__number_value(0));
+          return (__positive_zero_value());
         }
         default:
           assert(false && "unexpected rem op1");
@@ -927,7 +931,7 @@ MValue InterSource::JSopSub(MValue &mv0, MValue &mv1, PrimType ptyp, Opcode op) 
           break;
         }
         case JSTYPE_OBJECT: {
-          __jsvalue v0 = __number_value(0);
+          __jsvalue v0 = __positive_zero_value();
           return (__jsop_object_sub(&v0, &mv1));
         }
         case JSTYPE_NULL: {
@@ -1849,7 +1853,7 @@ MValue InterSource::JSopUnaryNeg(MValue &mval) {
     case JSTYPE_NUMBER: {
       int32_t xx = __jsval_to_number(&mval);
       if (xx == 0) {
-         return (__double_value(-0));
+         return (__negative_zero_value());
       } else {
             return (__number_value(-xx));
       }
@@ -1857,7 +1861,7 @@ MValue InterSource::JSopUnaryNeg(MValue &mval) {
     case JSTYPE_DOUBLE: {
       double dv = __jsval_to_double(&mval);
       if (fabs(dv - 0.0f) < NumberMinValue) {
-            return (__number_value(0));
+            return (__positive_zero_value());
       } else {
             return (__double_value(-dv));
       }
@@ -1876,7 +1880,7 @@ MValue InterSource::JSopUnaryNeg(MValue &mval) {
     case JSTYPE_NAN:
       return (__nan_value());
     case JSTYPE_NULL:
-      return (__number_value(0));
+      return (__positive_zero_value());
     case JSTYPE_OBJECT: {
       __jsobject *obj = __jsval_to_object(&mval);
       __jsvalue xval = __object_internal_DefaultValue(obj, JSTYPE_NUMBER);
@@ -2121,10 +2125,14 @@ MValue InterSource::FuncCall(void *callee, bool isIntrinsiccall, void *env, MVal
   sp -= offset;
   SetCurFunc(oldDynFunc);
 
-  // RC-- for arguments and local vars
+  // RC-- for local vars
+  // RC is increased for args and decreased after the func call, therefore, the pair of RC ops can be eliminated.
   uint8 *spaddr = (uint8 *)GetSPAddr();
-  uint8 *addr = spaddr + offset - calleeHeader->frameSize; // offset is negative
-  while(addr < spaddr) {
+  uint8 *frameEnd = spaddr + offset;  // offset is negative
+  uint8 *addr = frameEnd - calleeHeader->frameSize;
+  // frame: between addr and frameEnd; args: between frameEnd and spaddr
+  // while(addr < spaddr) {
+  while(addr < frameEnd) {
     void *local = *(void**)addr;
     if (IS_NEEDRC(local)) {
       GCDecRf(local);
@@ -2173,10 +2181,14 @@ MValue InterSource::FuncCall_JS(__jsobject *fObject, __jsvalue *this_arg, void *
   sp -= offset;
   SetCurFunc(oldDynFunc);
 
-  // RC-- for arguments and local vars
+  // RC-- for local vars
+  // RC is increased for args and decreased after the func call, therefore, the pair of RC ops can be eliminated.
   uint8 *spaddr = (uint8 *)GetSPAddr();
-  uint8 *addr = spaddr + offset - calleeHeader->frameSize; // offset is negative
-  while(addr < spaddr) {
+  uint8 *frameEnd = spaddr + offset;  // offset is negative
+  uint8 *addr = frameEnd - calleeHeader->frameSize;
+  // frame: between addr and frameEnd; args: between frameEnd and spaddr
+  // while(addr < spaddr) {
+  while(addr < frameEnd) {
     void **local = (void**)addr;
     if (IS_NEEDRC(*local)) {
       GCDecRf(*local);
@@ -2356,8 +2368,8 @@ extern "C" int64_t EngineShimDynamic(int64_t firstArg, char *appPath) {
   assert(header->upFormalSize == 0 && "main function got a frame size?");
   addr += *(int32_t*)addr; // skip to 1st instruction
   val = maple_invoke_dynamic_method_main (addr, header);
-#ifdef MEMORY_LEAK_CHECK
-  memory_manager->AppMemLeakCheck();
+#ifdef MM_DEBUG
+  memory_manager->DumpMMStats();
 #endif
   return val.x.i64;
 }

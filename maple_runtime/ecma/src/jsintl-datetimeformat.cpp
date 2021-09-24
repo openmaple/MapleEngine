@@ -34,6 +34,16 @@ extern std::unordered_map<std::string,std::vector<std::string>> kDateTimeFormatC
 // ECMA-402 1.0 12.1 The Intl.DateTimeFormat Constructor
 __jsvalue __js_DateTimeFormatConstructor(__jsvalue *this_arg,
                                         __jsvalue *arg_list, uint32_t nargs) {
+  if (!__is_null(this_arg) && __is_js_object(this_arg)) {
+    __jsvalue p = StrToVal("initializedIntlObject");
+    __jsvalue v = __jsop_getprop(this_arg, &p);
+    if (!__is_undefined(&v)) {
+      if (__is_boolean(&v) && __jsval_to_boolean(&v) == true) {
+        MAPLE_JS_TYPEERROR_EXCEPTION();
+      }
+    }
+  }
+
   __jsobject *obj = __create_object();
   __jsobj_set_prototype(obj, JSBUILTIN_INTL_DATETIMEFORMAT_PROTOTYPE);
   obj->object_class = JSINTL_DATETIMEFORMAT;
@@ -816,6 +826,111 @@ __jsvalue __jsintl_DateTimeFormatFormat(__jsvalue *date_time_format, __jsvalue *
   return res;
 }
 
+void ResolveICUPattern(__jsvalue *date_time_format, __jsvalue *pattern) {
+  int i = 0;
+  uint32_t len = __jsstr_get_length(__jsval_to_string(pattern));
+  std::string pat = ValToStr(pattern);
+  __jsvalue p, v;
+
+  while (i < len) {
+    char c = pat[i++];
+    if (c == '\'') {
+      while (i < len && pat[i] != '\'')
+        i++;
+      i++;
+    } else {
+      int count = 1;
+      while (i < len && pat[i] == c) {
+        i++;
+        count++;
+      }
+      std::string v;
+      switch (c) {
+      case 'G':
+      case 'E':
+      case 'z':
+      case 'v':
+      case 'V':
+        if (count <= 3)
+          v = "short";
+        else if (count == 4)
+          v = "long";
+        else
+          v = "narrow";
+        break;
+      case 'y':
+      case 'd':
+      case 'h':
+      case 'H':
+      case 'm':
+      case 's':
+      case 'k':
+      case 'K':
+        if (count == 2)
+          v = "2-digit";
+        else
+          v = "numeric";
+        break;
+      case 'M':
+      case 'L':
+        if (count == 1)
+          v = "numeric";
+        else if (count == 2)
+          v = "2-digit";
+        else if (count == 3)
+          v = "short";
+        else if (count == 4)
+          v = "long";
+        else
+          v = "narrow";
+        break;
+      default:
+        // skip other characters in pattern.
+        break;
+      }
+
+      // Set value to date_time_format.
+      bool valid_char = true;
+      if (c == 'E')
+        p = StrToVal("weekday");
+      else if (c == 'G')
+        p = StrToVal("era");
+      else if (c == 'y')
+        p = StrToVal("year");
+      else if (c == 'M' || c == 'L')
+        p = StrToVal("month");
+      else if (c == 'd')
+        p = StrToVal("day");
+      else if (c == 'h' || c == 'H' || c == 'k' || c == 'K')
+        p = StrToVal("hour");
+      else if (c == 'm')
+        p = StrToVal("minute");
+      else if (c == 's')
+        p = StrToVal("second");
+      else if (c == 'z' || c == 'v' || c == 'V')
+        p = StrToVal("timeZoneName");
+      else {
+        valid_char = false;
+      }
+
+      __jsvalue value;
+      if (valid_char) {
+        value = StrToVal(v);
+        __jsop_setprop(date_time_format, &p, &value);
+      }
+
+      // Set 'hour12'.
+      if (c == 'h' || c == 'K') {
+        value = __boolean_value(true);
+      } else if (c == 'H' || c == 'k') {
+        value = __boolean_value(false);
+      }
+      p = StrToVal("hour12");
+      __jsop_setprop(date_time_format, &p, &value);
+    }
+  } // end of while
+}
+
 // ECMA-402 1.0 12.3.3
 // Intl.DateTimeFormat.prototype.resolvedOptions()
 __jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *date_time_format) {
@@ -835,10 +950,13 @@ __jsvalue __jsintl_DateTimeFormatResolvedOptions(__jsvalue *date_time_format) {
   for (int i = 0; i < props.size(); i++) {
     p = StrToVal(props[i]);
     v = __jsop_getprop(date_time_format, &p);
-    __jsop_setprop(&dtf, &p, &v);
+    if (!__is_undefined(&v))
+      __jsop_setprop(&dtf, &p, &v);
   }
-  // TODO: Handle "pattern".
+  // Handle "pattern".
   p = StrToVal("pattern");
+  v = __jsop_getprop(date_time_format, &p);
+  ResolveICUPattern(&dtf, &v);
 
   // NOTE: is this really needed?
   p = StrToVal("initializedNumberFormat");
@@ -898,7 +1016,7 @@ void InitializeDateTimeFormatProperties(__jsvalue *date_time_format, __jsvalue *
 
     // Check if 'p' is undefined (JSI9460).
     if (__is_undefined(&p)) {
-      continue;
+      p = DefaultLocale();
     }
     __jsop_setprop(&locale_data, &p, &locale);
 
@@ -922,18 +1040,6 @@ void InitializeDateTimeFormatProperties(__jsvalue *date_time_format, __jsvalue *
   format_object->object_class = JSOBJECT;
   format_object->extensible = true;
   format_object->object_type = JSREGULAR_OBJECT;
-
-  p = StrToVal("hour");
-  v = StrToVal("numeric");
-  __jsop_setprop(&format, &p, &v);
-
-  p = StrToVal("minute");
-  v = StrToVal("2-digit");
-  __jsop_setprop(&format, &p, &v);
-
-  p = StrToVal("second");
-  v = StrToVal("2-digit");
-  __jsop_setprop(&format, &p, &v);
 
   p = StrToVal("pattern");
   MAPLE_JS_ASSERT(__is_null(&locale) == false);
@@ -1065,9 +1171,11 @@ std::string GetDateTimeStringSkeleton(__jsvalue *locale, __jsvalue *options) {
   p = StrToVal("hour12");
   v = __jsop_getprop(options, &p);
   if (!__is_undefined(&v)) {
-    hour_pattern_char = "h";
-  } else {
-    hour_pattern_char = "H";
+    if (__jsval_to_boolean(&v) == true) {
+      hour_pattern_char = "h";
+    } else {
+      hour_pattern_char = "H";
+    }
   }
   p = StrToVal("hour");
   v = __jsop_getprop(options, &p);

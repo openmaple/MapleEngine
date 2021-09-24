@@ -34,8 +34,10 @@ __jsvalue __jsop_typeof(__jsvalue *v) {
     case JSTYPE_BOOLEAN:
       id = JSBUILTIN_STRING_BOOLEAN;
       break;
-    case JSTYPE_DOUBLE:
     case JSTYPE_NUMBER:
+      id = (v->x.u64 == 0) ? JSBUILTIN_STRING_UNDEFINED : JSBUILTIN_STRING_NUMBER;
+      break;
+    case JSTYPE_DOUBLE:
     case JSTYPE_NAN:
     case JSTYPE_INFINITY:
       id = JSBUILTIN_STRING_NUMBER;

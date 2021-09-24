@@ -309,7 +309,9 @@ __jsstring *__js_ToStringSlow(__jsvalue *v) {
 
 // ecma 9.9
 __jsobject *__js_ToObject(__jsvalue *v) {
-  __jsvalue res = *v;
+  if (__is_js_object(v))
+    return v->x.obj;
+  __jsvalue res;
   switch (__jsval_typeof(v)) {
     case JSTYPE_UNDEFINED:
     case JSTYPE_NULL:
@@ -329,7 +331,7 @@ __jsobject *__js_ToObject(__jsvalue *v) {
       res = __js_new_num_obj(NULL, v, 1);
       break;
     default:
-      MAPLE_JS_ASSERT(__is_js_object(v));
+      MAPLE_JS_ASSERT(false);
       break;
   }
   return __jsval_to_object(&res);

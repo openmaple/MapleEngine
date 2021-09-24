@@ -621,6 +621,13 @@ __jsvalue CanonicalizeLocaleList(__jsvalue *locales) {
   if (__is_null(locales)) { // handle the case when locales is null.
     MAPLE_JS_TYPEERROR_EXCEPTION();
   }
+
+  // Check if 'locales' is non-object (JSI9405).
+  if (!__is_js_object(locales)) {
+    __jsobject *arr = __js_new_arr_internal(0);
+    return __object_value(arr);
+  }
+
   // Step 4.
   // Let 'O' be ToObject(locales).
   __jsobject *o_obj = __jsval_to_object(locales);
@@ -760,7 +767,7 @@ __jsvalue LookupMatcher(__jsvalue *available_locales, __jsvalue *requested_local
     // abstract operation with arguments 'availableLocales' and 'noExtensionLocale'.
     available_locale = BestAvailableLocale(available_locales, &no_extension_locale);
     // Step 4d.
-    i--;
+    i++;
   }
   // Step 5.
   __jsobject *result_obj = __js_new_obj_obj_0();
@@ -998,7 +1005,7 @@ __jsvalue ResolveLocale(__jsvalue *available_locales, __jsvalue *requested_local
     // Set result.[[<key>]] to 'value'.
     __jsop_setprop(&result, &key, &value);
     // Step 11j.
-    __jsstr_concat(&supported_extension_addition, &supported_extension, 1);
+    __jsstr_concat(&supported_extension, &supported_extension_addition, 1);
     // Step 11h k.
     i++;
   } // end of while

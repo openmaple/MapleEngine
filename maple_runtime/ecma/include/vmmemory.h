@@ -151,31 +151,38 @@ class MemoryManager {
 #ifdef MM_DEBUG                 // this macro control the debug informaiton of memory manager
   uint32 app_mem_usage;  // heap memory used by current app
   uint32 max_app_mem_usage;  // the max (high water mark) heap memory used by current app.
-  uint32 mem_allocated;  // total allocation
-  uint32 mem_released;  // total release
-  uint32 mem_alloc_bytes_by_type[MemHeadLast];  // total allocated bytes
-  uint32 mem_alloc_count_by_type[MemHeadLast];  // total count of allocations
-  uint32 mem_release_bytes_by_type[MemHeadLast];
-  uint32 mem_release_count_by_type[MemHeadLast];
+  uint32 mem_allocated;  // total allocated bytes
+  uint32 mem_released;  // total released bytes
+  uint32 mem_alloc_count;
+  uint32 mem_release_count;
+  uint32 mem_alloc_bytes_by_tag[MemHeadLast];  // total allocated bytes
+  uint32 mem_alloc_count_by_tag[MemHeadLast];  // total count of allocations
+  uint32 mem_release_bytes_by_tag[MemHeadLast];
+  uint32 mem_release_count_by_tag[MemHeadLast];
+  uint32 num_Malloc_calls;
+  uint32 num_Realloc_calls;
 
-  void* mainSP;
-  void* mainFP;
-  void* mainGP;
-  void* mainTopGP;
 
-  uint32 max_rc0_by_type[MemHeadLast];
   void AppMemLeakCheck();
   void AppMemUsageSummary();   // output the memory usage summary of an app.
   void AppMemAccessSummary();  // output the mmap node visiting length summary of an app.
   void AppMemShapeSummary();   // output the mmap shape summary of an app.
+  void DumpAllocReleaseStats();
+  void DumpMMStats();
 
-  std::map<void*, int> live_objects;  // map live object to max RC
-  std::map<int, uint32> max_rc_histogram;
-  uint32 num_Malloc_calls;
-  uint32 num_Realloc_calls;
+  // RC-related
   uint64_t num_rcinc;
   uint64_t num_rcdec;
+  uint32 max_rc0_by_tag[MemHeadLast];
+  std::map<int, uint32> max_rc_histogram;
 
+  // For leak check
+  void* mainSP;
+  void* mainFP;
+  void* mainGP;
+  void* mainTopGP;
+  std::map<void*, int> live_objects;  // map live object to max RC
+  void DumpRCStats();
 #endif                         // MM_DEBUG
 
   // Internal VM memory management
@@ -299,7 +306,9 @@ class MemoryManager {
       if(header.refcount < UINT14_MAX)
         header.refcount++;
 #ifdef MM_DEBUG
+#ifdef MM_RC_STATS
       num_rcinc++;
+#endif
 #ifdef MEMORY_LEAK_CHECK
       if (header.refcount > live_objects[true_addr])
         live_objects[true_addr] = header.refcount;

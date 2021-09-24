@@ -416,7 +416,7 @@ __jsvalue __jsmath_pt_atan2(__jsvalue *this_math, __jsvalue *y, __jsvalue *x) {
       return __double_value(-MathPi/2.0);
   }
   double f = atan2(yv, xv);
-  return __double_value(f);
+  return (f == 0) ? __positive_zero_value() : __double_value(f);
 }
 
 // 15.8.2.10

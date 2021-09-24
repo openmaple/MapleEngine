@@ -1000,6 +1000,58 @@ __jsvalue __jsarr_helper_iter_method(__jsvalue *this_array, __jsvalue *callbackf
   // At this point RC(o)=0, which must be rectified as o is live until after the while loop.
   // Otherwise, jsfun_internal_call() will cause o to be prematurely released.
   GCIncRf(o);
+
+#if 1
+  __jsvalue k_value;
+  __jsprop *p;
+  if (o->prop_index_map == NULL && o->object_class == JSSTRING && o->shared.prim_string) {
+    // lazy initailize properties for string
+    __jsobj_initprop_fromString(o, o->shared.prim_string);
+  }
+  p = o->prop_list;
+  while (k < len) {
+    if (!p || !p->isIndex || p->n.index != k) {
+      if (!__jsobj_helper_HasPropertyAndGet(o, k, &k_value)) {
+        if (iter_type == JSARR_FIND) {
+          GCDecRf(o); // undo the RC++ right before the while loop.
+          // array doesn't have k property
+          return __object_value(a);
+        }
+        k++;
+        continue;
+      }
+    } else {
+      if (__is_undefined_desc(p->desc)) {
+        k++;
+        p = p->next;
+        continue;
+      }
+      k_value = __jsobj_internal_get_by_desc(o, p->desc);
+    }
+    __jsvalue arg_list[3] = { k_value, __number_value(k), vo };
+    __jsvalue result_val = __jsfun_internal_call(func, this_arg, arg_list, 3);
+    if (iter_type == JSARR_EVERY || iter_type == JSARR_SOME) {
+      if (__js_ToBoolean(&result_val) == res) {
+        GCDecRf(o); // undo the RC++ right before the while loop.
+        return __boolean_value(res);
+      }
+    } else if (iter_type == JSARR_FIND) {
+      if (__js_ToBoolean(&result_val) == true) {
+        GCDecRf(o); // undo the RC++ right before the while loop.
+        return k_value;
+      }
+    } else if (iter_type == JSARR_MAP) {
+      __set_generic_elem(a, k, &result_val);
+    } else if (iter_type == JSARR_FILTER) {
+      if (__js_ToBoolean(&result_val)) {
+        __set_generic_elem(a, to++, &k_value);
+      }
+    }
+    k++;
+    if (p)
+      p = p->next;
+  }
+#else
   while (k < len) {
     __jsvalue k_value;
     if (__jsobj_helper_HasPropertyAndGet(o, k, &k_value)) {
@@ -1029,6 +1081,7 @@ __jsvalue __jsarr_helper_iter_method(__jsvalue *this_array, __jsvalue *callbackf
     }
     k++;
   }
+#endif
   GCDecRf(o); // undo the RC++ right before the while loop.
   return ((a == nullptr) && (iter_type != JSARR_FIND)) ? __boolean_value(!res) :  __object_value(a);
 }
@@ -1445,7 +1498,11 @@ void __set_regular_elem(__jsvalue *arr, uint32_t index, __jsvalue *v) {
 #ifndef RC_NO_MMAP
   memory_manager->UpdateGCReference(&arr[index + 1].x.payload.ptr, JsvalToMval(*v));
 #else
-  GCCheckAndUpdateRf(arr[index + 1].x.asbits, IsNeedRc(arr[index +1].ptyp), v->x.asbits, IsNeedRc(v->ptyp));
+  //GCCheckAndUpdateRf(arr[index + 1].x.asbits, IsNeedRc(arr[index +1].ptyp), v->x.asbits, IsNeedRc(v->ptyp));
+  if (IsNeedRc(arr[index +1].ptyp))
+    GCDecRf((void*)arr[index + 1].x.asbits);
+  if (IsNeedRc(v->ptyp))
+    GCIncRf((void*)v->x.asbits);
 #endif
   arr[index + 1] = *v;
 }

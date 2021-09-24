@@ -292,7 +292,7 @@ void __jsobj_internal_Put(__jsobject *o, __jsstring *p, __jsvalue *v, bool throw
 void __jsobj_internal_Put(__jsobject *o, uint32_t index, __jsvalue *v, bool throw_p);
 // ecma 8.12.6
 // ecma 8.12.6
-bool __jsobj_internal_HasProperty(__jsobject *o, __jsstring *p);
+bool __jsobj_internal_HasProperty(__jsobject *o, __jsstring *p, __jsprop_desc *descp = NULL);
 // ecma 8.12.7
 bool __jsobj_internal_Delete(__jsobject *o, __jsvalue *p, bool mark_as_deleted = false, bool throw_p = false);
 bool __jsobj_internal_Delete(__jsobject *o, __jsstring *p, bool mark_as_deleted = false, bool throw_p = false);
@@ -360,4 +360,6 @@ __jsprop *__jsobj_helper_init_value_propertyByValue(__jsobject *, uint32_t, __js
 __jsvalue __jsobj_GetValueFromPropertyByValue(__jsobject *, uint32_t);
 bool __jsPropertyIsWritable(__jsobject *, uint32_t);
 void __jsconsole_pt_log (__jsvalue *, __jsvalue *);
+__jsvalue __jsobj_internal_get_by_desc(__jsobject *obj, __jsprop_desc desc, __jsvalue *orgVal = NULL);
+__jsprop_desc __jsobj_internal_GetOwnPropertyByValue(__jsobject *o, uint32_t index);
 #endif

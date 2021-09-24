@@ -111,5 +111,6 @@ std::string ToBCP47CalendarName(const char* name);
 std::string GetDateTimeStringSkeleton(__jsvalue *locale, __jsvalue *options);
 __jsvalue GetICUPattern(std::string&, std::string& pattern);
 const char* ToICULocale(std::string& locale);
+void ResolveICUPattern(__jsvalue *date_time_format, __jsvalue *pattern);
 
 #endif // JSINTL_H

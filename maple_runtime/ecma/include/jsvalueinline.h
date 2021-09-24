@@ -85,11 +85,11 @@ static inline bool __is_js_object_or_primitive(__jsvalue *data) {
 }
 
 static inline bool __is_positive_zero(__jsvalue *data) {
-  return (data->ptyp == JSTYPE_NUMBER && data->x.asbits == 0);
+  return (data->ptyp == JSTYPE_NUMBER && data->x.asbits == POS_ZERO);
 }
 
 static inline bool __is_negative_zero(__jsvalue *data) {
-  return (data->ptyp == JSTYPE_DOUBLE && data->x.asbits == 0);
+  return (data->ptyp == JSTYPE_DOUBLE && data->x.asbits == NEG_ZERO);
 }
 
 #if MACHINE64
@@ -128,8 +128,11 @@ static inline double __jsval_to_double(__jsvalue *data) {
 }
 static inline __jsvalue __double_value(double f64) {
   __jsvalue jsval;
-  jsval.ptyp = JSTYPE_DOUBLE;
   jsval.x.f64 = f64;
+  if (jsval.x.u64 == 0)
+    jsval.ptyp = JSTYPE_NUMBER;
+  else
+    jsval.ptyp = JSTYPE_DOUBLE;
   return jsval;
 }
 static inline __jsvalue __function_value (void *addr) {
